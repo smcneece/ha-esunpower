@@ -1,4 +1,4 @@
-"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - UPDATED"""
+"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - SIMPLE SOLAR LOGIC"""
 
 import asyncio
 import json
@@ -145,15 +145,14 @@ def calculate_sun_elevation_fallback():
         return 15.0  # Safe default - assume day mode
 
 
-def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, has_battery, current_hour=None):
-    """Determine if polling should be active based on sunrise/sunset elevation thresholds
+def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, has_battery):
+    """SIMPLE: Determine if polling should be active based on sun elevation - CLEANED UP
     
     Args:
         elevation: Current sun elevation in degrees
-        sunrise_threshold: Minimum elevation to start morning polling
-        sunset_threshold: Minimum elevation to continue evening polling
+        sunrise_threshold: Start polling threshold  
+        sunset_threshold: Stop polling threshold
         has_battery: Whether battery system is installed
-        current_hour: Current hour (0-23), used for fallback logic
         
     Returns:
         tuple: (should_poll, state_reason, active_threshold)
@@ -161,32 +160,19 @@ def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, 
     
     # Battery systems poll 24/7 regardless of sun elevation
     if has_battery:
-        return True, "battery_system", None
+        return True, "battery_system_active", None
     
-    # Get current hour for transition logic
-    if current_hour is None:
-        current_hour = dt_util.now().hour
+    # For solar-only systems, use the lower threshold for maximum coverage
+    # This gives the most generous polling window
+    active_threshold = min(sunrise_threshold, sunset_threshold)
     
-    # Morning hours (6 AM - 12 PM): Use sunrise threshold
-    if 6 <= current_hour < 12:
-        active_threshold = sunrise_threshold
-        threshold_type = "sunrise"
-    # Afternoon/evening hours (12 PM - 10 PM): Use sunset threshold  
-    elif 12 <= current_hour < 22:
-        active_threshold = sunset_threshold
-        threshold_type = "sunset"
-    # Very early morning or late night: Use lower of the two thresholds for maximum coverage
-    else:
-        active_threshold = min(sunrise_threshold, sunset_threshold)
-        threshold_type = "night_coverage"
-    
-    # Check if elevation meets the active threshold
+    # Simple day/night logic
     if elevation >= active_threshold:
         should_poll = True
-        state_reason = f"above_{threshold_type}_threshold"
+        state_reason = "daytime_polling_active"
     else:
         should_poll = False
-        state_reason = f"below_{threshold_type}_threshold"
+        state_reason = "nighttime_polling_disabled"
     
     return should_poll, state_reason, active_threshold
 
@@ -305,7 +291,7 @@ def create_diagnostic_device_data(cache, inverter_data):
         "DESCR": "Enhanced SunPower Integration Diagnostics",
         "DEVICE_TYPE": DIAGNOSTIC_DEVICE_TYPE,
         "STATE": "working",
-        "SWVER": "2025.7.31",
+        "SWVER": "2025.8.7",
         "HWVER": "Virtual",
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
@@ -495,7 +481,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.info("Creating coordinator with %ds interval (minimum 300s for PVS protection)", polling_interval)
 
     async def async_update_data():
-        """Enhanced data fetching with sunrise/sunset elevation logic"""
+        """Enhanced data fetching with SIMPLE sunrise/sunset elevation logic"""
         
         notify_diagnostic_coordinator_started(hass, entry, cache)
         
@@ -534,7 +520,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             else:
                 _LOGGER.info("No cache file found, proceeding with fresh poll")
         
-        # Enhanced sun state check with sunrise/sunset elevation
+        # SIMPLE sun state check with sunrise/sunset elevation
         try:
             sun_entity = hass.states.get("sun.sun")
             if sun_entity and sun_entity.attributes:
@@ -572,7 +558,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         has_battery, user_has_battery = get_battery_configuration_simple(entry)
         reset_battery_failure_tracking_simple(cache)
 
-        # Determine polling state using sunrise/sunset logic
+        # SIMPLE: Determine polling state using cleaned up logic
         should_poll, state_reason, active_threshold = determine_sun_polling_state(
             elevation, sunrise_elevation, sunset_elevation, has_battery
         )
@@ -608,7 +594,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.warning("Night mode: No cached data available")
             raise UpdateFailed(f"Night mode ({state_reason}): No cached data available")
         
-        elif should_poll and state_reason != "battery_system":
+        elif should_poll and state_reason != "battery_system_active":
             # Day mode activated - reset health check state
             _LOGGER.info("Day mode activated (%s) - resetting health check state for fresh start", state_reason)
             cache.pvs_health_failures = 0
@@ -768,4 +754,3 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
-            
