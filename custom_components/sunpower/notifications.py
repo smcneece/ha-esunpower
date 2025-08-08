@@ -1,4 +1,4 @@
-"""SunPower Integration Multi-Channel Notification System - SUNRISE/SUNSET ELEVATION UPDATE"""
+"""SunPower Integration Multi-Channel Notification System - SIMPLE DAY/NIGHT"""
 
 import hashlib
 import logging
@@ -83,7 +83,7 @@ async def send_mobile_notification(hass, message, title, mobile_service=None):
 def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None, 
                force_notify=False, is_general=False, is_debug=False, 
                notification_category="general", cache=None, add_timestamp=True):
-    """Enhanced notification system with mobile support - TIME CONVERSION FIX"""
+    """Enhanced notification system with mobile support"""
     try:
         # Get notification settings from config
         if config_entry:
@@ -256,7 +256,7 @@ def notify_polling_failed(hass, entry, cache, polling_url, error):
                notification_category="health", cache=cache)
 
 def notify_setup_warning(hass, entry, cache, polling_url, polling_interval):
-    """ESSENTIAL: Setup warning notifications - TIME CONVERSION FIX"""
+    """ESSENTIAL: Setup warning notifications"""
     next_retry_minutes = polling_interval // 60
     retry_text = "1 minute" if next_retry_minutes == 1 else f"{next_retry_minutes} minutes"
     
@@ -275,11 +275,10 @@ def notify_setup_warning(hass, entry, cache, polling_url, polling_interval):
 # GENERAL NOTIFICATIONS - POLLING CHANNEL (is_general=True, category="polling")
 
 def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
-    """GENERAL: Successful data update - CLEANED UP MESSAGE"""
+    """GENERAL: Successful data update"""
     
     if last_poll_timestamp > 0:
         last_poll_time_str = datetime.fromtimestamp(last_poll_timestamp).strftime("%H:%M:%S")
-        # FIXED: Cleaner message without redundant "0s ago"
         msg = f"✅ Fresh data from PVS (poll completed @ {last_poll_time_str})"
         safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True, 
                    notification_category="polling", cache=cache, add_timestamp=False)
@@ -289,7 +288,7 @@ def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
                    notification_category="polling", cache=cache)
 
 def notify_using_cached_data(hass, entry, cache, reason, time_info=None):
-    """GENERAL: Cached data usage - POLLING CHANNEL - TIME CONVERSION FIX"""
+    """GENERAL: Cached data usage - POLLING CHANNEL"""
     if time_info:
         if isinstance(time_info, (int, float)):
             # Convert seconds to human-readable time
@@ -309,7 +308,7 @@ def notify_using_cached_data(hass, entry, cache, reason, time_info=None):
                notification_category="polling", cache=cache)
 
 
-# DEBUG NOTIFICATIONS - UPDATED FOR SUNRISE/SUNSET
+# DEBUG NOTIFICATIONS - SIMPLE DAY/NIGHT LOGIC
 
 def notify_pvs_health_check_attempt(hass, entry, cache, host, max_retries):
     """DEBUG: Health check attempt notification"""
@@ -324,37 +323,27 @@ def notify_setup_success(hass, entry, cache):
                notification_category="debug", cache=cache)
 
 def notify_day_mode_elevation(hass, entry, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
-    """DEBUG: Day mode activation with sunrise/sunset elevation info"""
-    if state_reason == "above_sunrise_threshold":
-        msg = f"🌅 Day mode: Sun elevation {elevation:.1f}° ≥ {sunrise_elevation}° (sunrise threshold) - polling started"
-    elif state_reason == "above_sunset_threshold":
-        msg = f"🌇 Evening mode: Sun elevation {elevation:.1f}° ≥ {sunset_elevation}° (sunset threshold) - polling continues"
-    elif state_reason == "above_night_coverage":
-        msg = f"☀️ Day mode: Sun elevation {elevation:.1f}° ≥ {active_threshold}° (night coverage) - polling active"
+    """DEBUG: SIMPLE day mode activation"""
+    if state_reason == "daytime_polling_active":
+        msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}° ≥ {active_threshold:.1f}° threshold"
     else:
-        msg = f"☀️ Day mode: Sun elevation {elevation:.1f}° - polling active"
+        msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}°"
     
     safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True, 
                notification_category="daynight", cache=cache)
 
 def notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
-    """DEBUG: Night mode activation with sunrise/sunset elevation info"""
+    """DEBUG: SIMPLE night mode activation"""
     if has_battery:
-        if state_reason == "below_sunrise_threshold":
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° < {sunrise_elevation}° (sunrise threshold) - battery system continues polling"
-        elif state_reason == "below_sunset_threshold":
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° < {sunset_elevation}° (sunset threshold) - battery system continues polling"
+        if state_reason == "nighttime_polling_disabled":
+            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° < {active_threshold:.1f}° threshold - battery system continues polling"
         else:
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° - battery system continues polling"
+            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° - battery system continues polling"
     else:
-        if state_reason == "below_sunrise_threshold":
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° < {sunrise_elevation}° (sunrise threshold) - solar polling disabled"
-        elif state_reason == "below_sunset_threshold":
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° < {sunset_elevation}° (sunset threshold) - solar polling disabled"
-        elif state_reason == "below_night_coverage":
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° < {active_threshold}° (night coverage) - solar polling disabled"
+        if state_reason == "nighttime_polling_disabled":
+            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° < {active_threshold:.1f}° threshold - solar polling disabled"
         else:
-            msg = f"🌙 Night mode: Sun elevation {elevation:.1f}° - solar polling disabled"
+            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° - solar polling disabled"
     
     safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True, 
                notification_category="daynight", cache=cache)
