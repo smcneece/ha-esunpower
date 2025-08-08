@@ -1,0 +1,97 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Already Configured"
+        },
+        "error": {
+            "cannot_connect": "Cannot Connect",
+            "connection_failed": "PVS Connection Failed",
+            "unknown": "Unknown Error",
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+        },
+        "step": {
+            "user": {
+                "title": "Enhanced SunPower - Basic Setup",
+                "description": "Configure essential Enhanced SunPower settings.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware from excessive requests.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.",
+                "data": {
+                    "host": "PVS IP Address",
+                    "polling_interval_seconds": "Polling interval (seconds)",
+                    "has_battery_system": "I have a SunVault battery system"
+                },
+                "data_description": {
+                    "host": "Hostname or IP of PVS (typically 172.27.153.1)",
+                    "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
+                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)"
+                }
+            },
+            "advanced": {
+                "title": "Enhanced SunPower - Advanced Settings",
+                "description": "Configure advanced Enhanced SunPower features.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n\n🔔 Notification Options:\n• General notifications provide 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Select your phone/tablet for critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
+                "data": {
+                    "minimum_sun_elevation": "Minimum sun elevation (degrees)",
+                    "general_notifications": "Show status notifications",
+                    "deep_debug_notifications": "Show debug diagnostics",
+                    "overwrite_general_notifications": "Replace status notifications",
+                    "mobile_notifications": "Enable mobile notifications",
+                    "mobile_device": "Mobile device for alerts",
+                    "route_check_enabled": "Enable automatic route checking",
+                    "route_gateway_ip": "Gateway IP for route repair"
+                },
+                "data_description": {
+                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
+                    "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
+                    "mobile_device": "Select which mobile device receives critical notifications",
+                    "route_check_enabled": "Detect and repair missing network routes when TCP health check fails (for VLAN/custom routing setups)",
+                    "route_gateway_ip": "Gateway IP address for route repair (typically your router IP like 192.168.1.1 or switch IP)"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Enhanced SunPower - Basic Settings",
+                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.",
+                "data": {
+                    "host": "PVS IP Address",
+                    "polling_interval_seconds": "Polling interval (seconds)",
+                    "has_battery_system": "I have a SunVault battery system"
+                },
+                "data_description": {
+                    "host": "Hostname or IP of PVS (typically 172.27.153.1)",
+                    "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
+                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)"
+                }
+            },
+            "advanced": {
+                "title": "Enhanced SunPower - Advanced Settings",
+                "description": "Configure advanced Enhanced SunPower features and notifications.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Choose which device receives critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes when connection fails",
+                "data": {
+                    "minimum_sun_elevation": "Minimum sun elevation (degrees)",
+                    "general_notifications": "Show status notifications",
+                    "deep_debug_notifications": "Show debug diagnostics",
+                    "overwrite_general_notifications": "Replace status notifications",
+                    "mobile_notifications": "Enable mobile notifications",
+                    "mobile_device": "Mobile device for alerts",
+                    "route_check_enabled": "Enable automatic route checking"
+                },
+                "data_description": {
+                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
+                    "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) directly to your mobile device",
+                    "mobile_device": "Select which mobile device receives critical notifications (requires Home Assistant mobile app)",
+                    "route_check_enabled": "Automatically check and repair missing network routes when PVS becomes unreachable (for VLAN/custom routing setups)"
+                }
+            }
+        },
+        "error": {
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+        }
+    },
+    "title": "Enhanced SunPower"
+}
