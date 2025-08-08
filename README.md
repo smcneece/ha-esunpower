@@ -69,7 +69,6 @@
 - **Integration validates real PVS connection** during setup process with bulletproof validation
 - **Night mode intelligently suspends polling for solar only (no batteries)** to protect PVS hardware
 
-
 ### 🚀 **Via HACS (Strongly Recommended)**
 HACS provides the cleanest installation and handles all file management automatically:
 
@@ -83,11 +82,11 @@ HACS provides the cleanest installation and handles all file management automati
 7. **Restart Home Assistant** - Files are now available
 
 **Step 2: Add Integration**
-8. **Go to Settings** → "Devices & Services"
-9. **Click "Add Integration"** 
-10. **Search for "Enhanced SunPower"** 
-11. **Select and configure** - Follow setup prompts
-12. **Integration ready!** - All entities will be created
+1. **Go to Settings** → "Devices & Services"
+2. **Click "Add Integration"**
+3. **Search for "Enhanced SunPower"**
+4. **Select and configure** - Follow setup prompts
+5. **Integration ready!** - All entities will be created
 
 ### ⚠️ **Upgrading from Original SunPower Integration**
 
