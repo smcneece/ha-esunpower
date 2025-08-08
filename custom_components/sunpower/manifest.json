@@ -1,0 +1,17 @@
+{
+  "domain": "sunpower",
+  "name": "Enhanced SunPower",
+  "codeowners": ["@smcneece"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/smcneece/ha-esunpower",
+  "homekit": {},
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/smcneece/ha-esunpower/issues",
+  "requirements": ["requests"],
+  "ssdp": [],
+  "version": "2025.8.7",
+  "zeroconf": [],
+  "integration_type": "device",
+  "after_dependencies": ["sun"]
+}
