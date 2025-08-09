@@ -1,9 +1,4 @@
 {
   "name": "Enhanced SunPower",
-  "domains": ["binary_sensor", "sensor"],
-  "homeassistant": "2024.1.0",
-  "iot_class": ["Local Poll"],
-  "render_readme": true,
-  "content_in_root": false,
-  "filename": "sunpower"
+  "render_readme": true
 }
