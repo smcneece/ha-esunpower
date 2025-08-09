@@ -7,7 +7,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.9
+Version: v2025.8.9.1
 
 ![Integration Overview](images/overview.png)
 
@@ -202,6 +202,46 @@ The community has developed several proven approaches for PVS network isolation:
 **For detailed network setup guidance**, see existing community resources and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
 
 **⚠️ Support Scope**: Network configuration is outside the scope of this integration. We provide general guidance but recommend consulting community network guides for detailed setup assistance.
+
+### ⚡ **Hardware Power Requirements & Known Issues**
+
+**🚨 CRITICAL: PVS USB Power Limitation Warning**
+
+Many users power their Raspberry Pi directly from the PVS USB ports. However, the PVS has **limited USB power capacity** that can cause **random connection drops** when exceeded:
+
+**The Problem:**
+- **PVS USB ports** have limited power output (exact specs unknown)
+- **Dual USB-Ethernet setup** (WAN + LAN adapters) can exceed this capacity
+- **Raspberry Pi Zero 2 W** alone can draw up to **1.5A**
+- **USB-Ethernet adapters** add ~500-800mA each
+- **Combined load** can exceed PVS USB power capacity
+
+**Real-World Example:**
+*Developer experienced random PVS connectivity issues using **two SunPower-approved USB-Ethernet adapters** (one for WAN, one for LAN) powered from PVS USB ports. Problem completely resolved by switching PVS back to WiFi for WAN connection, leaving only one USB-Ethernet adapter for LAN polling.*
+
+**Symptoms of PVS USB Power Overload:**
+- **Random "PVS OFFLINE" alerts** despite network functioning normally
+- **Integration works fine for hours, then suddenly fails**
+- **PVS becomes completely unresponsive** requiring power cycle
+- **Both WAN and LAN connections drop randomly**
+
+**Practical Solutions:**
+
+**Recommended: Reduce USB Load**
+- **Use WiFi for PVS WAN** connection (phoning home to SunPower)
+- **Single USB-Ethernet adapter** for LAN polling only
+- **Significantly reduces** PVS USB power draw
+- **Fits within limited PVS enclosure space**
+
+**Alternative: External Pi Power**
+- **External power supply** for Raspberry Pi (don't use PVS USB for Pi power)
+- **Note**: Space constraints in PVS enclosure make this challenging
+
+**⚠️ Important Notes:**
+- **No PVS logs available** - you won't see USB disconnect messages
+- **SunPower-approved hardware** can still exceed power limits in dual configuration
+- **Random failures** are the primary symptom, not permanent connection loss
+- **PVS newer models** often lack RJ45 jacks, requiring USB-Ethernet solutions
 
 ## 📊 Available Data
 
@@ -438,6 +478,14 @@ PVS systems use endpoints designed for provisioning, not continuous monitoring. 
 3. **Monitor Route Alerts**: Watch for route missing vs PVS unreachable notifications
 4. **Manual Route Check**: `ip route show 172.27.153.0/24` to verify route exists
 5. **Test Route Repair**: Integration will automatically add missing routes
+
+#### ⚡ **Hardware/Power Issues (USB Setups)**
+1. **Check Power Draw**: Measure combined USB device power consumption
+2. **Single Adapter**: Use only one USB-Ethernet adapter per power source
+3. **Dedicated Power**: Power USB adapters separately from Pi/computer
+4. **Powered Hub**: Use quality powered USB hub rated for network adapters
+5. **Cable Length**: Use shorter, thicker USB cables to minimize voltage drop
+6. **Monitor Logs**: Check for USB disconnect messages in system logs
 
 #### All Entities Show "Unavailable"
 1. **Check Integration Status**: Look for "Fresh data from PVS" notifications
