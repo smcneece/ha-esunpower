@@ -1,3 +1,7 @@
 {
-  "name": "Enhanced SunPower"
+  "name": "Enhanced SunPower",
+  "domain": "sunpower",
+  "homeassistant": "2024.6.0",
+  "render_readme": true,
+  "country": ["ALL"]
 }
