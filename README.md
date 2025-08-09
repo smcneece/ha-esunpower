@@ -78,15 +78,15 @@ Version: v2025.8.9.1
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=smcneece&repository=ha-esunpower&category=integration)
 
-### 2. This will open a page asking you to open a page in Home Assistant, click the Open Link Button.
+2. This will open a page asking you to open a page in Home Assistant, click the Open Link Button.
 
-### 3. A window should open asking to Add custom respository, click ADD on that window.
+3. A window should open asking to Add custom respository, click ADD on that window.
 
-### 4. After a moment it should show you the integration page, with a Download button in the bottom right of screen, click that button to download, and click Download again when the new window opens asking about version.
+4. After a moment it should show you the integration page, with a Download button in the bottom right of screen, click that button to download, and click Download again when the new window opens asking about version.
 
-### 5. Click the main "Settings" link in Home Assistant, there should be a repair listed at the top saying Restart Required,  click that and click Submit and then the Finish button.
+5. Click the main "Settings" link in Home Assistant, there should be a repair listed at the top saying Restart Required,  click that and click Submit and then the Finish button.
 
-### 6. Now to add the integrtation click link below, or on your main integration page in Home Assistant click Add Integration and look for the Enhanced Sunpower integration, and add it.
+6. Now to add the integrtation click link below, or on your main integration page in Home Assistant click Add Integration and look for the Enhanced Sunpower integration, and add it.
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
