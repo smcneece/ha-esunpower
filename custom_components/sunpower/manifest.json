@@ -11,6 +11,7 @@
   "issue_tracker": "https://github.com/smcneece/ha-esunpower/issues",
   "requirements": ["requests"],
   "ssdp": [],
-  "version": "2025.8.7",
+  "version": "2025.8.8",
   "zeroconf": []
 }
+
