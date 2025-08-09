@@ -1,0 +1,68 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Enhanced SunPower Setup",
+        "description": "Configure your SunPower PVS connection",
+        "data": {
+          "host": "PVS IP Address",
+          "polling_interval_seconds": "Polling Interval (seconds)",
+          "has_battery_system": "Battery System Present",
+          "sunrise_elevation": "Sunrise Elevation Threshold (degrees)",
+          "sunset_elevation": "Sunset Elevation Threshold (degrees)"
+        }
+      },
+      "advanced": {
+        "title": "Advanced Options",
+        "description": "Configure notifications and network settings",
+        "data": {
+          "general_notifications": "General Notifications",
+          "deep_debug_notifications": "Debug Notifications",
+          "overwrite_general_notifications": "Overwrite General Notifications",
+          "mobile_notifications": "Mobile Notifications",
+          "mobile_device": "Mobile Device",
+          "route_check_enabled": "Route Check Enabled",
+          "route_gateway_ip": "Gateway IP Address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to PVS",
+      "invalid_host": "Invalid host address",
+      "timeout": "Connection timeout",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "cannot_connect": "Cannot connect to device"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Reconfigure Enhanced SunPower",
+        "description": "Update your SunPower PVS settings",
+        "data": {
+          "host": "PVS IP Address",
+          "polling_interval_seconds": "Polling Interval (seconds)",
+          "has_battery_system": "Battery System Present",
+          "sunrise_elevation": "Sunrise Elevation Threshold (degrees)",
+          "sunset_elevation": "Sunset Elevation Threshold (degrees)"
+        }
+      },
+      "advanced": {
+        "title": "Advanced Options",
+        "description": "Configure notifications and network settings",
+        "data": {
+          "general_notifications": "General Notifications",
+          "deep_debug_notifications": "Debug Notifications",
+          "overwrite_general_notifications": "Overwrite General Notifications",
+          "mobile_notifications": "Mobile Notifications",
+          "mobile_device": "Mobile Device",
+          "route_check_enabled": "Route Check Enabled",
+          "route_gateway_ip": "Gateway IP Address"
+        }
+      }
+    }
+  }
+}
