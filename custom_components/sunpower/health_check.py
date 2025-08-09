@@ -81,7 +81,7 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
     # Import notification functions locally to avoid circular imports
     from .notifications import notify_pvs_health_check_attempt, notify_route_missing, notify_route_repaired
     
-    current_time = time.monotonic()  # DST-safe timing
+    current_time = time.time()  # Use regular time
     
     # Check if we're in backoff period
     if current_time < cache.health_backoff_until:
@@ -166,7 +166,7 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
     cache.pvs_health_failures += 1
     cache.last_health_check = current_time
     
-    # Set backoff period using monotonic time (DST-safe)
+    # Set backoff period using regular time
     cache.health_backoff_until = current_time + (backoff_minutes * 60)
     
     _LOGGER.warning("PVS health check failed after %d attempts, backing off for %d minutes", 
