@@ -1,4 +1,4 @@
-"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - SIMPLE SOLAR LOGIC"""
+"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - FIXED NOTIFICATION TEXT"""
 
 import asyncio
 import json
@@ -60,6 +60,7 @@ from .notifications import (
     notify_polling_failed,
     notify_setup_warning,
     notify_using_cached_data,
+    convert_state_reason_to_text,  # ADDED: Import the conversion function
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -291,7 +292,7 @@ def create_diagnostic_device_data(cache, inverter_data):
         "DESCR": "Enhanced SunPower Integration Diagnostics",
         "DEVICE_TYPE": DIAGNOSTIC_DEVICE_TYPE,
         "STATE": "working",
-        "SWVER": "2025.8.7",
+        "SWVER": "2025.8.9",  # UPDATED VERSION
         "HWVER": "Virtual",
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
@@ -508,8 +509,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                 
-                # Use cached data notification with time conversion
-                notify_using_cached_data(hass, entry, cache, "polling interval not elapsed", cache_age)
+                # FIXED: Use converted text for notification
+                notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age)
                 return data
             else:
                 _LOGGER.warning("Cached data invalid, proceeding with fresh poll despite timing")
@@ -565,7 +566,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Handle night mode (when polling disabled)
         if not should_poll:
-            _LOGGER.info("Night mode: %s - using cached data", state_reason)
+            _LOGGER.info("Night mode: %s - using cached data", convert_state_reason_to_text(state_reason))
             notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, 
                                       sunrise_elevation, sunset_elevation, active_threshold, state_reason)
             
@@ -587,16 +588,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
                     _LOGGER.info("Night mode: Using cached data with %d devices", device_count)
-                    notify_using_cached_data(hass, entry, cache, f"{state_reason} - solar polling disabled", cache_age)
+                    # FIXED: Pass the converted state reason to notification
+                    notify_using_cached_data(hass, entry, cache, state_reason, cache_age)
                     return data
             
             # No cache file - fail gracefully
             _LOGGER.warning("Night mode: No cached data available")
-            raise UpdateFailed(f"Night mode ({state_reason}): No cached data available")
+            raise UpdateFailed(f"Night mode ({convert_state_reason_to_text(state_reason)}): No cached data available")
         
         elif should_poll and state_reason != "battery_system_active":
             # Day mode activated - reset health check state
-            _LOGGER.info("Day mode activated (%s) - resetting health check state for fresh start", state_reason)
+            _LOGGER.info("Day mode activated (%s) - resetting health check state for fresh start", convert_state_reason_to_text(state_reason))
             cache.pvs_health_failures = 0
             cache.health_backoff_until = 0
             cache.last_health_check = 0
@@ -668,7 +670,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                         
                         _LOGGER.info("Using cached data with %d devices", device_count)
-                        notify_using_cached_data(hass, entry, cache, "PVS health check failed", cache_age)
+                        # FIXED: Pass the converted state reason to notification
+                        notify_using_cached_data(hass, entry, cache, "PVS_health_check_failed", cache_age)
                         return data
                 
                 # No cache available - fail gracefully
@@ -697,7 +700,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
                     _LOGGER.info("Error fallback: Using cached data with %d devices", device_count)
-                    notify_using_cached_data(hass, entry, cache, "polling error - using cache", cache_age)
+                    # FIXED: Pass the converted state reason to notification
+                    notify_using_cached_data(hass, entry, cache, "polling_error", cache_age)
                     return data
             
             # No fallback available
