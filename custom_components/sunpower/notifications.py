@@ -1,4 +1,4 @@
-"""SunPower Integration Multi-Channel Notification System - SIMPLE DAY/NIGHT"""
+"""SunPower Integration Multi-Channel Notification System - FIXED NOTIFICATION TEXT"""
 
 import hashlib
 import logging
@@ -27,6 +27,24 @@ def format_time_duration(seconds):
                 return f"{hours}h {remaining_minutes}m"
     except (ValueError, TypeError):
         return f"{seconds}s"  # Fallback to original format
+
+
+def convert_state_reason_to_text(state_reason):
+    """Convert state_reason codes to human-readable text"""
+    reason_map = {
+        "nighttime_polling_disabled": "nighttime mode",
+        "daytime_polling_active": "daytime mode", 
+        "battery_system_active": "battery system active",
+        "above_sunrise_threshold": "above sunrise threshold",
+        "above_sunset_threshold": "above sunset threshold", 
+        "below_sunrise_threshold": "below sunrise threshold",
+        "below_sunset_threshold": "below sunset threshold",
+        "polling_interval_not_elapsed": "polling interval not elapsed",
+        "PVS_health_check_failed": "PVS health check failed",
+        "polling_error": "polling error"
+    }
+    
+    return reason_map.get(state_reason, state_reason)
 
 
 async def get_mobile_devices(hass):
@@ -288,22 +306,25 @@ def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
                    notification_category="polling", cache=cache)
 
 def notify_using_cached_data(hass, entry, cache, reason, time_info=None):
-    """GENERAL: Cached data usage - POLLING CHANNEL"""
+    """GENERAL: Cached data usage - FIXED TEXT CONVERSION"""
+    # Convert state_reason codes to readable text
+    readable_reason = convert_state_reason_to_text(reason)
+    
     if time_info:
         if isinstance(time_info, (int, float)):
             # Convert seconds to human-readable time
             time_str = format_time_duration(time_info)
-            msg = f"📦 Using cached data: {reason} (last poll {time_str} ago)"
+            msg = f"📦 Using cached data: {readable_reason} (last poll {time_str} ago)"
         else:
             # Handle remaining seconds case
             try:
                 remaining_seconds = int(time_info)
                 remaining_str = format_time_duration(remaining_seconds)
-                msg = f"📦 Using cached data: {reason} ({remaining_str} remaining)"
+                msg = f"📦 Using cached data: {readable_reason} ({remaining_str} remaining)"
             except (ValueError, TypeError):
-                msg = f"📦 Using cached data: {reason} ({time_info} remaining)"
+                msg = f"📦 Using cached data: {readable_reason} ({time_info} remaining)"
     else:
-        msg = f"📦 Using cached data: {reason}"
+        msg = f"📦 Using cached data: {readable_reason}"
     safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True, 
                notification_category="polling", cache=cache)
 
