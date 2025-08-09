@@ -1,4 +1,4 @@
-"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - FIXED NOTIFICATION TEXT"""
+"""The Enhanced SunPower integration with Sunrise/Sunset Elevation - COORDINATOR LOCKUP FIXED"""
 
 import asyncio
 import json
@@ -60,16 +60,16 @@ from .notifications import (
     notify_polling_failed,
     notify_setup_warning,
     notify_using_cached_data,
-    convert_state_reason_to_text,  # ADDED: Import the conversion function
+    notify_firmware_upgrade,
+    convert_state_reason_to_text,
+    format_time_duration,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
+
 def check_firmware_upgrade(hass, entry, cache, pvs_data):
     """Check for PVS firmware upgrades and notify"""
-    # Import notification function locally to avoid circular imports
-    from .notifications import notify_firmware_upgrade
-    
     if not pvs_data:
         return
     
@@ -99,22 +99,11 @@ def check_firmware_upgrade(hass, entry, cache, pvs_data):
         cache.last_known_firmware = current_firmware
 
 
-# Simplified battery configuration
-def get_battery_configuration_simple(entry):
-    """Simple battery configuration - no complex cache logic"""
+def get_battery_configuration(entry):
+    """Single battery configuration function"""
     user_has_battery = entry.options.get("has_battery_system") or entry.data.get("has_battery_system", False)
-    return user_has_battery, user_has_battery
+    return user_has_battery
 
-def reset_battery_failure_tracking_simple(cache):
-    """Simple battery tracking reset"""
-    cache.battery_detection_failures = 0
-    cache.battery_warning_sent = False
-
-def handle_battery_detection_simple(hass, entry, data, cache, safe_notify, user_has_battery):
-    """Simplified battery detection - no complex warnings"""
-    if not user_has_battery:
-        return
-    _LOGGER.debug("Battery system enabled, detection logic simplified")
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 
@@ -147,7 +136,7 @@ def calculate_sun_elevation_fallback():
 
 
 def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, has_battery):
-    """SIMPLE: Determine if polling should be active based on sun elevation - CLEANED UP
+    """Determine if polling should be active based on sun elevation
     
     Args:
         elevation: Current sun elevation in degrees
@@ -164,7 +153,6 @@ def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, 
         return True, "battery_system_active", None
     
     # For solar-only systems, use the lower threshold for maximum coverage
-    # This gives the most generous polling window
     active_threshold = min(sunrise_threshold, sunset_threshold)
     
     # Simple day/night logic
@@ -176,6 +164,13 @@ def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, 
         state_reason = "nighttime_polling_disabled"
     
     return should_poll, state_reason, active_threshold
+
+
+def get_cache_filename(entry_id):
+    """Get consistent cache filename to avoid multiple files"""
+    # Use only first 8 characters to keep filename short and consistent
+    short_id = entry_id[:8] if len(entry_id) > 8 else entry_id
+    return f"sunpower_cache_{short_id}.json"
 
 
 class SunPowerDataCache:
@@ -191,14 +186,10 @@ class SunPowerDataCache:
         self.startup_time = time.time()
         self.startup_notifications_sent = set()
         
-        # PVS health check tracking (DST-safe)
+        # PVS health check tracking
         self.pvs_health_failures = 0
         self.last_health_check = 0
         self.health_backoff_until = 0
-        
-        # Battery detection failure tracking
-        self.battery_detection_failures = 0
-        self.battery_warning_sent = False
         
         # Inverter health monitoring
         self.inverter_health_initialized = False
@@ -209,7 +200,7 @@ class SunPowerDataCache:
         self.last_known_firmware = None
         self.firmware_tracking_initialized = False
         
-        # NEW: Diagnostic tracking
+        # Diagnostic tracking
         self.diagnostic_stats = {
             'total_polls': 0,
             'successful_polls': 0,
@@ -244,7 +235,7 @@ def update_diagnostic_stats(cache, success, response_time=None):
 
 
 def create_diagnostic_device_data(cache, inverter_data):
-    """Create diagnostic device data for sensors - FIXED DATA FORMATS"""
+    """Create diagnostic device data for sensors"""
     stats = cache.diagnostic_stats
     
     # Calculate success rate
@@ -262,27 +253,20 @@ def create_diagnostic_device_data(cache, inverter_data):
     # Calculate uptime percentage
     total_runtime = time.time() - stats['integration_start_time']
     if total_runtime > 0 and stats['last_successful_poll']:
-        # Consider "up" time as time when we were successfully polling
-        uptime_seconds = total_runtime - (stats['failed_polls'] * 300)  # Assume 300s poll interval
+        uptime_seconds = total_runtime - (stats['failed_polls'] * 300)
         uptime_percent = max(0, min(100, (uptime_seconds / total_runtime) * 100))
     else:
         uptime_percent = 0
     
-    # Count active inverters vs total expected
-    total_expected = len(cache.expected_inverters) if hasattr(cache, 'expected_inverters') else 0
+    # Count active inverters
     active_inverters = len(inverter_data) if inverter_data else 0
     
-    # FIXED: Last successful poll as simple string (not timestamp object) - TIME CONVERSION FIX
+    # Last successful poll formatting
     if stats['last_successful_poll']:
         time_ago = int(time.time() - stats['last_successful_poll'])
-        # Use the time conversion function
-        from .notifications import format_time_duration
         last_poll_str = format_time_duration(time_ago) + " ago"
     else:
         last_poll_str = "Never"
-    
-    # FIXED: Active inverters as simple number, not ratio string
-    active_inverters_value = active_inverters
     
     # Create diagnostic device
     diagnostic_serial = "sunpower_diagnostics"
@@ -292,14 +276,14 @@ def create_diagnostic_device_data(cache, inverter_data):
         "DESCR": "Enhanced SunPower Integration Diagnostics",
         "DEVICE_TYPE": DIAGNOSTIC_DEVICE_TYPE,
         "STATE": "working",
-        "SWVER": "2025.8.9",  # UPDATED VERSION
+        "SWVER": "2025.8.9.1",
         "HWVER": "Virtual",
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
         "consecutive_failures": stats['consecutive_failures'],
-        "last_successful_poll": last_poll_str,  # FIXED: Simple string with time conversion
+        "last_successful_poll": last_poll_str,
         "average_response_time": round(avg_response, 2),
-        "active_inverters": active_inverters_value,  # FIXED: Simple number
+        "active_inverters": active_inverters,
         "pvs_uptime_percent": round(uptime_percent, 1),
     }
     
@@ -307,18 +291,18 @@ def create_diagnostic_device_data(cache, inverter_data):
 
 
 async def save_cache_file(hass: HomeAssistant, entry_id: str, pvs_data: dict):
-    """Save PVS data to simple cache file - ASYNC COMPLIANT"""
+    """Save PVS data to cache file with consistent naming"""
     try:
         # Use HA storage directory for cache file
         storage_path = hass.config.path(".storage")
-        cache_file = os.path.join(storage_path, f"sunpower_cache_{entry_id}.json")
+        cache_filename = get_cache_filename(entry_id)
+        cache_file = os.path.join(storage_path, cache_filename)
         
         # Validate data before saving
         if not pvs_data or not isinstance(pvs_data, dict) or "devices" not in pvs_data:
             _LOGGER.warning("Invalid PVS data, not saving to cache")
             return False
         
-        # FIXED: Use async file operations to avoid blocking the event loop
         def write_cache_file():
             with open(cache_file, 'w') as f:
                 json.dump(pvs_data, f, indent=2)
@@ -327,7 +311,7 @@ async def save_cache_file(hass: HomeAssistant, entry_id: str, pvs_data: dict):
         await hass.async_add_executor_job(write_cache_file)
         
         device_count = len(pvs_data.get("devices", []))
-        _LOGGER.info("Saved PVS data to cache: %d devices", device_count)
+        _LOGGER.info("Saved PVS data to cache: %s (%d devices)", cache_filename, device_count)
         return True
         
     except Exception as e:
@@ -336,13 +320,13 @@ async def save_cache_file(hass: HomeAssistant, entry_id: str, pvs_data: dict):
 
 
 async def load_cache_file(hass: HomeAssistant, entry_id: str):
-    """Load PVS data from simple cache file - ASYNC COMPLIANT"""
+    """Load PVS data from cache file with consistent naming"""
     try:
         # Use HA storage directory for cache file
         storage_path = hass.config.path(".storage")
-        cache_file = os.path.join(storage_path, f"sunpower_cache_{entry_id}.json")
+        cache_filename = get_cache_filename(entry_id)
+        cache_file = os.path.join(storage_path, cache_filename)
         
-        # Check if file exists using async
         def check_and_load_cache():
             if not os.path.exists(cache_file):
                 return None, 0, False
@@ -359,7 +343,7 @@ async def load_cache_file(hass: HomeAssistant, entry_id: str):
         pvs_data, cache_age, file_exists = await hass.async_add_executor_job(check_and_load_cache)
         
         if not file_exists:
-            _LOGGER.info("No cache file found: %s", cache_file)
+            _LOGGER.info("No cache file found: %s", cache_filename)
             return None, 0
         
         # Validate cached data
@@ -369,7 +353,7 @@ async def load_cache_file(hass: HomeAssistant, entry_id: str):
             return None, 0
         
         device_count = len(pvs_data.get("devices", []))
-        _LOGGER.info("Loaded cached PVS data: %d devices, %.0fs old", device_count, cache_age)
+        _LOGGER.info("Loaded cached PVS data: %s (%d devices, %.0fs old)", cache_filename, device_count, cache_age)
         return pvs_data, cache_age
         
     except Exception as e:
@@ -378,7 +362,7 @@ async def load_cache_file(hass: HomeAssistant, entry_id: str):
 
 
 async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, entry):
-    """Poll PVS with existing safety protocols and diagnostic tracking"""
+    """Poll PVS with safety protocols and diagnostic tracking"""
     
     start_time = time.time()
     
@@ -398,7 +382,7 @@ async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, 
     # If PVS unhealthy, don't attempt poll
     if health_status != 'healthy':
         if health_status == 'backoff':
-            remaining = int(cache.health_backoff_until - time.monotonic())
+            remaining = int(cache.health_backoff_until - time.time())
             _LOGGER.info("PVS in backoff period, %ds remaining", remaining)
         else:
             _LOGGER.warning("PVS health check failed, skipping poll")
@@ -464,13 +448,13 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Enhanced SunPower from a config entry with sunrise/sunset elevation"""
-    _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP (SUNRISE/SUNSET ELEVATION) ===")
+    """Set up Enhanced SunPower from a config entry"""
+    _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP ===")
     entry_id = entry.entry_id
 
     hass.data[DOMAIN].setdefault(entry_id, {})
 
-    # Create enhanced cache with diagnostics
+    # Create enhanced cache with diagnostics - REMOVED CALLBACK SETUP
     cache = SunPowerDataCache()
 
     polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
@@ -482,19 +466,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.info("Creating coordinator with %ds interval (minimum 300s for PVS protection)", polling_interval)
 
     async def async_update_data():
-        """Enhanced data fetching with SIMPLE sunrise/sunset elevation logic"""
+        """Enhanced data fetching with sunrise/sunset elevation logic"""
         
         notify_diagnostic_coordinator_started(hass, entry, cache)
         
-        # SMART POLL TIMING: Check cache file age first with tolerance
+        # Check cache file age first
         cached_data, cache_age = await load_cache_file(hass, entry_id)
-        poll_tolerance = 30  # Allow 30 second tolerance for timing precision
+        poll_tolerance = 30
         
         if cached_data and cache_age < (polling_interval - poll_tolerance):
-            # Cache is fresh enough, use it instead of polling
+            # Cache is fresh enough
             remaining_time = polling_interval - cache_age
-            _LOGGER.info("Skipping poll - cache is only %ds old (<%ds with %ds tolerance), waiting %ds more", 
-                        cache_age, polling_interval, poll_tolerance, remaining_time)
+            _LOGGER.info("Skipping poll - cache is only %ds old, waiting %ds more", cache_age, remaining_time)
             
             # Update cache object for compatibility
             cache.previous_pvs_sample = cached_data
@@ -509,96 +492,82 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                 
-                # FIXED: Use converted text for notification
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age)
                 return data
             else:
-                _LOGGER.warning("Cached data invalid, proceeding with fresh poll despite timing")
-        else:
-            if cached_data:
-                _LOGGER.info("Cache is %ds old (>=%ds with %ds tolerance), proceeding with fresh poll", 
-                            cache_age, polling_interval - poll_tolerance, poll_tolerance)
-            else:
-                _LOGGER.info("No cache file found, proceeding with fresh poll")
+                _LOGGER.warning("Cached data invalid, proceeding with fresh poll")
         
-        # SIMPLE sun state check with sunrise/sunset elevation
+        # Sun state check with sunrise/sunset elevation
         try:
             sun_entity = hass.states.get("sun.sun")
             if sun_entity and sun_entity.attributes:
                 elevation = float(sun_entity.attributes.get("elevation", -90))
                 
-                # Get sunrise and sunset thresholds (with migration from old single threshold)
+                # Get sunrise and sunset thresholds with migration
                 sunrise_elevation = entry.options.get("sunrise_elevation")
                 sunset_elevation = entry.options.get("sunset_elevation")
                 
-                # Migration: If no sunrise/sunset values but old minimum_sun_elevation exists
                 if sunrise_elevation is None or sunset_elevation is None:
                     old_elevation = entry.options.get("minimum_sun_elevation", 5)
-                    sunrise_elevation = old_elevation if sunrise_elevation is None else sunrise_elevation
-                    sunset_elevation = old_elevation if sunset_elevation is None else sunset_elevation
-                    _LOGGER.info("Migrating from minimum_sun_elevation=%s to sunrise=%s, sunset=%s", 
+                    if sunrise_elevation is None:
+                        sunrise_elevation = old_elevation
+                    if sunset_elevation is None:
+                        sunset_elevation = old_elevation
+                    _LOGGER.info("Migrating elevation settings: %s → sunrise=%s, sunset=%s", 
                                 old_elevation, sunrise_elevation, sunset_elevation)
                 
-                _LOGGER.debug("Sun elevation %.1f°, sunrise threshold: %.1f°, sunset threshold: %.1f°", 
+                _LOGGER.debug("Sun elevation %.1f°, thresholds: sunrise=%.1f°, sunset=%.1f°", 
                              elevation, sunrise_elevation, sunset_elevation)
                 
             else:
-                _LOGGER.warning("Sun entity unavailable, using fallback calculation")
+                _LOGGER.warning("Sun entity unavailable, using fallback")
                 elevation = calculate_sun_elevation_fallback()
                 sunrise_elevation = entry.options.get("sunrise_elevation", 5)
                 sunset_elevation = entry.options.get("sunset_elevation", 5)
-                _LOGGER.info("Fallback sun elevation: %.1f° (sunrise: %.1f°, sunset: %.1f°)", 
-                            elevation, sunrise_elevation, sunset_elevation)
         except (ValueError, TypeError) as e:
-            _LOGGER.warning("Sun elevation calculation failed: %s, using safe fallback", e)
+            _LOGGER.warning("Sun elevation calculation failed: %s", e)
             elevation = 15.0
             sunrise_elevation = 5
             sunset_elevation = 5
 
         # Get battery configuration
-        has_battery, user_has_battery = get_battery_configuration_simple(entry)
-        reset_battery_failure_tracking_simple(cache)
+        has_battery = get_battery_configuration(entry)
 
-        # SIMPLE: Determine polling state using cleaned up logic
+        # Determine polling state
         should_poll, state_reason, active_threshold = determine_sun_polling_state(
             elevation, sunrise_elevation, sunset_elevation, has_battery
         )
 
-        # Handle night mode (when polling disabled)
+        # Handle night mode
         if not should_poll:
             _LOGGER.info("Night mode: %s - using cached data", convert_state_reason_to_text(state_reason))
             notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, 
                                       sunrise_elevation, sunset_elevation, active_threshold, state_reason)
             
-            # Load cache file (may be same as above check, but ensure we have it)
             if not cached_data:
                 cached_data, cache_age = await load_cache_file(hass, entry_id)
             
             if cached_data:
-                # Update cache object for compatibility
                 cache.previous_pvs_sample = cached_data
                 cache.previous_pvs_sample_time = time.time() - cache_age
                 
                 data = convert_sunpower_data(cached_data)
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if is_valid:
-                    # Add diagnostic device
                     inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                     diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
                     _LOGGER.info("Night mode: Using cached data with %d devices", device_count)
-                    # FIXED: Pass the converted state reason to notification
                     notify_using_cached_data(hass, entry, cache, state_reason, cache_age)
                     return data
             
-            # No cache file - fail gracefully
             _LOGGER.warning("Night mode: No cached data available")
             raise UpdateFailed(f"Night mode ({convert_state_reason_to_text(state_reason)}): No cached data available")
         
         elif should_poll and state_reason != "battery_system_active":
-            # Day mode activated - reset health check state
-            _LOGGER.info("Day mode activated (%s) - resetting health check state for fresh start", convert_state_reason_to_text(state_reason))
+            # Day mode activated
+            _LOGGER.info("Day mode activated (%s)", convert_state_reason_to_text(state_reason))
             cache.pvs_health_failures = 0
             cache.health_backoff_until = 0
             cache.last_health_check = 0
@@ -606,16 +575,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             notify_day_mode_elevation(hass, entry, cache, elevation, 
                                     sunrise_elevation, sunset_elevation, active_threshold, state_reason)
 
-        # Polling attempt (only reached if cache check didn't return or night mode failed)
+        # Polling attempt
         try:
-            # Try to poll PVS (with diagnostic tracking)
             fresh_data = await poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, entry)
             
             if fresh_data:
-                # Poll successful - save to cache file
+                # Save to cache
                 await save_cache_file(hass, entry_id, fresh_data)
                 
-                # Update cache object for compatibility
                 cache.previous_pvs_sample = fresh_data
                 cache.previous_pvs_sample_time = time.time()
                 
@@ -625,12 +592,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 if not is_valid:
                     raise UpdateFailed(f"Data conversion failed: {error_message}")
                 
-                # Check inverter health after successful poll
+                # Check inverter health
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 if inverter_data:
                     check_inverter_health(hass, entry, cache, inverter_data)
                 
-                # Check for firmware upgrades after successful poll
+                # Check firmware upgrades
                 pvs_data = data.get(PVS_DEVICE_TYPE, {})
                 if pvs_data:
                     check_firmware_upgrade(hass, entry, cache, pvs_data)
@@ -639,76 +606,57 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                 
-                # Handle battery detection
-                try:
-                    handle_battery_detection_simple(hass, entry, data, cache, safe_notify, user_has_battery)
-                except Exception as error:
-                    _LOGGER.error("Battery detection handler failed: %s", error)
-                
-                # Success notification
                 notify_data_update_success(hass, entry, cache, time.time())
                 _LOGGER.info("SUCCESS: Fresh PVS data with %d devices (%d inverters)", 
                            device_count, len(inverter_data))
                 return data
             else:
-                # Poll failed (health check failed) - use cache file
-                _LOGGER.info("PVS poll failed, attempting to use cached data")
+                # Poll failed - use cache
+                _LOGGER.info("PVS poll failed, using cached data")
                 if not cached_data:
                     cached_data, cache_age = await load_cache_file(hass, entry_id)
                     
                 if cached_data:
-                    # Update cache object for compatibility
                     cache.previous_pvs_sample = cached_data
                     cache.previous_pvs_sample_time = time.time() - cache_age
                     
                     data = convert_sunpower_data(cached_data)
                     is_valid, device_count, error_message = validate_converted_data(data)
                     if is_valid:
-                        # Add diagnostic device
                         inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                         diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                         
-                        _LOGGER.info("Using cached data with %d devices", device_count)
-                        # FIXED: Pass the converted state reason to notification
                         notify_using_cached_data(hass, entry, cache, "PVS_health_check_failed", cache_age)
                         return data
                 
-                # No cache available - fail gracefully
-                _LOGGER.warning("No cached data available after PVS failure")
                 raise UpdateFailed("PVS offline and no cached data available")
                 
         except Exception as e:
-            _LOGGER.error("Polling attempt failed: %s", e)
+            _LOGGER.error("Polling failed: %s", e)
             notify_polling_failed(hass, entry, cache, polling_url, e)
             
-            # Last resort - try cache file
+            # Last resort cache
             if not cached_data:
                 cached_data, cache_age = await load_cache_file(hass, entry_id)
                 
             if cached_data:
-                # Update cache object for compatibility
                 cache.previous_pvs_sample = cached_data
                 cache.previous_pvs_sample_time = time.time() - cache_age
                 
                 data = convert_sunpower_data(cached_data)
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if is_valid:
-                    # Add diagnostic device
                     inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                     diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
-                    _LOGGER.info("Error fallback: Using cached data with %d devices", device_count)
-                    # FIXED: Pass the converted state reason to notification
                     notify_using_cached_data(hass, entry, cache, "polling_error", cache_age)
                     return data
             
-            # No fallback available
-            _LOGGER.error("All data sources failed - no cached data available")
             raise UpdateFailed(f"All data sources failed: {e}")
 
-    # Create coordinator with proper debouncer (back to standard DataUpdateCoordinator)
+    # Create coordinator
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
@@ -727,7 +675,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         SUNPOWER_COORDINATOR: coordinator,
     }
 
-    # Initial setup
+    # Initial setup - COORDINATOR FIRST, THEN PLATFORMS
     try:
         _LOGGER.info("Attempting initial Enhanced SunPower data fetch...")
         await coordinator.async_config_entry_first_refresh()
@@ -740,10 +688,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         notify_setup_warning(hass, entry, cache, polling_url, polling_interval)
         _LOGGER.info("Enhanced SunPower integration continuing with polling schedule")
 
-    # Set up platforms
+    # Set up platforms AFTER coordinator is working
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP COMPLETE (SUNRISE/SUNSET) ===")
+    _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP COMPLETE ===")
     return True
 
 
