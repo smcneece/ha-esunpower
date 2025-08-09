@@ -72,24 +72,28 @@ Version: v2025.8.8
 - **Integration validates real PVS connection** during setup process with bulletproof validation
 - **Night mode intelligently suspends polling for solar only (no batteries)** to protect PVS hardware
 
-### 🚀 **Via HACS (Strongly Recommended)**
-HACS provides the cleanest installation and handles all file management automatically:
+## Installation via HACS
 
-**Step 1: Install via HACS**
-1. **Open HACS** in Home Assistant
-2. **Go to "Integrations"** 
-3. **Click the 3 dots menu** → "Custom repositories"
-4. **Add repository:** `smcneece/ha-esunpower`
-5. **Category:** "Integration"
-6. **Install "Enhanced SunPower"** - HACS will download all files
-7. **Restart Home Assistant** - Files are now available
+### 1. Add this repository as a custom repository to HACS:
 
-**Step 2: Add Integration**
-1. **Go to Settings** → "Devices & Services"
-2. **Click "Add Integration"**
-3. **Search for "Enhanced SunPower"**
-4. **Select and configure** - Follow setup prompts
-5. **Integration ready!** - All entities will be created
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=smcneece&repository=ha-esunpower&category=integration)
+
+### 2. Use HACS to install the integration.
+
+### 3. Restart Home Assistant.
+
+### 4. Set up the integration using the UI:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
+
+## Manual Installation
+
+1. Download the integration files from the GitHub repository.
+2. Place the integration folder in the custom_components directory of Home Assistant.
+3. Restart Home Assistant.
+4. Set up the integration using the UI:
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
 ### ⚠️ **Upgrading from Original SunPower Integration**
 
