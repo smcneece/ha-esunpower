@@ -37,6 +37,10 @@ Version: v2025.8.9.1
 
 ![Configuration Options](images/config.png)
 
+### Advanced Configuration Options
+
+![Advanced Configuration](images/advanced_config.png)
+
 ## ⚠️ **Important Notes & Breaking Changes**
 
 ### **🔄 Breaking Changes from Original Integration**
