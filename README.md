@@ -7,7 +7,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.9.3
+Version: v2025.8.9.1
 
 ![Integration Overview](images/overview.png)
 
@@ -24,7 +24,7 @@ Version: v2025.8.9.3
 - **⚡ Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
 - **🔋 Enhanced Battery Support**: Improved SunVault detection and monitoring with smart fallbacks
 - **🕒 Human-Readable Time Display**: All notifications show user-friendly time formats
-- **🛜 Automatic Route Repair**: Detects and fixes lost network routes for VLAN setups
+- **🛜 Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
 
 ### 🎯 **Core Enhancements**
 - **Honest Status Reporting**: Clear distinction between real PVS data vs cached/fallback data with transparency
@@ -33,7 +33,7 @@ Version: v2025.8.9.3
 - **Async Compliance**: Full Home Assistant 2025.12+ compliance with modern patterns and best practices
 - **Persistent Polling**: Survives Home Assistant restarts without excessive PVS requests using smart cache files
 - **Advanced Configuration**: User-friendly two-step setup with comprehensive options andconnection validation
-- **Network Intelligence**: Automatic route detection and repair for complex networking setups
+- **Network Intelligence**: Automatic route detection, setup, and repair for complex networking setups
 
 ![Configuration Options](images/config.png)
 
@@ -71,6 +71,76 @@ Version: v2025.8.9.3
 - **Sun elevation must be above configured threshold** for proper validation
 - **Integration validates real PVS connection** during setup process with bulletproof validation
 - **Night mode intelligently suspends polling for solar only (no batteries)** to protect PVS hardware
+
+## 🔄 Upgrading from Original SunPower Integration
+
+**⚠️ IMPORTANT: If you're upgrading from [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower), follow these steps to ensure a clean upgrade:**
+
+### Step-by-Step Upgrade Process
+
+1. **Remove Original Integration**
+   - Go to "Settings" → "Devices & Services"
+   - Find "SunPower" integration
+   - Click the three dots menu → "Delete"
+   - Confirm deletion
+
+2. **Remove Original HACS Repository** (if installed via HACS)
+   - Go to HACS → Integrations
+   - Find "SunPower" integration
+   - Click the three dots menu → "Remove"
+   - Confirm removal
+
+3. **Clean Up Files** (if manually installed)
+   ```bash
+   # Remove old integration folder
+   rm -rf /config/custom_components/sunpower/
+   ```
+
+4. **Restart Home Assistant**
+   - Go to "Settings" → "System" → "Restart"
+   - Wait for restart to complete
+
+5. **Install Enhanced Version** (follow installation steps below)
+
+### Why Remove First?
+
+**✅ Prevents Entity Conflicts**
+- Original uses entity patterns like `sensor.sunpower_inverter_power`
+- Enhanced adds new diagnostic sensors like `sensor.sunpower_poll_success_rate`
+- Clean installation avoids confusion between old and new entities
+
+**✅ Configuration Migration**
+- Enhanced version automatically detects and migrates old configuration
+- Clean slate ensures optimal setup with new sunrise/sunset elevation features
+- Prevents conflicts between different configuration formats
+
+**✅ Entity History Preserved**
+- Home Assistant maintains historical data even after integration removal
+- Your energy dashboard and automations will continue working
+- No data loss from graphs or statistics
+
+**✅ Breaking Changes Handled**
+- Enhanced version fixes binary sensor format (boolean vs text)
+- Clean installation applies all fixes automatically
+- Prevents automation failures from format changes
+
+### What Gets Migrated Automatically
+
+**Enhanced integration detects and converts:**
+- Host/IP address settings
+- Polling interval preferences
+- Battery system configuration
+- Descriptive names and product name settings
+- Single elevation → dual sunrise/sunset thresholds
+
+**New Configuration Options Available:**
+- 🌅 Separate sunrise/sunset elevation thresholds
+- 📱 Mobile notification system
+- 🛜 Automatic route setup/repair
+- 🔧 Individual inverter health monitoring
+- 📊 Diagnostic dashboard monitoring
+
+---
 
 ## Installation via HACS
 
@@ -110,7 +180,7 @@ Version: v2025.8.9.3
 
 **What Happens During Upgrade:**
 1. **Entities Preserved** - All sensors, binary sensors, and history maintained
-2. **Configuration Enhanced** - New features added (sunrise/sunset elevation, notifications, diagnostics, route repair, etc.)
+2. **Configuration Enhanced** - New features added (sunrise/sunset elevation, notifications, diagnostics, route setup/repair, etc.)
 3. **Zero Downtime** - Continuous operation during upgrade process
 
 ## ⚙️ Configuration
@@ -135,7 +205,7 @@ Version: v2025.8.9.3
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Mobile Notifications** | Send alerts to phone | `false` | Enable for critical alerts |
 | **Mobile Device** | Which device receives alerts | None | Select your phone |
-| **Route Check** | Auto-repair network routes | `false` | Enable for VLAN setups |
+| **Route Check** | Auto-setup/repair network routes | `false` | Enable for VLAN setups |
 | **Gateway IP** | Route repair gateway | `192.168.1.80` | Your router/switch IP |
 
 ### 🌅 **NEW: Sunrise/Sunset Elevation Guide**
@@ -156,13 +226,13 @@ Version: v2025.8.9.3
 **💡 Fine-Tuning Tip:** Start with recommended values for your panel orientation, then observe notifications. The system shows which threshold is active in debug notifications, helping you optimize based on your actual generation patterns. 
       Pair with also using the SunStrong app to monitor actual production. 
 
-### 🛜 **Automatic Route Repair**
+### 🛜 **Automatic Route Setup/Repair**
 
 **For VLAN/Custom Network Setups:**
-- **Problem**: Docker/HA seems to lose manual network routes to isolated PVS
-- **Solution**: Integration automatically detects and repairs missing routes
+- **Problem**: Docker/HA seems to lose manual network routes to isolated PVS, especially after restarts
+- **Solution**: Integration automatically detects and sets up/repairs missing routes
 - **Configuration**: Enable "Route Check" + set your gateway IP
-- **Security**: Only repairs when route actually missing, never interferes with working setups
+- **Security**: Only adds routes when actually missing, never interferes with working setups
 
 **Common Gateway IPs:**
 - **Standard Router**: `192.168.1.1` (more common home networks)
@@ -175,7 +245,7 @@ TCP Health Check Fails
     ↓
 Check if route exists (ip route show)
     ↓
-Route Missing? → Auto-repair + Alert: "Route restored"
+Route Missing? → Auto-setup/repair + Alert: "Route restored"
 Route Exists? → Alert: "PVS unreachable (route OK)"
 ```
 
@@ -199,7 +269,7 @@ PVS WAN Port   PVS LAN Port (172.27.153.1)
 ### Community Solutions
 The community has developed several proven approaches for PVS network isolation:
 
-- **VLAN Isolation** (Recommended for managed switches) - **Auto route repair supported**
+- **VLAN Isolation** (Recommended for managed switches) - **Auto route setup/repair supported**
 - **Raspberry Pi Proxy** (Popular community solution)
 - **Dedicated Network Interface** (Direct connection approach)
 
@@ -364,7 +434,7 @@ For comprehensive whole-home monitoring, we recommend dedicated current transfor
 - **Equipment maintenance** - Temperature monitoring, MPPT analysis, inverter health tracking
 - **Solar-specific metrics** - Frequency analysis, power factor, voltage regulation
 - **System reliability** - Integration performance and diagnostic monitoring
-- **Network troubleshooting** - Route status and automatic repair capabilities
+- **Network troubleshooting** - Route status and automatic setup/repair capabilities
 - **Sunrise/sunset optimization** - Panel-specific polling schedules
 
 ### Energy Dashboard Setup
@@ -383,7 +453,7 @@ System Diagnostics: sensor.sunpower_pvs_*
 Inverter Health: Individual inverter status tracking
 MPPT Monitoring: sensor.sunpower_inverter_*_mppt_kw
 Integration Health: sensor.sunpower_diagnostics_*
-Network Status: Route check and repair monitoring
+Network Status: Route check, setup, and repair monitoring
 Sunrise/Sunset Control: Panel-optimized polling schedules
 ```
 
@@ -413,7 +483,7 @@ If dedicated monitoring isn't available, Enhanced SunPower sensors work directly
 - 🔍 **Inverter health tracking** (individual panel monitoring)
 - 🔧 **MPPT monitoring** (DC-side performance analysis)
 - 📊 **Integration reliability** (diagnostic dashboard monitoring)
-- 🛜 **Network intelligence** (route detection and repair)
+- 🛜 **Network intelligence** (route detection, setup, and repair)
 - 🌅 **Panel optimization** (sunrise/sunset elevation control)
 
 **Together:** Complete solar installation monitoring from grid-level accuracy down to individual panel performance, network connectivity, and panel-specific scheduling.
@@ -432,7 +502,7 @@ PVS systems use endpoints designed for provisioning, not continuous monitoring. 
 - **Persistent State**: Polling data survives HA restarts using transparent cache files
 - **DST-Safe Operations**: Robust time handling across daylight saving transitions
 - **300s Minimum Intervals**: Hardware protection enforced (increased from 60s)
-- **Route Intelligence**: Automatic network route detection and repair
+- **Route Intelligence**: Automatic network route detection, setup, and repair
 
 ## 🌞 Intelligent Solar Optimization
 
@@ -481,7 +551,7 @@ PVS systems use endpoints designed for provisioning, not continuous monitoring. 
 2. **Configure Gateway**: Set correct gateway IP for your network topology
 3. **Monitor Route Alerts**: Watch for route missing vs PVS unreachable notifications
 4. **Manual Route Check**: `ip route show 172.27.153.0/24` to verify route exists
-5. **Test Route Repair**: Integration will automatically add missing routes
+5. **Test Route Setup/Repair**: Integration will automatically add missing routes
 
 #### ⚡ **Hardware/Power Issues (USB Setups)**
 1. **Check Power Draw**: Measure combined USB device power consumption
@@ -544,7 +614,7 @@ Enable debug notifications to monitor:
 - Auto-recovery events and cache usage
 - Individual inverter health status
 - Mobile notification delivery status
-- Route detection and repair activities
+- Route detection, setup, and repair activities
 - Time conversion accuracy
 
 ## 📝 Version History
@@ -559,7 +629,7 @@ Enable debug notifications to monitor:
 
 ### Enhanced Edition v2025.7.31 - Time Conversion + Route Repair (August 2025)
 - **🕒 Human-Readable Time Display** - All notifications show user-friendly time formats
-- **🛜 Automatic Route Repair** - Detects and fixes lost network routes for VLAN setups
+- **🛜 Automatic Route Setup/Repair** - Detects and fixes lost network routes for VLAN setups
 - **⚙️ Configurable Gateway IP** - Route repair works with any network topology
 - **📊 Enhanced Diagnostics** - 7 sensors with improved time display formatting
 - **🔧 Context-Aware Alerts** - Route-specific notifications distinguish network vs PVS issues
@@ -628,4 +698,4 @@ This integration is not affiliated with or endorsed by SunPower Corporation. Use
 
 ---
 
-**🌞 Enjoying reliable SunPower monitoring with intelligent solar optimization, sunrise/sunset elevation control, mobile alerts, individual inverter health tracking, automatic route repair, diagnostic dashboard monitoring, and human-readable time display? Consider starring this repository to help others find these critical improvements!**
+**🌞 Enjoying reliable SunPower monitoring with intelligent solar optimization, sunrise/sunset elevation control, mobile alerts, individual inverter health tracking, automatic route setup/repair, diagnostic dashboard monitoring, and human-readable time display? Consider starring this repository to help others find these critical improvements!**
