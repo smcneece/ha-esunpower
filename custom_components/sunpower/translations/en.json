@@ -16,12 +16,16 @@
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval_seconds": "Polling interval (seconds)",
-                    "has_battery_system": "I have a SunVault battery system"
+                    "has_battery_system": "I have a SunVault battery system",
+                    "sunrise_elevation": "Sunrise elevation",
+                    "sunset_elevation": "Sunset elevation"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
-                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)"
+                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
+                    "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
+                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)"
                 }
             },
             "advanced": {
@@ -35,7 +39,7 @@
                     "mobile_notifications": "Enable mobile notifications",
                     "mobile_device": "Mobile device for alerts",
                     "route_check_enabled": "Enable automatic route checking",
-                    "route_gateway_ip": "Gateway IP for route repair"
+                    "route_gateway_ip": "Gateway IP for setup/repair"
                 },
                 "data_description": {
                     "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
@@ -45,7 +49,7 @@
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
                     "mobile_device": "Select which mobile device receives critical notifications",
                     "route_check_enabled": "Detect and repair missing network routes when TCP health check fails (for VLAN/custom routing setups)",
-                    "route_gateway_ip": "Gateway IP address for route repair (typically your router IP like 192.168.1.1 or switch IP)"
+                    "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
                 }
             }
         }
@@ -58,17 +62,21 @@
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval_seconds": "Polling interval (seconds)",
-                    "has_battery_system": "I have a SunVault battery system"
+                    "has_battery_system": "I have a SunVault battery system",
+                    "sunrise_elevation": "Sunrise elevation",
+                    "sunset_elevation": "Sunset elevation"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
-                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)"
+                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
+                    "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
+                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)"
                 }
             },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
-                "description": "Configure advanced Enhanced SunPower features and notifications.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Choose which device receives critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes when connection fails",
+                "description": "🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Choose which device receives critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes when connection fails",
                 "data": {
                     "minimum_sun_elevation": "Minimum sun elevation (degrees)",
                     "general_notifications": "Show status notifications",
@@ -76,7 +84,8 @@
                     "overwrite_general_notifications": "Replace status notifications",
                     "mobile_notifications": "Enable mobile notifications",
                     "mobile_device": "Mobile device for alerts",
-                    "route_check_enabled": "Enable automatic route checking"
+                    "route_check_enabled": "Enable automatic route checking",
+                    "route_gateway_ip": "Gateway IP for setup/repair"
                 },
                 "data_description": {
                     "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
@@ -85,7 +94,8 @@
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) directly to your mobile device",
                     "mobile_device": "Select which mobile device receives critical notifications (requires Home Assistant mobile app)",
-                    "route_check_enabled": "Automatically check and repair missing network routes when PVS becomes unreachable (for VLAN/custom routing setups)"
+                    "route_check_enabled": "Automatically check and repair missing network routes when PVS becomes unreachable (for VLAN/custom routing setups)",
+                    "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
                 }
             }
         },

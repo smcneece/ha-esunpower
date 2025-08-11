@@ -207,11 +207,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             ),
             vol.Required("route_check_enabled", default=False): selector.BooleanSelector(),
-            vol.Optional("route_gateway_ip", default="192.168.1.80"): selector.TextSelector(
-                selector.TextSelectorConfig(
-                    type=selector.TextSelectorType.TEXT,
-                )
-            ),
+            vol.Required("route_gateway_ip", default="192.168.1.80"): selector.TextSelector(),
         })
 
         return self.async_show_form(
@@ -383,11 +379,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             ),
             vol.Required("route_check_enabled", default=current_route_check): selector.BooleanSelector(),
-            vol.Optional("route_gateway_ip", default=current_gateway_ip): selector.TextSelector(
-                selector.TextSelectorConfig(
-                    type=selector.TextSelectorType.TEXT,
-                )
-            ),
+            vol.Required("route_gateway_ip", default=current_gateway_ip): str,
         })
 
         return self.async_show_form(

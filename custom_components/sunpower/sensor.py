@@ -67,9 +67,31 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 continue
             unique_id = SENSORS[device_type]["unique_id"]
             sensors = SENSORS[device_type]["sensors"]
+            
+            # Special handling for diagnostic sensors with route repair counter
+            if device_type == "Enhanced SunPower Diagnostics":
+                # Check if route checking is enabled
+                route_check_enabled = config_entry.options.get("route_check_enabled", False)
+                
+                # Filter out route repairs sensor if route checking is disabled
+                if not route_check_enabled and "ROUTE_REPAIRS" in sensors:
+                    sensors = {k: v for k, v in sensors.items() if k != "ROUTE_REPAIRS"}
+                    _LOGGER.debug("Route checking disabled - excluding route repairs sensor")
+                else:
+                    _LOGGER.debug("Route checking enabled - including route repairs sensor")
+            
             for index, sensor_data in enumerate(sunpower_data[device_type].values()):
                 for sensor_name in sensors:
                     sensor = sensors[sensor_name]
+                    
+                    # NEW: Hybrid approach - field exists AND has value (upgrade compatible + clean interface)
+                    field_name = sensor["field"]
+                    if field_name not in sensor_data:
+                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' not in device data", 
+                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
+                        continue
+                    
+                    # Create the sensor object to check its value
                     sensor_type = (
                         "" if not do_descriptive_names else f"{sensor_data.get('TYPE', '')} "
                     )
@@ -103,10 +125,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                         state_class=sensor["state"],
                         entity_category=sensor.get("entity_category", None),
                     )
-                    # FIXED: Remove the problematic entity filtering that was preventing entity creation
-                    # The original code had: if sunpower_sensor.native_value is not None:
-                    # This was filtering out entities before coordinator had any data - REMOVED!
-                    entities.append(sunpower_sensor)
+                    
+                    # HYBRID: Field exists + has value (original compatibility + our clean interface)
+                    if sunpower_sensor.native_value is not None:
+                        _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s", 
+                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name, 
+                                    sunpower_sensor.native_value)
+                        entities.append(sunpower_sensor)
+                    else:
+                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value", 
+                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
 
     async_add_entities(entities, True)
 

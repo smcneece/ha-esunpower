@@ -83,6 +83,10 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
     
     current_time = time.time()  # Use regular time
     
+    # Initialize route repairs counter if not exists
+    if not hasattr(cache, 'route_repairs_count'):
+        cache.route_repairs_count = 0
+    
     # Check if we're in backoff period
     if current_time < cache.health_backoff_until:
         remaining = int(cache.health_backoff_until - current_time)
@@ -143,6 +147,10 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
             if route_added:
                 _LOGGER.info("Route repair successful, testing PVS connection...")
                 notify_route_repaired(hass, entry, cache)
+                
+                # Increment route repairs counter
+                cache.route_repairs_count += 1
+                _LOGGER.info("Route repairs counter incremented to %d", cache.route_repairs_count)
                 
                 # Test TCP again after route repair
                 if await tcp_connect_test(host, timeout=tcp_timeout):

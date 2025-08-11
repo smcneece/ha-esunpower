@@ -130,11 +130,17 @@ def create_vmeter(data):
             "SWVER": "1.0",
             "HWVER": "Virtual",
             "origin": "virtual",
-            "net_ltea_3phsum_kwh": kwh,
-            "p_3phsum_kw": kw,
-            "freq_hz": freq_avg,
-            "i_a": amps,
-            "v12_v": volts_avg,
+            # Fixed field names to match real power meters
+            "net_ltea_3phsum_kwh": kwh,  # Lifetime Power
+            "p_3phsum_kw": kw,  # Power
+            "neg_ltea_3phsum_kwh": kwh,  # kWh To Grid (production meter shows all as export)
+            "pos_ltea_3phsum_kwh": 0.0,  # kWh To Home (production meter shows 0)
+            "freq_hz": freq_avg,  # Frequency
+            "i_a": amps,  # Amps
+            "v12_v": volts_avg,  # Supply Volts
+            # Additional diagnostic fields
+            "s_3phsum_kva": kw,  # Apparent Power (simplified as kW for virtual meter)
+            "tot_pf_rto": 1.0,  # Power Factor (assume perfect for solar production)
         }
         
         _LOGGER.info("Created virtual meter: %s (aggregated from %d inverters)", 

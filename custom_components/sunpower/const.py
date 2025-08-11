@@ -470,6 +470,15 @@ SUNPOWER_SENSORS = {
                 "state": SensorStateClass.MEASUREMENT,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
+            "ROUTE_REPAIRS": {
+                "field": "route_repairs_count",
+                "title": "SunPower Route Repairs",
+                "unit": "",
+                "icon": "mdi:router-network",
+                "device": None,
+                "state": SensorStateClass.TOTAL_INCREASING,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
         },
     },
 }

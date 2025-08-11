@@ -268,6 +268,9 @@ def create_diagnostic_device_data(cache, inverter_data):
     else:
         last_poll_str = "Never"
     
+    # Get route repairs count (session-based)
+    route_repairs_count = getattr(cache, 'route_repairs_count', 0)
+    
     # Create diagnostic device
     diagnostic_serial = "sunpower_diagnostics"
     diagnostic_device = {
@@ -285,6 +288,7 @@ def create_diagnostic_device_data(cache, inverter_data):
         "average_response_time": round(avg_response, 2),
         "active_inverters": active_inverters,
         "pvs_uptime_percent": round(uptime_percent, 1),
+        "route_repairs_count": route_repairs_count,
     }
     
     return diagnostic_serial, diagnostic_device
