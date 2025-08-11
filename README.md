@@ -1,4 +1,8 @@
 # Enhanced SunPower Home Assistant Integration
+
+> **⚠️ CRITICAL: If upgrading from original krbaker integration, FOLLOW UPGRADE INSTRUCTIONS EXACTLY below! AND BACK YOUR SYSTEM UP FIRST!**  
+> **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
@@ -7,7 +11,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.9.1
+Version: v2025.8.11
 
 ![Integration Overview](images/overview.png)
 
@@ -570,11 +574,12 @@ PVS systems use endpoints designed for provisioning, not continuous monitoring. 
 5. **Cable Length**: Use shorter, thicker USB cables to minimize voltage drop
 6. **Monitor Logs**: Check for USB disconnect messages in system logs
 
-#### All Entities Show "Unavailable"
-1. **Check Integration Status**: Look for "Fresh data from PVS" notifications
-2. **Verify Health Check**: Should see "PVS Health Check" notifications in debug mode
-3. **Monitor Notifications**: Check for "PVS OFFLINE" or backoff messages
-4. **Check PVS Response**: Try manual test: `curl http://172.27.153.1/cgi-bin/dl_cgi?Command=DeviceList`
+#### All Entities Show "Unavailable" or Config UI Corrupted
+1. **🌐 Force Browser Refresh**: **Ctrl+F5** (Windows) or **Cmd+Shift+R** (Mac) to clear cached files
+2. **Check Integration Status**: Look for "Fresh data from PVS" notifications
+3. **Verify Health Check**: Should see "PVS Health Check" notifications in debug mode
+4. **Monitor Notifications**: Check for "PVS OFFLINE" or backoff messages
+5. **Check PVS Response**: Try manual test: `curl http://172.27.153.1/cgi-bin/dl_cgi?Command=DeviceList`
 
 #### Diagnostic Sensors Not Working
 1. **Check Device**: Look for "Enhanced SunPower Diagnostics" device
