@@ -93,6 +93,8 @@ Version: v2025.8.9.1
    - Find "SunPower" integration
    - Click the three dots menu → "Remove"
    - Confirm removal
+   - **Also Remove Custom Repo**: Click 3 dots (top right) → "Custom repositories"
+   - Find the original SunPower repository and click the trash icon to delete
 
 3. **Clean Up Files** (if manually installed)
    ```bash
@@ -356,6 +358,7 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 - **Average Response Time**: PVS performance monitoring (e.g., "7.15s")
 - **Active Inverters**: Real-time count of responding inverters (e.g., "30")
 - **PVS Uptime Percentage**: System availability tracking (e.g., "100%")
+- **Route Repairs**: Session counter tracking automatic route fixes (only visible when route checking enabled)
 
 ## 📱 **Smart Notification System**
 
