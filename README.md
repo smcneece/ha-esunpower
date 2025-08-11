@@ -7,7 +7,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.9.3
+Version: v2025.8.9.1
 
 ![Integration Overview](images/overview.png)
 
@@ -359,6 +359,8 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 - **Active Inverters**: Real-time count of responding inverters (e.g., "30")
 - **PVS Uptime Percentage**: System availability tracking (e.g., "100%")
 - **Route Repairs**: Session counter tracking automatic route fixes (only visible when route checking enabled)
+
+![Diagnostic Sensors](images/diagnostic_sensors.png)
 
 ## 📱 **Smart Notification System**
 
