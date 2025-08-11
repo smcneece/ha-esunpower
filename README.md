@@ -574,6 +574,18 @@ PVS systems use endpoints designed for provisioning, not continuous monitoring. 
 5. **Cable Length**: Use shorter, thicker USB cables to minimize voltage drop
 6. **Monitor Logs**: Check for USB disconnect messages in system logs
 
+#### Unit Change Notifications After Upgrade
+![Unit Change Dialog](images/upgrade_error.png)
+
+**Expected Behavior**: Enhanced integration fixes unit inconsistencies from original.
+
+**Recommended Action**: Click **"Update the unit of the historic statistic values"** to:
+- ✅ Preserve all historical data
+- ✅ Fix unit displays (shows proper % symbols)
+- ✅ Improve HA statistics consistency
+
+**Why This Happens**: Enhanced integration properly declares percentage units for sensors like "System Load" that previously had no units.
+
 #### All Entities Show "Unavailable" or Config UI Corrupted
 1. **🌐 Force Browser Refresh**: **Ctrl+F5** (Windows) or **Cmd+Shift+R** (Mac) to clear cached files
 2. **Check Integration Status**: Look for "Fresh data from PVS" notifications
