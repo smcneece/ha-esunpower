@@ -136,6 +136,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                         _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value", 
                                     sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
 
+        # Create entities for each device type
+
     async_add_entities(entities, True)
 
 

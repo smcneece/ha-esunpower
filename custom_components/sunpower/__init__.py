@@ -234,7 +234,7 @@ def update_diagnostic_stats(cache, success, response_time=None):
         stats['consecutive_failures'] += 1
 
 
-def create_diagnostic_device_data(cache, inverter_data):
+def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     """Create diagnostic device data for sensors"""
     stats = cache.diagnostic_stats
     
@@ -279,7 +279,7 @@ def create_diagnostic_device_data(cache, inverter_data):
         "DESCR": "Enhanced SunPower Integration Diagnostics",
         "DEVICE_TYPE": DIAGNOSTIC_DEVICE_TYPE,
         "STATE": "working",
-        "SWVER": "2025.8.9.1",
+        "SWVER": "2025.8.12",
         "HWVER": "Virtual",
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
@@ -493,7 +493,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             if is_valid:
                 # Add diagnostic device
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
+                meter_data = data.get('Power Meter', {})
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                 
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age)
@@ -559,7 +560,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if is_valid:
                     inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                    diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
+                    meter_data = data.get('Power Meter', {})
+                    diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
                     _LOGGER.info("Night mode: Using cached data with %d devices", device_count)
@@ -607,7 +609,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     check_firmware_upgrade(hass, entry, cache, pvs_data)
                 
                 # Add diagnostic device
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
+                meter_data = data.get('Power Meter', {})
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                 
                 notify_data_update_success(hass, entry, cache, time.time())
@@ -628,7 +631,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     is_valid, device_count, error_message = validate_converted_data(data)
                     if is_valid:
                         inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
+                        meter_data = data.get('Power Meter', {})
+                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                         
                         notify_using_cached_data(hass, entry, cache, "PVS_health_check_failed", cache_age)
@@ -652,7 +656,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if is_valid:
                     inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                    diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data)
+                    meter_data = data.get('Power Meter', {})
+                    diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                     data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     
                     notify_using_cached_data(hass, entry, cache, "polling_error", cache_age)

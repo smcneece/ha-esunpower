@@ -1,17 +1,18 @@
 # Enhanced SunPower Home Assistant Integration
 
-> **⚠️ CRITICAL: If upgrading from original krbaker integration, FOLLOW UPGRADE INSTRUCTIONS EXACTLY below! AND BACK YOUR SYSTEM UP FIRST!**  
+> **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**  
 > **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
+[![Version](https://img.shields.io/badge/version-2025.8.13-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.13)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.11
+Version: v2025.8.13
 
 ![Integration Overview](images/overview.png)
 
@@ -83,6 +84,8 @@ Version: v2025.8.11
 ## 🔄 Upgrading from Original SunPower Integration
 
 **⚠️ IMPORTANT: If you're upgrading from [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower), follow these steps to ensure a clean upgrade:**
+
+**🔄 Note: This upgrade is a one-way process** - backup recommended before proceeding.
 
 ### Step-by-Step Upgrade Process
 
@@ -645,7 +648,7 @@ Enable debug notifications to monitor:
 
 ## 📝 Version History
 
-### Enhanced Edition v2025.8.7 - Sunrise/Sunset Elevation Control (August 2025)
+### Enhanced Edition v2025.8.13 - Sunrise/Sunset Elevation Control (August 2025)
 - **🌅 Sunrise/Sunset Elevation Split** - Separate thresholds for morning and evening optimization
 - **🎯 Panel Orientation Support** - Perfect for east/west-facing panel installations
 - **⚙️ UI Reorganization** - Sun elevation moved to basic setup, cleaner advanced options
@@ -653,7 +656,7 @@ Enable debug notifications to monitor:
 - **🔧 Smart Time Logic** - Morning uses sunrise threshold, evening uses sunset threshold
 - **✅ Migration Support** - Auto-converts old single elevation to dual thresholds
 
-### Enhanced Edition v2025.7.31 - Time Conversion + Route Repair (August 2025)
+### Enhanced Edition v2025.8.13 - Time Conversion + Route Repair (August 2025)
 - **🕒 Human-Readable Time Display** - All notifications show user-friendly time formats
 - **🛜 Automatic Route Setup/Repair** - Detects and fixes lost network routes for VLAN setups
 - **⚙️ Configurable Gateway IP** - Route repair works with any network topology
@@ -661,7 +664,7 @@ Enable debug notifications to monitor:
 - **🔧 Context-Aware Alerts** - Route-specific notifications distinguish network vs PVS issues
 - **✅ Production Tested** - Extensive validation on real VLAN networking scenarios
 
-### Enhanced Edition v2025.7.31 - Diagnostic Monitoring + Optimized Architecture
+### Enhanced Edition v2025.8.13 - Diagnostic Monitoring + Optimized Architecture
 - **📊 Diagnostic Dashboard** - 7 new sensors tracking integration reliability and performance
 - **🔧 MPPT Sensor Bug Fixed** - Individual MPPT sensors now show real power values instead of "Unknown"
 - **📦 50% Code Reduction** - const.py optimized, battery code separated for better organization
@@ -669,7 +672,7 @@ Enable debug notifications to monitor:
 - **🏗️ Better Architecture** - Logical separation by functionality, improved maintainability
 - **✅ Zero Regression** - All existing features preserved, same entity names and functionality
 
-### Enhanced Edition v2025.7.26 - Professional Solar Monitoring
+### Enhanced Edition v2025.8.13 - Professional Solar Monitoring
 - **📱 Mobile Notification System**: Direct alerts to your phone with smart fallback
 - **🔧 Inverter Health Monitoring**: Individual inverter tracking with failure detection
 - **🌞 Intelligent Solar Optimization**: Sun elevation-based polling with configurable thresholds
