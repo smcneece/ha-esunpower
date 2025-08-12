@@ -5,8 +5,10 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
-[![Version](https://img.shields.io/badge/version-2025.8.13-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.13)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
+[![Version](https://img.shields.io/badge/version-2025.8.12-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.12)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
+[![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
@@ -648,7 +650,7 @@ Enable debug notifications to monitor:
 
 ## 📝 Version History
 
-### Enhanced Edition v2025.8.13 - Sunrise/Sunset Elevation Control (August 2025)
+### Enhanced Edition v2025.8.7 - Sunrise/Sunset Elevation Control (August 2025)
 - **🌅 Sunrise/Sunset Elevation Split** - Separate thresholds for morning and evening optimization
 - **🎯 Panel Orientation Support** - Perfect for east/west-facing panel installations
 - **⚙️ UI Reorganization** - Sun elevation moved to basic setup, cleaner advanced options
@@ -656,7 +658,7 @@ Enable debug notifications to monitor:
 - **🔧 Smart Time Logic** - Morning uses sunrise threshold, evening uses sunset threshold
 - **✅ Migration Support** - Auto-converts old single elevation to dual thresholds
 
-### Enhanced Edition v2025.8.13 - Time Conversion + Route Repair (August 2025)
+### Enhanced Edition v2025.7.31 - Time Conversion + Route Repair (August 2025)
 - **🕒 Human-Readable Time Display** - All notifications show user-friendly time formats
 - **🛜 Automatic Route Setup/Repair** - Detects and fixes lost network routes for VLAN setups
 - **⚙️ Configurable Gateway IP** - Route repair works with any network topology
@@ -664,7 +666,7 @@ Enable debug notifications to monitor:
 - **🔧 Context-Aware Alerts** - Route-specific notifications distinguish network vs PVS issues
 - **✅ Production Tested** - Extensive validation on real VLAN networking scenarios
 
-### Enhanced Edition v2025.8.13 - Diagnostic Monitoring + Optimized Architecture
+### Enhanced Edition v2025.7.31 - Diagnostic Monitoring + Optimized Architecture
 - **📊 Diagnostic Dashboard** - 7 new sensors tracking integration reliability and performance
 - **🔧 MPPT Sensor Bug Fixed** - Individual MPPT sensors now show real power values instead of "Unknown"
 - **📦 50% Code Reduction** - const.py optimized, battery code separated for better organization
@@ -672,7 +674,7 @@ Enable debug notifications to monitor:
 - **🏗️ Better Architecture** - Logical separation by functionality, improved maintainability
 - **✅ Zero Regression** - All existing features preserved, same entity names and functionality
 
-### Enhanced Edition v2025.8.13 - Professional Solar Monitoring
+### Enhanced Edition v2025.7.26 - Professional Solar Monitoring
 - **📱 Mobile Notification System**: Direct alerts to your phone with smart fallback
 - **🔧 Inverter Health Monitoring**: Individual inverter tracking with failure detection
 - **🌞 Intelligent Solar Optimization**: Sun elevation-based polling with configurable thresholds
