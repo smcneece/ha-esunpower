@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.12-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.12)
+[![Version](https://img.shields.io/badge/version-2025.8.16-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.16)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -14,7 +14,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.14
+Version: v2025.8.16
 
 ![Integration Overview](images/overview.png)
 
