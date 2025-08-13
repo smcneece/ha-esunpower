@@ -14,7 +14,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.13
+Version: v2025.8.12
 
 ![Integration Overview](images/overview.png)
 
@@ -457,33 +457,48 @@ For comprehensive whole-home monitoring, we recommend dedicated current transfor
 
 ### Energy Dashboard Setup
 
-**Optimal Configuration:**
-```yaml
-# Primary Energy Dashboard (CT Monitor)
-Solar Production: sensor.sem_meter_solar_production
-Grid Import: sensor.sem_meter_grid_import  
-Grid Export: sensor.sem_meter_solar_to_grid
+### Energy Dashboard Setup
 
-# Diagnostic Monitoring (Enhanced SunPower)
-Individual Inverters: sensor.sunpower_inverter_*_power
-PVS Health: binary_sensor.sunpower_pvs_state
-System Diagnostics: sensor.sunpower_pvs_*
-Inverter Health: Individual inverter status tracking
-MPPT Monitoring: sensor.sunpower_inverter_*_mppt_kw
-Integration Health: sensor.sunpower_diagnostics_*
-Network Status: Route check, setup, and repair monitoring
-Sunrise/Sunset Control: Panel-optimized polling schedules
-```
+**Enhanced SunPower Integration** provides comprehensive data for Home Assistant's Energy Dashboard. Once you install the integration and configure it, allow it to run for a few hours so that the statistics entries are generated. Then go to the Energy Dashboard configuration and add the measurements you want.
 
-### PVS-Only Configuration
+#### Setting Up Solar Production
 
-If dedicated monitoring isn't available, Enhanced SunPower sensors work directly in Energy Dashboard:
+For **Solar Production**, you can use either:
+- **Production Meter**: `sensor.power_meter_*p_lifetime_power` (most accurate if available)
+- **Virtual Production Meter**: `sensor.virtual_production_meter_*_lifetime_power` (aggregated from all inverters)
+- **Individual Panels**: Add each inverter's `sensor.sunpower_inverter_*_lifetime_power` separately
 
-**📊 [Energy Dashboard Configuration Guide](https://github.com/krbaker/hass-sunpower#energy-dashboard)**
+![Solar Production Setup](images/solar_panel_setup.png)
 
-*Setup examples courtesy of [@krbaker](https://github.com/krbaker) - thank you for the comprehensive documentation!*
+#### Setting Up Grid Consumption
 
-**Note:** PVS polling limitations (300+ second intervals) make dedicated energy monitors preferable for real-time energy tracking.
+For **Grid Consumption**, use your consumption meter:
+- **Consumption from Grid**: `sensor.power_meter_*c_kwh_to_home`
+- **Return to Grid**: `sensor.power_meter_*c_kwh_to_grid`
+
+![Production Meter Configuration](images/production.png)
+![Consumption Meter Configuration](images/consumption.png)
+
+#### Complete Energy Dashboard
+
+Once configured, your Energy Dashboard will show comprehensive solar and consumption data:
+
+![Energy Dashboard Solar Production](images/energy_dash_solar_production.png)
+
+#### Advanced Configuration Options
+
+**Individual Panel Monitoring**: For detailed analysis, you can add each inverter individually to track per-panel performance and identify underperforming panels.
+
+**Multiple Meter Setup**: Some installations have both production and consumption meters - use both for the most accurate energy tracking.
+
+**Net Power Monitoring**: The consumption meter (`sensor.power_meter_*c_power`) provides real-time net power consumption, showing positive values when importing from grid and negative when exporting excess solar.
+
+#### Important Notes
+
+- **Statistics Generation**: Allow 2-4 hours after setup for HA to generate sufficient statistics
+- **Meter Accuracy**: Physical meters are more accurate than virtual aggregated data
+- **Energy vs Power**: Energy Dashboard uses kWh (cumulative energy) sensors, not kW (instantaneous power)
+- **Polling Interval**: 300+ second polling means energy data updates every 5-10 minutes
 
 ### Why Separate Monitoring Systems?
 
