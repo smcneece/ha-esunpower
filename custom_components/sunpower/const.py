@@ -411,7 +411,7 @@ SUNPOWER_SENSORS = {
         "sensors": {
             "POLL_SUCCESS_RATE": {
                 "field": "poll_success_rate",
-                "title": "SunPower Poll Success Rate",
+                "title": "Poll Success Rate",
                 "unit": PERCENTAGE,
                 "icon": "mdi:check-circle",
                 "device": None,
@@ -419,7 +419,7 @@ SUNPOWER_SENSORS = {
             },
             "TOTAL_POLLS": {
                 "field": "total_polls",
-                "title": "SunPower Total Polls",
+                "title": "Total Polls",
                 "unit": "",
                 "icon": "mdi:counter",
                 "device": None,
@@ -428,7 +428,7 @@ SUNPOWER_SENSORS = {
             },
             "CONSECUTIVE_FAILURES": {
                 "field": "consecutive_failures",
-                "title": "SunPower Consecutive Failures",
+                "title": "Consecutive Failures",
                 "unit": "",
                 "icon": "mdi:alert-circle",
                 "device": None,
@@ -437,7 +437,7 @@ SUNPOWER_SENSORS = {
             },
             "LAST_SUCCESSFUL_POLL": {
                 "field": "last_successful_poll",
-                "title": "SunPower Last Successful Poll",
+                "title": "Last Successful Poll",
                 "unit": None,
                 "icon": "mdi:clock-check",
                 "device": None,
@@ -446,7 +446,7 @@ SUNPOWER_SENSORS = {
             },
             "AVERAGE_RESPONSE_TIME": {
                 "field": "average_response_time",
-                "title": "SunPower Average Response Time",
+                "title": "Average Response Time",
                 "unit": UnitOfTime.SECONDS,
                 "icon": "mdi:speedometer",
                 "device": SensorDeviceClass.DURATION,
@@ -455,7 +455,7 @@ SUNPOWER_SENSORS = {
             },
             "ACTIVE_INVERTERS": {
                 "field": "active_inverters",
-                "title": "SunPower Active Inverters",
+                "title": "Active Inverters",
                 "unit": "",
                 "icon": "mdi:solar-panel",
                 "device": None,
@@ -463,7 +463,7 @@ SUNPOWER_SENSORS = {
             },
             "PVS_UPTIME_PERCENT": {
                 "field": "pvs_uptime_percent",
-                "title": "SunPower PVS Uptime",
+                "title": "PVS Uptime",
                 "unit": PERCENTAGE,
                 "icon": "mdi:server-network",
                 "device": None,
@@ -472,7 +472,7 @@ SUNPOWER_SENSORS = {
             },
             "ROUTE_REPAIRS": {
                 "field": "route_repairs_count",
-                "title": "SunPower Route Repairs",
+                "title": "Route Repairs",
                 "unit": "",
                 "icon": "mdi:router-network",
                 "device": None,

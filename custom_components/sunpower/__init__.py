@@ -265,8 +265,10 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     if stats['last_successful_poll']:
         time_ago = int(time.time() - stats['last_successful_poll'])
         last_poll_str = format_time_duration(time_ago) + " ago"
+        last_poll_seconds = time_ago
     else:
         last_poll_str = "Never"
+        last_poll_seconds = None
     
     # Get route repairs count (session-based)
     route_repairs_count = getattr(cache, 'route_repairs_count', 0)
@@ -284,7 +286,7 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
         "consecutive_failures": stats['consecutive_failures'],
-        "last_successful_poll": last_poll_str,
+        "last_successful_poll": last_poll_seconds,
         "average_response_time": round(avg_response, 2),
         "active_inverters": active_inverters,
         "pvs_uptime_percent": round(uptime_percent, 1),
