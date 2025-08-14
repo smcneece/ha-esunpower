@@ -122,7 +122,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["host"] = "connection_failed"
                     description_placeholders["error_details"] = message
 
-        # Basic configuration schema with sun elevation included
+        # Basic configuration schema with sun elevation AND naming options
         schema = vol.Schema({
             vol.Required("host", default="172.27.153.1"): str,
             vol.Required("polling_interval_seconds", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
@@ -150,6 +150,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
+            vol.Required("use_descriptive_names", default=True): selector.BooleanSelector(),
+            vol.Required("use_product_names", default=False): selector.BooleanSelector(),
         })
 
         return self.async_show_form(
@@ -175,6 +177,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "host": complete_config["host"],
                     "polling_interval_seconds": complete_config["polling_interval_seconds"],
                     "has_battery_system": complete_config["has_battery_system"],
+                    "use_descriptive_names": complete_config["use_descriptive_names"],
+                    "use_product_names": complete_config["use_product_names"],
                 },
                 options={
                     "sunrise_elevation": complete_config["sunrise_elevation"],
@@ -194,7 +198,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         mobile_options = {"none": "Disabled"}
         mobile_options.update(mobile_devices)
 
-        # Advanced configuration schema - cleaner without sun elevation
+        # Advanced configuration schema - notifications and network features
         schema = vol.Schema({
             vol.Required("general_notifications", default=True): selector.BooleanSelector(),
             vol.Required("deep_debug_notifications", default=False): selector.BooleanSelector(),
@@ -270,7 +274,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             _LOGGER.info("Migrating from minimum_sun_elevation=%s to sunrise=%s, sunset=%s", 
                         old_elevation, current_sunrise, current_sunset)
 
-        # Basic options schema with sun elevation included
+        # Get current naming values with fallback to data
+        current_descriptive = self.config_entry.data.get("use_descriptive_names", True)
+        current_product = self.config_entry.data.get("use_product_names", False)
+
+        # Basic options schema with sun elevation AND naming options
         schema = vol.Schema({
             vol.Required("host", default=current_host): str,
             vol.Required("polling_interval_seconds", default=current_interval): selector.NumberSelector(
@@ -298,6 +306,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
+            vol.Required("use_descriptive_names", default=current_descriptive): selector.BooleanSelector(),
+            vol.Required("use_product_names", default=current_product): selector.BooleanSelector(),
         })
 
         return self.async_show_form(
@@ -323,6 +333,10 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 data_updates["has_battery_system"] = complete_config["has_battery_system"]
             if complete_config["polling_interval_seconds"] != self.config_entry.data.get("polling_interval_seconds"):
                 data_updates["polling_interval_seconds"] = complete_config["polling_interval_seconds"]
+            if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):
+                data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
+            if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):
+                data_updates["use_product_names"] = complete_config["use_product_names"]
             
             # Apply data updates if needed
             if data_updates:
@@ -366,7 +380,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         current_route_check = self.config_entry.options.get("route_check_enabled", False)
         current_gateway_ip = self.config_entry.options.get("route_gateway_ip", "192.168.1.80")
 
-        # Advanced options schema - cleaner without sun elevation
+        # Advanced options schema - notifications and network features only
         schema = vol.Schema({
             vol.Required("general_notifications", default=current_general): selector.BooleanSelector(),
             vol.Required("deep_debug_notifications", default=current_debug): selector.BooleanSelector(),

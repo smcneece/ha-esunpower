@@ -18,14 +18,18 @@
                     "polling_interval_seconds": "Polling interval (seconds)",
                     "has_battery_system": "I have a SunVault battery system",
                     "sunrise_elevation": "Sunrise elevation",
-                    "sunset_elevation": "Sunset elevation"
+                    "sunset_elevation": "Sunset elevation",
+                    "use_descriptive_names": "Use descriptive names",
+                    "use_product_names": "Use product names"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
                     "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
-                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)"
+                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
             "advanced": {
@@ -64,14 +68,18 @@
                     "polling_interval_seconds": "Polling interval (seconds)",
                     "has_battery_system": "I have a SunVault battery system",
                     "sunrise_elevation": "Sunrise elevation",
-                    "sunset_elevation": "Sunset elevation"
+                    "sunset_elevation": "Sunset elevation",
+                    "use_descriptive_names": "Use descriptive names",
+                    "use_product_names": "Use product names"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
                     "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
-                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)"
+                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
             "advanced": {

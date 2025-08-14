@@ -326,7 +326,7 @@ SUNPOWER_SENSORS = {
         "sensors": {
             "INVERTER_NET_KWH": {
                 "field": "ltea_3phsum_kwh",
-                "title": "{SUN_POWER}{DESCR}Lifetime Power",
+                "title": "{SUN_POWER}Inverter {SERIAL} Lifetime Power",
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,

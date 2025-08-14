@@ -30,11 +30,15 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     _LOGGER.debug("Enhanced SunPower state: %s", sunpower_state)
 
     do_descriptive_names = False
-    if SUNPOWER_DESCRIPTIVE_NAMES in config_entry.data:
+    if "use_descriptive_names" in config_entry.options:
+        do_descriptive_names = config_entry.options["use_descriptive_names"]
+    elif SUNPOWER_DESCRIPTIVE_NAMES in config_entry.data:
         do_descriptive_names = config_entry.data[SUNPOWER_DESCRIPTIVE_NAMES]
 
     do_product_names = False
-    if SUNPOWER_PRODUCT_NAMES in config_entry.data:
+    if "use_product_names" in config_entry.options:
+        do_product_names = config_entry.options["use_product_names"]
+    elif SUNPOWER_PRODUCT_NAMES in config_entry.data:
         do_product_names = config_entry.data[SUNPOWER_PRODUCT_NAMES]
 
     coordinator = sunpower_state[SUNPOWER_COORDINATOR]

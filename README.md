@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.16-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.16)
+[![Version](https://img.shields.io/badge/version-2025.8.17-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.17)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -14,7 +14,7 @@
 
 > **🌟 Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, smart health checking, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.16
+Version: v2025.8.17
 
 ![Integration Overview](images/overview.png)
 
@@ -457,7 +457,22 @@ For comprehensive whole-home monitoring, we recommend dedicated current transfor
 
 ### Energy Dashboard Setup
 
-### Energy Dashboard Setup
+### 🔧 **Entity Naming Compatibility (v2025.8.17)**
+
+**Background:** The original krbaker integration included naming configuration options (`use_descriptive_names` and `use_product_names`) that we initially missed in our Enhanced version. This caused energy dashboard entities to show generic names like "Lifetime Power" instead of the proper "Inverter E001221370442207 Lifetime Power".
+
+**✅ Fixed in Enhanced v2025.8.17:**
+- **Descriptive Names**: Shows proper inverter serial numbers (default: enabled)
+- **Product Names**: Optional "SunPower" prefix (default: disabled)  
+- **Backward Compatibility**: Automatically reads naming preferences from original installations
+- **Configuration Options**: Both settings available in Basic Setup (page 1)
+- **Energy Dashboard**: Now shows proper inverter identification matching original krbaker behavior
+
+**Configuration Location:** Settings → Devices & Services → Enhanced SunPower → Configure → Basic Settings (page 1)
+
+**Why This Matters:** The Energy Dashboard requires descriptive entity names for proper identification. Without these naming options enabled, all inverters would show generic "Lifetime Power" labels, making it impossible to distinguish between different panels in your solar array.
+
+#### Enhanced SunPower Integration Setup
 
 **Enhanced SunPower Integration** provides comprehensive data for Home Assistant's Energy Dashboard. Once you install the integration and configure it, allow it to run for a few hours so that the statistics entries are generated. Then go to the Energy Dashboard configuration and add the measurements you want.
 
