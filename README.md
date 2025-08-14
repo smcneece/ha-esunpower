@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.17-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.17)
+[![Version](https://img.shields.io/badge/version-2025.8.12-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.12)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -20,20 +20,20 @@ Version: v2025.8.17
 
 ## 🚀 What Makes This Enhanced?
 
-### ⭐ **Improvements**
-- **🌅 Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
-- **🌞 Intelligent Solar Optimization**: Sun elevation-based polling eliminates wasteful dawn/dusk requests (10-15% efficiency gain)
-- **🔔 Multi-Channel Notifications**: Computer status light paradigm with 6 separate notification streams  
-- **🛡️ Smart Health Check System**: TCP-based PVS protection with intelligent retry logic and backoff
-- **📱 Mobile Alert System**: Critical notifications sent directly to your phone with persistent fallback
-- **🔧 Individual Inverter Health Monitoring**: Real-time failure detection and recovery alerts for each panel
-- **📊 Diagnostic Dashboard**: 7 real-time sensors tracking integration reliability and performance
-- **⚡ Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
-- **🔋 Enhanced Battery Support**: Improved SunVault detection and monitoring with smart fallbacks
-- **🕒 Human-Readable Time Display**: All notifications show user-friendly time formats
-- **🛜 Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
+### **Improvements**
+- **Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
+- **Intelligent Solar Optimization**: Sun elevation-based polling eliminates wasteful dawn/dusk requests (10-15% efficiency gain)
+- **Multi-Channel Notifications**: Computer status light paradigm with 6 separate notification streams  
+- **Smart Health Check System**: TCP-based PVS protection with intelligent retry logic and backoff
+- **Mobile Alert System**: Critical notifications sent directly to your phone with persistent fallback
+- **Individual Inverter Health Monitoring**: Real-time failure detection and recovery alerts for each panel
+- **Diagnostic Dashboard**: 7 real-time sensors tracking integration reliability and performance
+- **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
+- **Enhanced Battery Support**: Improved SunVault detection and monitoring with smart fallbacks
+- **Human-Readable Time Display**: All notifications show user-friendly time formats
+- **Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
 
-### 🎯 **Core Enhancements**
+### **Core Enhancements**
 - **Honest Status Reporting**: Clear distinction between real PVS data vs cached/fallback data with transparency
 - **PVS Hardware Protection**: Built-in throttling (300s minimum), health checking, and intelligent backoff strategies  
 - **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns across 10+ files
@@ -50,12 +50,12 @@ Version: v2025.8.17
 
 ## ⚠️ **Important Notes & Breaking Changes**
 
-### **🔄 Breaking Changes from Original Integration**
+### **Breaking Changes from Original Integration**
 - **Binary Sensors Fixed**: Now use proper boolean states (`on`/`off`) instead of text values like `"working"`. This follows Home Assistant standards but **may break existing automations**.
 - **Configuration Enhanced**: Advanced options now available without deleting integration through professional setup flow.
 - **Minimum Polling**: Increased from 60s to 300s (5 minutes) for PVS hardware protection. (if you really want shorter poll rates I can tell you what to change in the source code)
 
-### **📋 Migration Guide**
+### **Migration Guide**
 ```yaml
 # OLD automation (will break):
 - condition: state
@@ -68,16 +68,16 @@ Version: v2025.8.17
   state: "on"
 ```
 
-### **⚠️ General Disclaimers**
+### **General Disclaimers**
 - **Testing Status**: Extensively tested on a 30-panel SunPower system **without batteries**. Battery system users welcome to test and provide feedback.
 - **Use at Your Own Risk**: You assume all risk using this integration. It accesses unofficial PVS APIs not intended for continuous monitoring.
 - **Data Sharing**: If you encounter issues, you may be asked to share JSON files, notifications, log entries, etc., for troubleshooting.
 
 ## 📦 Installation & Upgrade
 
-### ⚠️ **CRITICAL: Setup Timing Requirements**
+### **CRITICAL: Setup Timing Requirements**
 
-**🌞 STRONGLY RECOMMENDED: Install during daylight hours**
+**STRONGLY RECOMMENDED: Install during daylight hours**
 
 - **Sun elevation must be above configured threshold** for proper validation
 - **Integration validates real PVS connection** during setup process with bulletproof validation
@@ -119,22 +119,22 @@ Version: v2025.8.17
 
 ### Why Remove First?
 
-**✅ Prevents Entity Conflicts**
+**Prevents Entity Conflicts**
 - Original uses entity patterns like `sensor.sunpower_inverter_power`
 - Enhanced adds new diagnostic sensors like `sensor.sunpower_poll_success_rate`
 - Clean installation avoids confusion between old and new entities
 
-**✅ Configuration Migration**
+**Configuration Migration**
 - Enhanced version automatically detects and migrates old configuration
 - Clean slate ensures optimal setup with new sunrise/sunset elevation features
 - Prevents conflicts between different configuration formats
 
-**✅ Entity History Preserved**
+**Entity History Preserved**
 - Home Assistant maintains historical data even after integration removal
 - Your energy dashboard and automations will continue working
 - No data loss from graphs or statistics
 
-**✅ Breaking Changes Handled**
+**Breaking Changes Handled**
 - Enhanced version fixes binary sensor format (boolean vs text)
 - Clean installation applies all fixes automatically
 - Prevents automation failures from format changes
@@ -149,11 +149,11 @@ Version: v2025.8.17
 - Single elevation → dual sunrise/sunset thresholds
 
 **New Configuration Options Available:**
-- 🌅 Separate sunrise/sunset elevation thresholds
-- 📱 Mobile notification system
-- 🛜 Automatic route setup/repair
-- 🔧 Individual inverter health monitoring
-- 📊 Diagnostic dashboard monitoring
+- Separate sunrise/sunset elevation thresholds
+- Mobile notification system
+- Automatic route setup/repair
+- Individual inverter health monitoring
+- Diagnostic dashboard monitoring
 
 ---
 
@@ -187,11 +187,11 @@ Version: v2025.8.17
 ### ⚠️ **Upgrading from Original SunPower Integration**
 
 **HACS Installation Benefits:**
-- ✅ **Seamless upgrade** - Same domain means all entities preserved
-- ✅ **Clean file management** - HACS handles everything automatically
-- ✅ **Entity history maintained** - No gaps in historical data
-- ✅ **Configuration preserved** - Existing settings remain intact
-- ✅ **Easy rollback** - Can restore original version if needed
+- **Seamless upgrade** - Same domain means all entities preserved
+- **Clean file management** - HACS handles everything automatically
+- **Entity history maintained** - No gaps in historical data
+- **Configuration preserved** - Existing settings remain intact
+- **Easy rollback** - Can restore original version if needed
 
 **What Happens During Upgrade:**
 1. **Entities Preserved** - All sensors, binary sensors, and history maintained
@@ -223,7 +223,7 @@ Version: v2025.8.17
 | **Route Check** | Auto-setup/repair network routes | `false` | Enable for VLAN setups |
 | **Gateway IP** | Route repair gateway | `192.168.1.80` | Your router/switch IP |
 
-### 🌅 **NEW: Sunrise/Sunset Elevation Guide**
+### **Sunrise/Sunset Elevation Guide**
 
 **Panel Orientation Optimization:**
 - **East-facing panels**: Sunrise 1°, Sunset 15° (early morning start, standard evening stop)
@@ -238,10 +238,10 @@ Version: v2025.8.17
 - **Energy Efficiency**: Reduces unnecessary polling during non-productive periods
 - **Smart Adaptation**: Integration automatically uses appropriate threshold based on time of day
 
-**💡 Fine-Tuning Tip:** Start with recommended values for your panel orientation, then observe notifications. The system shows which threshold is active in debug notifications, helping you optimize based on your actual generation patterns. 
+**Fine-Tuning Tip:** Start with recommended values for your panel orientation, then observe notifications. The system shows which threshold is active in debug notifications, helping you optimize based on your actual generation patterns. 
       Pair with also using the SunStrong app to monitor actual production. 
 
-### 🛜 **Automatic Route Setup/Repair**
+### **Automatic Route Setup/Repair**
 
 **For VLAN/Custom Network Setups:**
 - **Problem**: Docker/HA seems to lose manual network routes to isolated PVS, especially after restarts
@@ -266,7 +266,7 @@ Route Exists? → Alert: "PVS unreachable (route OK)"
 
 ## 🔌 Network Setup
 
-**⚠️ CRITICAL**: The PVS LAN port runs its own DHCP/DNS services and **MUST BE ISOLATED** from your main network to prevent conflicts.
+**CRITICAL**: The PVS LAN port runs its own DHCP/DNS services and **MUST BE ISOLATED** from your main network to prevent conflicts.
 
 ### Network Architecture Overview
 ```
@@ -290,11 +290,11 @@ The community has developed several proven approaches for PVS network isolation:
 
 **For detailed network setup guidance**, see existing community resources and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
 
-**⚠️ Support Scope**: Network configuration is outside the scope of this integration. We provide general guidance but recommend consulting community network guides for detailed setup assistance.
+**Support Scope**: Network configuration is outside the scope of this integration. We provide general guidance but recommend consulting community network guides for detailed setup assistance.
 
-### ⚡ **Hardware Power Requirements & Known Issues**
+### **Hardware Power Requirements & Known Issues**
 
-**🚨 CRITICAL: PVS USB Power Limitation Warning**
+**CRITICAL: PVS USB Power Limitation Warning**
 
 Many users power their Raspberry Pi directly from the PVS USB ports. However, the PVS has **limited USB power capacity** that can cause **random connection drops** when exceeded:
 
@@ -326,7 +326,7 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 - **External power supply** for Raspberry Pi (don't use PVS USB for Pi power)
 - **Note**: Space constraints in PVS enclosure make this challenging
 
-**⚠️ Important Notes:**
+**Important Notes:**
 - **No PVS logs available** - you won't see USB disconnect messages
 - **SunPower-approved hardware** can still exceed power limits in dual configuration
 - **Random failures** are the primary symptom, not permanent connection loss
@@ -334,24 +334,24 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 
 ## 📊 Available Data
 
-### 🏠 **PVS System Monitoring**
+### **PVS System Monitoring**
 - System load, uptime, memory usage, firmware version
 - Communication errors and scan statistics  
 - Flash storage availability
 - Real-time diagnostics and health monitoring
 
-### ⚡ **Solar Production**
+### **Solar Production**
 - **Inverters**: Power output, **individual MPPT data**, temperature monitoring
 - **Power Meters**: Energy consumption/production, voltage, frequency
 - **Virtual Meter**: Aggregated inverter data when no physical meter present
 
-### 🔋 **SunVault Battery System** (if equipped)
+### **SunVault Battery System** (if equipped)
 - **Individual Batteries**: State of charge, voltage, current, temperature
 - **ESS System**: Environmental conditions, power meters
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
 - **Virtual SunVault**: Aggregated battery statistics
 
-### 🔧 **Individual Inverter Health Monitoring**
+### **Individual Inverter Health Monitoring**
 - **Real-time Status**: Each inverter's operational state with smart adaptation
 - **Failure Detection**: Alerts when inverters stop reporting (5+ consecutive polls)
 - **Recovery Notifications**: Alerts when failed inverters return online
@@ -359,7 +359,7 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 - **Maintenance Alerts**: Temperature warnings and communication issues
 - **MPPT Monitoring**: Individual MPPT power, voltage, and current per inverter
 
-### 📊 **Diagnostic Dashboard Monitoring**
+### **Diagnostic Dashboard Monitoring**
 - **Poll Success Rate**: Real-time percentage of successful PVS polls (e.g., "100.0%")
 - **Total Polls**: Integration activity counter since startup
 - **Consecutive Failures**: Current failure streak for troubleshooting
