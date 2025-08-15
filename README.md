@@ -12,6 +12,10 @@
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
+> **💝 Enjoying Enhanced SunPower?** Consider sponsoring this work! Your support helps maintain and improve this integration for the entire community.
+> 
+> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) **Monthly:** Even $1/month helps! | **One-time:** Any amount appreciated!
+
 > **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
 Version: v2025.8.21
