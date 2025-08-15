@@ -24,7 +24,7 @@
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
+                    "polling_interval_seconds": "How often to check for new data (300-3600 seconds for PVS protection)",
                     "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
@@ -74,7 +74,7 @@
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval_seconds": "How often to check for new data (minimum 300 seconds for PVS protection)",
+                    "polling_interval_seconds": "How often to check for new data (300-3600 seconds for PVS protection)",
                     "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",

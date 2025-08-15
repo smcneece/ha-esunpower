@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.20-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.20)
+[![Version](https://img.shields.io/badge/version-2025.8.21-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.21)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -14,7 +14,7 @@
 
 > **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
-Version: v2025.8.20
+Version: v2025.8.21
 
 ![Integration Overview](images/overview.png)
 
@@ -210,9 +210,18 @@ Multi-channel notification system with human-readable time display:
 - **Virtual Production Meter**: `sensor.virtual_production_meter_*_lifetime_power` (aggregated)
 - **Individual Panels**: Add each `sensor.sunpower_inverter_*_lifetime_power` separately
 
+![Solar Production Setup](images/production.png)
+
 **Setting Up Grid Consumption:**
 - **Consumption from Grid**: `sensor.power_meter_*c_kwh_to_home`
 - **Return to Grid**: `sensor.power_meter_*c_kwh_to_grid`
+
+![Consumption Setup](images/consumption.png)
+
+**Solar Panel Configuration:**
+For individual panel monitoring, add each inverter's lifetime power sensor:
+
+![Solar Panel Setup](images/solar_panel_setup.png)
 
 ![Energy Dashboard Solar Production](images/energy_dash_solar_production.png)
 

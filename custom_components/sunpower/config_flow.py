@@ -128,7 +128,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required("polling_interval_seconds", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=300,  # Minimum 300 seconds for PVS safety
-                    max=3600,
+                    max=3600,  # Maximum 1 hour for reasonable polling
                     unit_of_measurement="seconds",
                     mode=selector.NumberSelectorMode.BOX,
                 )
@@ -284,7 +284,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required("polling_interval_seconds", default=current_interval): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=300,  # Minimum 300 seconds for PVS safety
-                    max=3600,
+                    max=3600,  # Maximum 1 hour for reasonable polling
                     unit_of_measurement="seconds",
                     mode=selector.NumberSelectorMode.BOX,
                 )
