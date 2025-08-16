@@ -18,6 +18,10 @@
 
 > **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
 
+> ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository to help other SunPower owners discover these improvements!
+> 
+> [![GitHub stars](https://img.shields.io/github/stars/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/stargazers) [![GitHub forks](https://img.shields.io/github/forks/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/network/members)
+
 Version: v2025.8.21
 
 ![Integration Overview](images/overview.png)
@@ -183,7 +187,7 @@ Version: v2025.8.21
 ### Diagnostic Dashboard
 - **Poll Success Rate**: Real-time percentage of successful PVS polls
 - **Total Polls**: Integration activity counter since startup
-- **Consecutive Failures**: Current failure streak for troubleshooting
+- **Consecutive Poll Failures**: Current streak of failed PVS poll attempts for troubleshooting
 - **Last Successful Poll**: Human-readable time since last data (e.g., "5 minutes ago")
 - **Average Response Time**: PVS performance monitoring
 - **Active Inverters**: Real-time count of responding inverters

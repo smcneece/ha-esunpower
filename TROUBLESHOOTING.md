@@ -1,5 +1,27 @@
 # Troubleshooting Guide
 
+## Poll Success Rate Expectations
+
+**Normal Behavior**: Poll success rates of **90-95%** are typical and expected. The PVS hardware occasionally fails to respond, which is why the integration:
+
+- **Attempts up to 2 retries** per polling interval before marking as failed
+- **Tracks poll success rate** in diagnostic sensors for monitoring
+- **Uses intelligent backoff** after consecutive failures to protect PVS hardware
+- **Maintains cached data** to bridge temporary connectivity gaps
+
+**Example**: 93.7% success rate with 79 total polls indicates healthy operation with expected intermittent PVS timeouts.
+
+**When to Investigate**:
+- Success rate **below 80%** consistently
+- **Long streaks** of consecutive poll failures (>5)
+- **"PVS OFFLINE"** alerts with high consecutive failure counts
+
+**Normal Fluctuations**: Success rates will vary based on:
+- PVS system load and processing time
+- Network latency and stability  
+- PVS internal housekeeping operations
+- Solar generation transitions (sunrise/sunset)
+
 ## Common Issues
 
 ### PVS Not Responding
