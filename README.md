@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.21-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.21)
+[![Version](https://img.shields.io/badge/version-2025.8.22-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.22)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -137,8 +137,11 @@ Version: v2025.8.21
 | **Sunrise Elevation** | Start polling threshold | 5° | See guide below |
 | **Sunset Elevation** | Stop polling threshold | 5° | See guide below |
 | **Battery System** | Enable if you have SunVault | `false` | Check if you have batteries |
+| **Use Descriptive Names** | Show detailed inverter names in energy dashboard | `true` | Enable for proper energy dashboard setup |
+| **Use Product Names** | Add 'SunPower' prefix to entity names | `false` | Personal preference |
 | **General Notifications** | Show status updates | `true` | Enable for monitoring |
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
+| **Replace Status Notifications** | Reuse notifications to prevent accumulation | `false` | Enable to reduce notification clutter |
 | **Mobile Notifications** | Send alerts to phone | `false` | Enable for critical alerts |
 | **Mobile Device** | Which device receives alerts | None | Select your phone |
 | **Route Check** | Auto-setup/repair network routes | `false` | Enable for VLAN setups |
@@ -188,7 +191,7 @@ Version: v2025.8.21
 - **Poll Success Rate**: Real-time percentage of successful PVS polls
 - **Total Polls**: Integration activity counter since startup
 - **Consecutive Poll Failures**: Current streak of failed PVS poll attempts for troubleshooting
-- **Last Successful Poll**: Human-readable time since last data (e.g., "5 minutes ago")
+- **Last Successful Poll**: Timestamp of last successful data retrieval (e.g., "14:29 08-16-25")
 - **Average Response Time**: PVS performance monitoring
 - **Active Inverters**: Real-time count of responding inverters
 - **PVS Uptime**: System availability tracking

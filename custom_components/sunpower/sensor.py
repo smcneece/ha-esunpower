@@ -222,15 +222,11 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
         if self._field == "SWVER":
             return self._my_info.get("SWVER")
         
-        # Special handling for last successful poll - format as human readable time
+        # Special handling for last successful poll - return the formatted string directly
         if self._field == "last_successful_poll":
             try:
-                seconds = self.coordinator.data[self._device_type][self.base_unique_id].get(self._field, None)
-                if seconds is not None:
-                    # Import format_time_duration from notifications module
-                    from .notifications import format_time_duration
-                    return format_time_duration(seconds) + " ago"
-                return "Never"
+                formatted_value = self.coordinator.data[self._device_type][self.base_unique_id].get(self._field, "Never")
+                return formatted_value  # Already formatted as timestamp in __init__.py
             except (KeyError, TypeError, AttributeError):
                 return "Never"
         

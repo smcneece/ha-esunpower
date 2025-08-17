@@ -261,11 +261,11 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     # Count active inverters
     active_inverters = len(inverter_data) if inverter_data else 0
     
-    # Last successful poll formatting
+    # Last successful poll formatting - use timestamp with date
     if stats['last_successful_poll']:
-        time_ago = int(time.time() - stats['last_successful_poll'])
-        last_poll_str = format_time_duration(time_ago) + " ago"
-        last_poll_seconds = time_ago
+        last_poll_dt = datetime.fromtimestamp(stats['last_successful_poll'])
+        last_poll_str = last_poll_dt.strftime("%H:%M %m-%d-%y")
+        last_poll_seconds = stats['last_successful_poll']
     else:
         last_poll_str = "Never"
         last_poll_seconds = None
@@ -286,7 +286,7 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats['total_polls'],
         "consecutive_failures": stats['consecutive_failures'],
-        "last_successful_poll": last_poll_seconds,
+        "last_successful_poll": last_poll_str,
         "average_response_time": round(avg_response, 2),
         "active_inverters": active_inverters,
         "pvs_uptime_percent": round(uptime_percent, 1),

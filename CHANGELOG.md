@@ -2,6 +2,17 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [Unreleased]
+
+### Bug Fixes
+- **Diagnostic Sensor Display**: "Last Successful Poll" now shows timestamp with date (e.g., "14:29 08-16-25") for easy comparison with current time
+- **Sensor Name Clarity**: Updated "Consecutive Failures" to "Consecutive Poll Failures" for better clarity
+
+### Documentation
+- **Configuration Table**: Added missing config options (Use Descriptive Names, Use Product Names, Replace Status Notifications)
+- **Updated Screenshots**: Refreshed config page images to match current UI
+- **Troubleshooting Guide**: Added poll success rate expectations section (90-95% normal)
+
 ## [v2025.8.21] - 2025-08-15
 
 ### Documentation Improvements

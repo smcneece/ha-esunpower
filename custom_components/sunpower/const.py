@@ -428,7 +428,7 @@ SUNPOWER_SENSORS = {
             },
             "CONSECUTIVE_FAILURES": {
                 "field": "consecutive_failures",
-                "title": "Consecutive Failures",
+                "title": "Consecutive Poll Failures",
                 "unit": "",
                 "icon": "mdi:alert-circle",
                 "device": None,
