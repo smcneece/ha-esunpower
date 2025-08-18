@@ -509,26 +509,5 @@ def handle_battery_detection_and_warnings(hass, entry, data, cache, safe_notify,
             cache.battery_warning_sent = False
 
 
-# SIMPLIFIED FALLBACK FUNCTIONS (for solar-only systems)
-def convert_ess_data_fallback(ess_data, data):
-    """No-op fallback when battery support not needed"""
-    _LOGGER.debug("Battery support not configured, skipping ESS data conversion")
-    return data
-
-
-def get_battery_configuration_fallback(entry, cache):
-    """Fallback that always returns no battery configuration"""
-    _LOGGER.debug("Battery support not configured, returning no battery config")
-    return False, False
-
-
-def reset_battery_failure_tracking_fallback(cache):
-    """No-op fallback when battery support not needed"""
-    _LOGGER.debug("Battery support not configured, skipping failure tracking reset")
-    pass
-
-
-def handle_battery_detection_and_warnings_fallback(hass, entry, data, cache, safe_notify, user_has_battery):
-    """No-op fallback when battery support not needed"""
-    _LOGGER.debug("Battery support not configured, skipping battery detection")
-    pass
+# SIMPLIFIED MAIN FUNCTIONS ONLY - REMOVED DUPLICATE FALLBACKS
+# All functions now handle both battery and non-battery systems gracefully

@@ -343,7 +343,7 @@ async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, 
         return None
     
     # If PVS unhealthy, don't attempt poll
-    if health_status != 'healthy':
+    if health_status not in ['healthy', 'route_fixed']:
         if health_status == 'backoff':
             remaining = int(cache.health_backoff_until - time.time())
             _LOGGER.info("PVS in backoff period, %ds remaining", remaining)
@@ -353,7 +353,10 @@ async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, 
         return None
     
     # PVS is healthy, proceed with polling
-    _LOGGER.info("PVS health check passed, proceeding with poll")
+    if health_status == 'route_fixed':
+        _LOGGER.info("Route repair successful, retrying PVS polling immediately")
+    else:
+        _LOGGER.info("PVS health check passed, proceeding with poll")
     
     try:
         # Poll PVS with adaptive timeout

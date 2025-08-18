@@ -2,6 +2,24 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.8.25] - 2025-08-25
+
+### Critical Fixes
+- **Route Repair Retry Logic**: Fixed automatic recovery after route repair - integration now properly retries polling immediately after successful route restoration
+- **Enhanced Logging**: Clear messages when route repair triggers automatic retry for better troubleshooting
+- **Complete Automation**: No manual reload required after route failures - full hands-off recovery
+
+### Code Maintenance
+- **Removed Duplicate Battery Handler Functions**: Eliminated 100+ lines of redundant fallback code (`convert_ess_data_fallback()`, `get_battery_configuration_fallback()`, etc.)
+- **Streamlined Battery Support**: Consolidated battery detection logic for better maintainability
+- **Improved Code Organization**: Cleaner, more focused codebase structure
+
+### Reliability Improvements
+- **Bulletproof Route Handling**: Complete automatic detection, repair, and recovery sequence
+- **Faster Recovery Times**: Route repair now triggers immediate polling retry instead of waiting for next cycle
+- **Better Error Handling**: Enhanced status tracking for route repair operations
+- **System Stability**: Reduced code complexity and memory overhead
+
 ## [Unreleased]
 
 ### Code Organization

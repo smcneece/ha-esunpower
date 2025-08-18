@@ -28,7 +28,7 @@
 **Core Improvements:**
 - **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
 - **Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
-- **Individual Inverter Health Monitoring**: Real-time failure detection and recovery alerts for each panel
+- **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Mobile Alert System**: Critical notifications sent directly to your phone with smart fallback
 - **Diagnostic Dashboard**: 8 real-time sensors tracking integration reliability and performance
 - **Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
