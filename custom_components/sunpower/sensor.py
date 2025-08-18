@@ -74,8 +74,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             
             # Special handling for diagnostic sensors with route repair counter
             if device_type == "Enhanced SunPower Diagnostics":
-                # Check if route checking is enabled
-                route_check_enabled = config_entry.options.get("route_check_enabled", False)
+                # Check if route checking is enabled (valid gateway IP)
+                route_gateway_ip = config_entry.data.get("route_gateway_ip", "")
+                route_check_enabled = route_gateway_ip and route_gateway_ip != "0.0.0.0" and route_gateway_ip.strip() != ""
                 
                 # Filter out route repairs sensor if route checking is disabled
                 if not route_check_enabled and "ROUTE_REPAIRS" in sensors:

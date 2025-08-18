@@ -99,6 +99,71 @@ def check_firmware_upgrade(hass, entry, cache, pvs_data):
         cache.last_known_firmware = current_firmware
 
 
+def check_flash_memory_level(hass, entry, cache, pvs_data):
+    """Check PVS flash memory level and send critical alerts if below threshold"""
+    if not pvs_data:
+        return
+    
+    # Get flash memory threshold from config (0 = disabled)
+    flash_threshold_mb = entry.options.get("flash_memory_threshold_mb", 0)
+    if flash_threshold_mb <= 0:
+        return  # Monitoring disabled
+    
+    # Get the PVS device
+    pvs_device = next(iter(pvs_data.values()), None)
+    if not pvs_device:
+        return
+    
+    # Get flash memory available in KB (from existing dl_flash_avail field)
+    flash_avail_kb = pvs_device.get("dl_flash_avail")
+    if flash_avail_kb is None:
+        _LOGGER.debug("Flash memory data not available from PVS")
+        return
+    
+    try:
+        # Convert KB to MB for threshold comparison
+        flash_avail_mb = int(flash_avail_kb) / 1024
+        
+        # Initialize tracking
+        if not hasattr(cache, 'flash_memory_last_alert_mb'):
+            cache.flash_memory_last_alert_mb = None
+            cache.flash_memory_last_alert_time = 0
+        
+        # Check if below threshold
+        if flash_avail_mb < flash_threshold_mb:
+            # Check if we should send alert (daily max frequency)
+            time_since_last_alert = time.time() - cache.flash_memory_last_alert_time
+            should_alert = (
+                cache.flash_memory_last_alert_mb is None or  # First time
+                time_since_last_alert > 86400 or  # 24 hours since last alert
+                flash_avail_mb < (cache.flash_memory_last_alert_mb - 5)  # Dropped by 5MB since last alert
+            )
+            
+            if should_alert:
+                _LOGGER.warning("PVS Flash memory critical: %.1fMB remaining (threshold: %dMB)", 
+                               flash_avail_mb, flash_threshold_mb)
+                
+                # Send critical alerts (UI + mobile if enabled)
+                from .notifications import notify_flash_memory_critical
+                notify_flash_memory_critical(hass, entry, cache, flash_avail_mb, flash_threshold_mb)
+                
+                # Update tracking
+                cache.flash_memory_last_alert_mb = flash_avail_mb
+                cache.flash_memory_last_alert_time = time.time()
+        else:
+            # Memory recovered - reset alert tracking if it was previously alerting
+            if cache.flash_memory_last_alert_mb and cache.flash_memory_last_alert_mb < flash_threshold_mb:
+                recovery_threshold = flash_threshold_mb + 5  # 5MB buffer
+                if flash_avail_mb >= recovery_threshold:
+                    _LOGGER.info("PVS Flash memory recovered: %.1fMB (above %dMB threshold)", 
+                                flash_avail_mb, flash_threshold_mb)
+                    cache.flash_memory_last_alert_mb = None
+                    cache.flash_memory_last_alert_time = 0
+    
+    except (ValueError, TypeError) as e:
+        _LOGGER.warning("Failed to process flash memory data: %s", e)
+
+
 def get_battery_configuration(entry):
     """Single battery configuration function"""
     user_has_battery = entry.options.get("has_battery_system") or entry.data.get("has_battery_system", False)
@@ -166,11 +231,18 @@ def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, 
     return should_poll, state_reason, active_threshold
 
 
-def get_cache_filename(entry_id):
-    """Get consistent cache filename to avoid multiple files"""
-    # Use only first 8 characters to keep filename short and consistent
-    short_id = entry_id[:8] if len(entry_id) > 8 else entry_id
-    return f"sunpower_cache_{short_id}.json"
+def get_cache_filename(host):
+    """Get consistent cache filename based on PVS IP address
+    
+    Args:
+        host: PVS IP address (e.g., '172.27.153.1')
+    
+    Returns:
+        Cache filename string (e.g., 'sunpower_cache_172_27_153_1.json')
+    """
+    # Replace dots with underscores to create valid filename
+    clean_host = host.replace(".", "_")
+    return f"sunpower_cache_{clean_host}.json"
 
 
 class SunPowerDataCache:
@@ -296,12 +368,12 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     return diagnostic_serial, diagnostic_device
 
 
-async def save_cache_file(hass: HomeAssistant, entry_id: str, pvs_data: dict):
-    """Save PVS data to cache file with consistent naming"""
+async def save_cache_file(hass: HomeAssistant, host: str, pvs_data: dict):
+    """Save PVS data to cache file with consistent naming based on host IP"""
     try:
         # Use HA storage directory for cache file
         storage_path = hass.config.path(".storage")
-        cache_filename = get_cache_filename(entry_id)
+        cache_filename = get_cache_filename(host)
         cache_file = os.path.join(storage_path, cache_filename)
         
         # Validate data before saving
@@ -325,12 +397,12 @@ async def save_cache_file(hass: HomeAssistant, entry_id: str, pvs_data: dict):
         return False
 
 
-async def load_cache_file(hass: HomeAssistant, entry_id: str):
-    """Load PVS data from cache file with consistent naming"""
+async def load_cache_file(hass: HomeAssistant, host: str):
+    """Load PVS data from cache file with consistent naming based on host IP"""
     try:
         # Use HA storage directory for cache file
         storage_path = hass.config.path(".storage")
-        cache_filename = get_cache_filename(entry_id)
+        cache_filename = get_cache_filename(host)
         cache_file = os.path.join(storage_path, cache_filename)
         
         def check_and_load_cache():
@@ -462,6 +534,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Create enhanced cache with diagnostics - REMOVED CALLBACK SETUP
     cache = SunPowerDataCache()
+    
+    # Initialize route repairs counter if route checking is enabled (valid gateway IP)
+    route_gateway_ip = entry.data.get("route_gateway_ip", "")
+    route_check_enabled = route_gateway_ip and route_gateway_ip != "0.0.0.0" and route_gateway_ip.strip() != ""
+    if route_check_enabled:
+        cache.route_repairs_count = 0
+        _LOGGER.info("Route checking enabled with gateway %s - initialized repairs counter to 0", route_gateway_ip)
+    else:
+        _LOGGER.info("Route checking disabled - no gateway IP configured")
 
     polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
     sunpower_monitor = SunPowerMonitor(entry.data['host'])
@@ -476,8 +557,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         
         notify_diagnostic_coordinator_started(hass, entry, cache)
         
+        # Get host IP for cache operations
+        host_ip = entry.data['host']
+        
         # Check cache file age first
-        cached_data, cache_age = await load_cache_file(hass, entry_id)
+        cached_data, cache_age = await load_cache_file(hass, host_ip)
         poll_tolerance = 30
         
         if cached_data and cache_age < (polling_interval - poll_tolerance):
@@ -552,7 +636,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                                       sunrise_elevation, sunset_elevation, active_threshold, state_reason)
             
             if not cached_data:
-                cached_data, cache_age = await load_cache_file(hass, entry_id)
+                cached_data, cache_age = await load_cache_file(hass, host_ip)
             
             if cached_data:
                 cache.previous_pvs_sample = cached_data
@@ -589,7 +673,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             
             if fresh_data:
                 # Save to cache
-                await save_cache_file(hass, entry_id, fresh_data)
+                await save_cache_file(hass, host_ip, fresh_data)
                 
                 cache.previous_pvs_sample = fresh_data
                 cache.previous_pvs_sample_time = time.time()
@@ -609,6 +693,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 pvs_data = data.get(PVS_DEVICE_TYPE, {})
                 if pvs_data:
                     check_firmware_upgrade(hass, entry, cache, pvs_data)
+                    check_flash_memory_level(hass, entry, cache, pvs_data)
                 
                 # Add diagnostic device
                 meter_data = data.get('Power Meter', {})
@@ -623,7 +708,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 # Poll failed - use cache
                 _LOGGER.info("PVS poll failed, using cached data")
                 if not cached_data:
-                    cached_data, cache_age = await load_cache_file(hass, entry_id)
+                    cached_data, cache_age = await load_cache_file(hass, host_ip)
                     
                 if cached_data:
                     cache.previous_pvs_sample = cached_data
@@ -648,7 +733,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             
             # Last resort cache
             if not cached_data:
-                cached_data, cache_age = await load_cache_file(hass, entry_id)
+                cached_data, cache_age = await load_cache_file(hass, host_ip)
                 
             if cached_data:
                 cache.previous_pvs_sample = cached_data

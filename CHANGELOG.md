@@ -4,6 +4,26 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ## [Unreleased]
 
+### Major Features
+- **Flash Memory Monitoring**: Critical alerts when PVS flash memory drops below configurable threshold (default: disabled, set MB value to enable)
+- **Hardware Protection**: Prevents PVS failures by alerting before flash memory fills up completely
+- **Smart Alert Logic**: Daily alert frequency with 5MB escalation (immediate alert if memory drops 5MB+ since last notification)
+- **Existing Sensor Integration**: Uses existing "Flash Available" sensor data (KB) with threshold comparison in MB
+- **Critical Alert System**: Flash memory alerts sent to both UI notifications and mobile devices (if enabled)
+- **Recovery Detection**: Automatic alert reset when memory rises above threshold + 5MB buffer
+
+### Bug Fixes
+- **Cache Filename Persistence**: Fixed cache files using integration ID - now uses PVS IP address for consistent filenames across integration reinstalls
+- **Route Repairs Diagnostic Sensor**: Fixed "Unavailable" status by correcting config data lookup (route_check_enabled stored in entry.data, not entry.options)
+- **Config Flow UI Cleanup**: Removed redundant mobile notifications toggle - mobile device dropdown selection now controls alert sending (select device = enabled, "Disabled" = off)
+- **Route Checking Simplification**: Removed separate route checking toggle - now controlled by Gateway IP field (empty = disabled, valid IP = enabled)
+- **Config Page Organization**: Moved flash memory threshold to top of notifications page for better field spacing and visual flow
+- **Config Flow Text Display**: Fixed missing text and labels on config flow pages 2 & 3 (Solar Configuration and Notifications)
+- **Config Flow Organization**: Moved route checking options from Notifications page to Basic Setup page for better logical grouping
+- **Translation Coverage**: Added complete translation entries for `solar` and `notifications` config flow steps
+
+## [v2025.8.22] - 2025-08-16
+
 ### Bug Fixes
 - **Diagnostic Sensor Display**: "Last Successful Poll" now shows timestamp with date (e.g., "14:29 08-16-25") for easy comparison with current time
 - **Sensor Name Clarity**: Updated "Consecutive Failures" to "Consecutive Poll Failures" for better clarity
@@ -47,7 +67,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ### Major Features
 - **Entity Naming Compatibility**: Fixed energy dashboard entity naming to show proper inverter identification
-- **Professional Documentation**: Enhanced README with 80% emoji reduction for credible presentation
+- **Documentation**: Enhanced README
 - **Config Flow Improvements**: Added naming options to Basic Settings page with backward compatibility
 
 ### Bug Fixes

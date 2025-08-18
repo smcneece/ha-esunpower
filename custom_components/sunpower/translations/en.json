@@ -32,6 +32,39 @@
                     "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
+            "solar": {
+                "title": "Enhanced SunPower - Solar Configuration",
+                "description": "Configure solar panel optimization and naming preferences.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n📛 Naming Options:\n• Descriptive names show detailed inverter IDs in energy dashboard\n• Product names add 'SunPower' prefix to all entities",
+                "data": {
+                    "sunrise_elevation": "Sunrise elevation (degrees)",
+                    "sunset_elevation": "Sunset elevation (degrees)",
+                    "use_descriptive_names": "Use descriptive names",
+                    "use_product_names": "Use product names"
+                },
+                "data_description": {
+                    "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
+                    "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
+                }
+            },
+            "notifications": {
+                "title": "Enhanced SunPower - Notifications & Advanced",
+                "description": "Configure notification preferences and advanced features.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting",
+                "data": {
+                    "general_notifications": "Show status notifications",
+                    "deep_debug_notifications": "Show debug diagnostics",
+                    "overwrite_general_notifications": "Replace status notifications",
+                    "mobile_device": "Mobile device for critical alerts",
+                    "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
+                },
+                "data_description": {
+                    "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
+                }
+            },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
                 "description": "Configure advanced Enhanced SunPower features.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n\n🔔 Notification Options:\n• General notifications provide 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Select your phone/tablet for critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
@@ -51,7 +84,7 @@
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
-                    "mobile_device": "Select which mobile device receives critical notifications",
+                    "mobile_device": "Device for alerts",
                     "route_check_enabled": "Detect and repair missing network routes when TCP health check fails (for VLAN/custom routing setups)",
                     "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
                 }
@@ -62,24 +95,51 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.",
+                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval_seconds": "Polling interval (seconds)",
                     "has_battery_system": "I have a SunVault battery system",
-                    "sunrise_elevation": "Sunrise elevation",
-                    "sunset_elevation": "Sunset elevation",
-                    "use_descriptive_names": "Use descriptive names",
-                    "use_product_names": "Use product names"
+                    "route_gateway_ip": "Gateway IP for route repair"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "polling_interval_seconds": "How often to check for new data (300-3600 seconds for PVS protection)",
                     "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
+                    "route_gateway_ip": "Gateway IP for automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)"
+                }
+            },
+            "solar": {
+                "title": "Enhanced SunPower - Solar Configuration",
+                "description": "Configure solar panel optimization and naming preferences.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n📛 Naming Options:\n• Descriptive names show detailed inverter IDs in energy dashboard\n• Product names add 'SunPower' prefix to all entities",
+                "data": {
+                    "sunrise_elevation": "Sunrise elevation (degrees)",
+                    "sunset_elevation": "Sunset elevation (degrees)",
+                    "use_descriptive_names": "Use descriptive names",
+                    "use_product_names": "Use product names"
+                },
+                "data_description": {
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
                     "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
                     "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
+                }
+            },
+            "notifications": {
+                "title": "Enhanced SunPower - Notifications",
+                "description": "Configure notification preferences.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting",
+                "data": {
+                    "general_notifications": "Show status notifications",
+                    "deep_debug_notifications": "Show debug diagnostics",
+                    "overwrite_general_notifications": "Replace status notifications",
+                    "mobile_device": "Mobile device for critical alerts",
+                    "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
+                },
+                "data_description": {
+                    "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
                 }
             },
             "advanced": {
@@ -101,7 +161,7 @@
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) directly to your mobile device",
-                    "mobile_device": "Select which mobile device receives critical notifications (requires Home Assistant mobile app)",
+                    "mobile_device": "Device for alerts",
                     "route_check_enabled": "Automatically check and repair missing network routes when PVS becomes unreachable (for VLAN/custom routing setups)",
                     "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
                 }

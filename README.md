@@ -6,7 +6,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
-[![Version](https://img.shields.io/badge/version-2025.8.22-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.22)
+[![Version](https://img.shields.io/badge/version-2025.8.23-blue.svg)](https://github.com/smcneece/ha-esunpower/releases/tag/v2025.8.23)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
 [![Maintainer](https://img.shields.io/badge/maintainer-Shawn%20McNeece%20%40smcneece-blue.svg)](https://github.com/smcneece)
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
@@ -29,6 +29,7 @@ Version: v2025.8.21
 ## What Makes This Enhanced?
 
 **Core Improvements:**
+- **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
 - **Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
 - **Individual Inverter Health Monitoring**: Real-time failure detection and recovery alerts for each panel
 - **Mobile Alert System**: Critical notifications sent directly to your phone with smart fallback
@@ -120,13 +121,19 @@ Version: v2025.8.21
 
 ## Configuration
 
-![Configuration Options](images/config.png)
+### Basic Setup (Page 1)
+![Basic Setup Configuration](images/config_pg1.png)
 
-### Basic Setup
-1. Enter your PVS IP address (usually `172.27.153.1`)
-2. Configure polling interval (minimum 300 seconds, recommended 300-600 seconds)
-3. Set sunrise and sunset elevation thresholds for your panel orientation
-4. Enable "Battery System" if you have SunVault batteries
+### Solar Configuration (Page 2)
+![Solar Configuration](images/config_pg2.png)
+
+### Notifications & Advanced (Page 3)
+![Notifications Configuration](images/config_pg3.png)
+
+### Setup Process
+1. **Page 1**: Enter PVS IP address, polling interval, battery system, route gateway IP
+2. **Page 2**: Configure sunrise/sunset elevation thresholds and naming preferences  
+3. **Page 3**: Set flash memory threshold, notification preferences, and mobile device
 
 ### Configuration Options
 
@@ -134,18 +141,17 @@ Version: v2025.8.21
 |---------|-------------|---------|-------------|
 | **Host** | PVS IP Address | N/A | `172.27.153.1` |
 | **Polling Interval** | Update frequency (seconds) | 300 | 300-600 seconds |
+| **Battery System** | Enable if you have SunVault | `false` | Check if you have batteries |
+| **Gateway IP** | Route repair (leave empty to disable) | `` | Your router IP for VLAN setups |
 | **Sunrise Elevation** | Start polling threshold | 5° | See guide below |
 | **Sunset Elevation** | Stop polling threshold | 5° | See guide below |
-| **Battery System** | Enable if you have SunVault | `false` | Check if you have batteries |
-| **Use Descriptive Names** | Show detailed inverter names in energy dashboard | `true` | Enable for proper energy dashboard setup |
-| **Use Product Names** | Add 'SunPower' prefix to entity names | `false` | Personal preference |
+| **Use Descriptive Names** | Show detailed inverter names | `true` | Enable for energy dashboard |
+| **Use Product Names** | Add 'SunPower' prefix | `false` | Personal preference |
+| **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
 | **General Notifications** | Show status updates | `true` | Enable for monitoring |
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
-| **Replace Status Notifications** | Reuse notifications to prevent accumulation | `false` | Enable to reduce notification clutter |
-| **Mobile Notifications** | Send alerts to phone | `false` | Enable for critical alerts |
-| **Mobile Device** | Which device receives alerts | None | Select your phone |
-| **Route Check** | Auto-setup/repair network routes | `false` | Enable for VLAN setups |
-| **Gateway IP** | Route repair gateway | `192.168.1.80` | Your router/switch IP |
+| **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
+| **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
 
 ### Sunrise/Sunset Elevation Guide
 
@@ -161,14 +167,12 @@ Version: v2025.8.21
 - Reduces unnecessary polling during non-productive periods
 - Integration automatically uses appropriate threshold based on time of day
 
-![Advanced Configuration](images/advanced_config.png)
-
 ## Available Data
 
 ### PVS System Monitoring
 - System load, uptime, memory usage, firmware version
 - Communication errors and scan statistics  
-- Flash storage availability
+- Flash storage availability with critical alerts
 - Real-time diagnostics and health monitoring
 
 ### Solar Production

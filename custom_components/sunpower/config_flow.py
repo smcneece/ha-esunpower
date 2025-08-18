@@ -96,7 +96,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return False, f"Setup validation failed: {str(e)}"
 
     async def async_step_user(self, user_input=None):
-        """Handle the basic configuration step with sun elevation moved here."""
+        """Handle the initial connection and hardware setup."""
         errors = {}
         description_placeholders = {}
 
@@ -107,33 +107,54 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["polling_interval_seconds"] = "MIN_INTERVAL"
             else:
                 # Test PVS connection before proceeding
-                _LOGGER.info("Setup: Validating PVS connection before proceeding")
+                _LOGGER.info("Setup: Validating PVS connection")
                 
                 success, message = await self._test_pvs_connection(user_input["host"])
                 
                 if success:
-                    # Store basic config and proceed to advanced step
+                    # Store basic config and proceed to solar config
                     self._basic_config = user_input.copy()
-                    _LOGGER.info("Setup: Basic configuration validated, proceeding to advanced settings")
-                    return await self.async_step_advanced()
+                    _LOGGER.info("Setup: Connection validated, proceeding to solar configuration")
+                    return await self.async_step_solar()
                 else:
-                    # Connection failed - show error and allow retry
+                    # Connection failed - show error
                     _LOGGER.warning("Setup: PVS validation failed: %s", message)
                     errors["host"] = "connection_failed"
                     description_placeholders["error_details"] = message
 
-        # Basic configuration schema with sun elevation AND naming options
+        # Page 1: Connection & Hardware schema
         schema = vol.Schema({
             vol.Required("host", default="172.27.153.1"): str,
             vol.Required("polling_interval_seconds", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=300,  # Minimum 300 seconds for PVS safety
-                    max=3600,  # Maximum 1 hour for reasonable polling
+                    min=300,
+                    max=3600,
                     unit_of_measurement="seconds",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
             vol.Required("has_battery_system", default=False): selector.BooleanSelector(),
+            vol.Required("route_gateway_ip", default=""): str,
+        })
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders=description_placeholders
+        )
+
+    async def async_step_solar(self, user_input=None):
+        """Handle solar optimization configuration."""
+        errors = {}
+
+        if user_input is not None:
+            # Store solar config and proceed to notifications
+            self._basic_config.update(user_input)
+            return await self.async_step_notifications()
+
+        # Page 2: Solar Optimization schema
+        schema = vol.Schema({
             vol.Required("sunrise_elevation", default=5): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=-10,
@@ -155,18 +176,17 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         })
 
         return self.async_show_form(
-            step_id="user",
+            step_id="solar",
             data_schema=schema,
-            errors=errors,
-            description_placeholders=description_placeholders
+            errors=errors
         )
 
-    async def async_step_advanced(self, user_input=None):
-        """Handle the advanced configuration step - now less crowded."""
+    async def async_step_notifications(self, user_input=None):
+        """Handle notifications and advanced configuration."""
         errors = {}
 
         if user_input is not None:
-            # Combine basic and advanced config
+            # Combine all config and create entry
             complete_config = self._basic_config.copy()
             complete_config.update(user_input)
             
@@ -179,6 +199,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "has_battery_system": complete_config["has_battery_system"],
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
+                    "route_gateway_ip": complete_config.get("route_gateway_ip", ""),
                 },
                 options={
                     "sunrise_elevation": complete_config["sunrise_elevation"],
@@ -186,10 +207,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "general_notifications": complete_config["general_notifications"],
                     "deep_debug_notifications": complete_config["deep_debug_notifications"],
                     "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
-                    "mobile_notifications": complete_config["mobile_notifications"],
                     "mobile_device": complete_config.get("mobile_device"),
-                    "route_check_enabled": complete_config["route_check_enabled"],
-                    "route_gateway_ip": complete_config.get("route_gateway_ip", "192.168.1.80"),
+                    "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
                 }
             )
 
@@ -198,24 +217,29 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         mobile_options = {"none": "Disabled"}
         mobile_options.update(mobile_devices)
 
-        # Advanced configuration schema - notifications and network features
+        # Page 3: Notifications schema
         schema = vol.Schema({
+            vol.Required("flash_memory_threshold_mb", default=0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=200,
+                    unit_of_measurement="MB",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
             vol.Required("general_notifications", default=True): selector.BooleanSelector(),
             vol.Required("deep_debug_notifications", default=False): selector.BooleanSelector(),
             vol.Required("overwrite_general_notifications", default=True): selector.BooleanSelector(),
-            vol.Required("mobile_notifications", default=False): selector.BooleanSelector(),
-            vol.Optional("mobile_device", default="none"): selector.SelectSelector(
+            vol.Required("mobile_device", default="none"): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=[{"value": k, "label": v} for k, v in mobile_options.items()],
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Required("route_check_enabled", default=False): selector.BooleanSelector(),
-            vol.Required("route_gateway_ip", default="192.168.1.80"): selector.TextSelector(),
         })
 
         return self.async_show_form(
-            step_id="advanced",
+            step_id="notifications",
             data_schema=schema,
             errors=errors
         )
@@ -229,12 +253,10 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         """Initialize options flow."""
-        # FIXED: Remove explicit config_entry assignment (deprecated in HA 2025.12)
-        # self.config_entry is automatically available in OptionsFlow
         self._basic_config = {}
 
     async def async_step_init(self, user_input=None):
-        """Handle the basic options step with sun elevation moved here."""
+        """Handle the connection and hardware options."""
         errors = {}
 
         if user_input is not None:
@@ -242,9 +264,9 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             if polling_interval < 300:
                 errors["polling_interval_seconds"] = "MIN_INTERVAL"
             else:
-                # Store basic config and proceed to advanced step
+                # Store basic config and proceed to solar step
                 self._basic_config = user_input.copy()
-                return await self.async_step_advanced()
+                return await self.async_step_solar()
 
         # Get current values from either options or data (fallback)
         current_host = self.config_entry.options.get(
@@ -261,8 +283,40 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             "has_battery_system",
             self.config_entry.data.get("has_battery_system", False)
         )
+        
+        current_route_gateway_ip = self.config_entry.data.get("route_gateway_ip", "")
 
-        # Get current sun elevation values with migration from old single elevation
+        # Page 1: Connection & Hardware schema
+        schema = vol.Schema({
+            vol.Required("host", default=current_host): str,
+            vol.Required("polling_interval_seconds", default=current_interval): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=300,
+                    max=3600,
+                    unit_of_measurement="seconds",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("has_battery_system", default=current_battery): selector.BooleanSelector(),
+            vol.Required("route_gateway_ip", default=current_route_gateway_ip): str,
+        })
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors
+        )
+
+    async def async_step_solar(self, user_input=None):
+        """Handle solar optimization options."""
+        errors = {}
+
+        if user_input is not None:
+            # Store solar config and proceed to notifications
+            self._basic_config.update(user_input)
+            return await self.async_step_notifications()
+
+        # Get current sun elevation values with migration
         current_sunrise = self.config_entry.options.get("sunrise_elevation")
         current_sunset = self.config_entry.options.get("sunset_elevation")
         
@@ -278,18 +332,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         current_descriptive = self.config_entry.data.get("use_descriptive_names", True)
         current_product = self.config_entry.data.get("use_product_names", False)
 
-        # Basic options schema with sun elevation AND naming options
+        # Page 2: Solar Optimization schema
         schema = vol.Schema({
-            vol.Required("host", default=current_host): str,
-            vol.Required("polling_interval_seconds", default=current_interval): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=300,  # Minimum 300 seconds for PVS safety
-                    max=3600,  # Maximum 1 hour for reasonable polling
-                    unit_of_measurement="seconds",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required("has_battery_system", default=current_battery): selector.BooleanSelector(),
             vol.Required("sunrise_elevation", default=current_sunrise): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=-10,
@@ -311,17 +355,17 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         })
 
         return self.async_show_form(
-            step_id="init",
+            step_id="solar",
             data_schema=schema,
             errors=errors
         )
 
-    async def async_step_advanced(self, user_input=None):
-        """Handle the advanced options step - cleaner without sun elevation."""
+    async def async_step_notifications(self, user_input=None):
+        """Handle notifications and advanced options."""
         errors = {}
 
         if user_input is not None:
-            # Combine basic and advanced config
+            # Combine all config and update entry
             complete_config = self._basic_config.copy()
             complete_config.update(user_input)
             
@@ -337,6 +381,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
             if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):
                 data_updates["use_product_names"] = complete_config["use_product_names"]
+            if complete_config["route_gateway_ip"] != self.config_entry.data.get("route_gateway_ip"):
+                data_updates["route_gateway_ip"] = complete_config["route_gateway_ip"]
             
             # Apply data updates if needed
             if data_updates:
@@ -351,17 +397,15 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     title=title
                 )
             
-            # Create options with sunrise/sunset elevation from basic config
+            # Create options
             options = {
                 "sunrise_elevation": complete_config["sunrise_elevation"],
                 "sunset_elevation": complete_config["sunset_elevation"],
                 "general_notifications": complete_config["general_notifications"],
                 "deep_debug_notifications": complete_config["deep_debug_notifications"],
                 "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
-                "mobile_notifications": complete_config["mobile_notifications"],
                 "mobile_device": complete_config.get("mobile_device"),
-                "route_check_enabled": complete_config["route_check_enabled"],
-                "route_gateway_ip": complete_config.get("route_gateway_ip", "192.168.1.80"),
+                "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
             }
             
             return self.async_create_entry(title="", data=options)
@@ -371,33 +415,36 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         mobile_options = {"none": "Disabled"}
         mobile_options.update(mobile_devices)
 
-        # Get current advanced values
+        # Get current values
         current_general = self.config_entry.options.get("general_notifications", True)
         current_debug = self.config_entry.options.get("deep_debug_notifications", False)
         current_overwrite = self.config_entry.options.get("overwrite_general_notifications", True)
-        current_mobile_enabled = self.config_entry.options.get("mobile_notifications", False)
         current_mobile_device = self.config_entry.options.get("mobile_device", "none")
-        current_route_check = self.config_entry.options.get("route_check_enabled", False)
-        current_gateway_ip = self.config_entry.options.get("route_gateway_ip", "192.168.1.80")
+        current_flash_threshold = self.config_entry.options.get("flash_memory_threshold_mb", 0)
 
-        # Advanced options schema - notifications and network features only
+        # Page 3: Notifications schema
         schema = vol.Schema({
+            vol.Required("flash_memory_threshold_mb", default=current_flash_threshold): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=200,
+                    unit_of_measurement="MB",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
             vol.Required("general_notifications", default=current_general): selector.BooleanSelector(),
             vol.Required("deep_debug_notifications", default=current_debug): selector.BooleanSelector(),
             vol.Required("overwrite_general_notifications", default=current_overwrite): selector.BooleanSelector(),
-            vol.Required("mobile_notifications", default=current_mobile_enabled): selector.BooleanSelector(),
-            vol.Optional("mobile_device", default=current_mobile_device): selector.SelectSelector(
+            vol.Required("mobile_device", default=current_mobile_device): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=[{"value": k, "label": v} for k, v in mobile_options.items()],
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Required("route_check_enabled", default=current_route_check): selector.BooleanSelector(),
-            vol.Required("route_gateway_ip", default=current_gateway_ip): str,
         })
 
         return self.async_show_form(
-            step_id="advanced",
+            step_id="notifications",
             data_schema=schema,
             errors=errors
         )

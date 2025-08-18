@@ -123,8 +123,9 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
         cache.last_health_check = current_time
         return 'healthy'
     
-    # TCP failed - check if route checking is enabled
-    route_check_enabled = entry.options.get("route_check_enabled", False)
+    # TCP failed - check if route checking is enabled (valid gateway IP)
+    route_gateway_ip = entry.data.get("route_gateway_ip", "")
+    route_check_enabled = route_gateway_ip and route_gateway_ip != "0.0.0.0" and route_gateway_ip.strip() != ""
     
     if route_check_enabled:
         _LOGGER.info("TCP failed, checking route status (route check enabled)")
@@ -137,12 +138,9 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
             _LOGGER.error("CRITICAL: Route to PVS network is missing!")
             notify_route_missing(hass, entry, cache)
             
-            # Get user's configured gateway (with fallback)
-            gateway_ip = entry.options.get("route_gateway_ip", "192.168.1.80")
-            
-            # Attempt to repair the route
-            _LOGGER.info("Attempting to repair missing route using gateway %s...", gateway_ip)
-            route_added = await add_pvs_route(gateway=gateway_ip)
+            # Use the configured gateway IP
+            _LOGGER.info("Attempting to repair missing route using gateway %s...", route_gateway_ip)
+            route_added = await add_pvs_route(gateway=route_gateway_ip)
             
             if route_added:
                 _LOGGER.info("Route repair successful, testing PVS connection...")

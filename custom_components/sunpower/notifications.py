@@ -108,8 +108,8 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
             show_general = config_entry.options.get("general_notifications", True)
             show_debug = config_entry.options.get("deep_debug_notifications", False)
             overwrite_general = config_entry.options.get("overwrite_general_notifications", True)
-            mobile_enabled = config_entry.options.get("mobile_notifications", False)
             mobile_device = config_entry.options.get("mobile_device")
+            mobile_enabled = mobile_device is not None and mobile_device != "none"
         else:
             # Fallback defaults if no config available
             show_general = True
@@ -266,6 +266,13 @@ def notify_inverter_recovery(hass, entry, cache, inverter_serial, downtime_polls
     msg = f"✅ INVERTER RECOVERED: {inverter_serial} back online after {downtime_polls} failed polls"
     safe_notify(hass, msg, "Enhanced SunPower Recovery", entry, force_notify=True, 
                notification_category="inverter", cache=cache)
+
+def notify_flash_memory_critical(hass, entry, cache, available_mb, threshold_mb):
+    """ESSENTIAL: Flash memory critical alert - UI + mobile"""
+    msg = f"⚠️ PVS FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb}MB)"
+    # This is critical hardware protection - always notify + mobile
+    safe_notify(hass, msg, "Enhanced SunPower Critical", entry, force_notify=True, 
+               notification_category="flash_memory", cache=cache)
 
 def notify_polling_failed(hass, entry, cache, polling_url, error):
     """ESSENTIAL: Polling failure notifications"""
