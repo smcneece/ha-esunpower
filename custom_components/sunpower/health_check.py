@@ -297,3 +297,124 @@ def get_inverter_health_summary(cache):
         "failed": failed_count,    # 5+ consecutive failures
         "failure_counts": cache.inverter_failure_counts.copy()
     }
+
+
+def check_firmware_upgrade(hass, entry, cache, pvs_data):
+    """Check for PVS firmware upgrades and notify"""
+    from .notifications import notify_firmware_upgrade
+    
+    if not pvs_data:
+        return
+    
+    # Get the PVS device (should only be one)
+    pvs_device = next(iter(pvs_data.values()), None)
+    if not pvs_device:
+        return
+    
+    current_firmware = pvs_device.get("SWVER")
+    if not current_firmware:
+        return
+    
+    # Initialize tracking on first successful poll
+    if not cache.firmware_tracking_initialized:
+        cache.last_known_firmware = current_firmware
+        cache.firmware_tracking_initialized = True
+        _LOGGER.info("Initialized firmware tracking: %s", current_firmware)
+        return
+    
+    # Check for firmware change
+    if cache.last_known_firmware and current_firmware != cache.last_known_firmware:
+        _LOGGER.info("PVS firmware upgrade detected: %s → %s", cache.last_known_firmware, current_firmware)
+        notify_firmware_upgrade(hass, entry, cache, cache.last_known_firmware, current_firmware)
+        cache.last_known_firmware = current_firmware
+    elif not cache.last_known_firmware:
+        # Handle case where we didn't have firmware before
+        cache.last_known_firmware = current_firmware
+
+
+def check_flash_memory_level(hass, entry, cache, pvs_data):
+    """Check PVS flash memory level and send critical alerts if below threshold"""
+    from .notifications import notify_flash_memory_critical
+    
+    if not pvs_data:
+        return
+    
+    # Get flash memory threshold from config (0 = disabled)
+    flash_threshold_mb = entry.options.get("flash_memory_threshold_mb", 0)
+    if flash_threshold_mb <= 0:
+        return  # Monitoring disabled
+    
+    # Get the PVS device
+    pvs_device = next(iter(pvs_data.values()), None)
+    if not pvs_device:
+        return
+    
+    # Get flash memory available in KB (from existing dl_flash_avail field)
+    flash_avail_kb = pvs_device.get("dl_flash_avail")
+    if flash_avail_kb is None:
+        _LOGGER.debug("Flash memory data not available from PVS")
+        return
+    
+    try:
+        # Convert KB to MB for threshold comparison
+        flash_avail_mb = int(flash_avail_kb) / 1024
+        
+        # Initialize tracking
+        if not hasattr(cache, 'flash_memory_last_alert_mb'):
+            cache.flash_memory_last_alert_mb = None
+            cache.flash_memory_last_alert_time = 0
+        
+        # Check if below threshold
+        if flash_avail_mb < flash_threshold_mb:
+            # Check if we should send alert (daily max frequency)
+            time_since_last_alert = time.time() - cache.flash_memory_last_alert_time
+            should_alert = (
+                cache.flash_memory_last_alert_mb is None or  # First time
+                time_since_last_alert > 86400 or  # 24 hours since last alert
+                flash_avail_mb < (cache.flash_memory_last_alert_mb - 5)  # Dropped by 5MB since last alert
+            )
+            
+            if should_alert:
+                _LOGGER.warning("PVS Flash memory critical: %.1fMB remaining (threshold: %dMB)", 
+                               flash_avail_mb, flash_threshold_mb)
+                
+                # Send critical alerts (UI + mobile if enabled)
+                notify_flash_memory_critical(hass, entry, cache, flash_avail_mb, flash_threshold_mb)
+                
+                # Update tracking
+                cache.flash_memory_last_alert_mb = flash_avail_mb
+                cache.flash_memory_last_alert_time = time.time()
+        else:
+            # Memory recovered - reset alert tracking if it was previously alerting
+            if cache.flash_memory_last_alert_mb and cache.flash_memory_last_alert_mb < flash_threshold_mb:
+                recovery_threshold = flash_threshold_mb + 5  # 5MB buffer
+                if flash_avail_mb >= recovery_threshold:
+                    _LOGGER.info("PVS Flash memory recovered: %.1fMB (above %dMB threshold)", 
+                                flash_avail_mb, flash_threshold_mb)
+                    cache.flash_memory_last_alert_mb = None
+                    cache.flash_memory_last_alert_time = 0
+    
+    except (ValueError, TypeError) as e:
+        _LOGGER.warning("Failed to process flash memory data: %s", e)
+
+
+def update_diagnostic_stats(cache, success, response_time=None):
+    """Update diagnostic statistics for dashboard sensors"""
+    stats = cache.diagnostic_stats
+    
+    # Update totals
+    stats['total_polls'] += 1
+    
+    if success:
+        stats['successful_polls'] += 1
+        stats['consecutive_failures'] = 0
+        stats['last_successful_poll'] = time.time()
+        
+        # Track response times (keep last 50 for average)
+        if response_time:
+            stats['response_times'].append(response_time)
+            if len(stats['response_times']) > 50:
+                stats['response_times'].pop(0)
+    else:
+        stats['failed_polls'] += 1
+        stats['consecutive_failures'] += 1

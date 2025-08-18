@@ -4,6 +4,14 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ## [Unreleased]
 
+### Code Organization
+- **Internal Refactoring**: Moved hardware monitoring functions from `__init__.py` to `health_check.py` for better code organization
+- **Flash Memory Monitoring**: `check_flash_memory_level()` now properly located in health check module
+- **Firmware Tracking**: `check_firmware_upgrade()` moved to health check module alongside other hardware monitoring
+- **Diagnostic Stats**: `update_diagnostic_stats()` relocated to health check module for logical grouping
+- **Maintainability**: Reduced `__init__.py` complexity by ~97 lines while preserving all functionality
+- **No User Impact**: Internal reorganization only - all features work identically
+
 ### Major Features
 - **Flash Memory Monitoring**: Critical alerts when PVS flash memory drops below configurable threshold (default: disabled, set MB value to enable)
 - **Hardware Protection**: Prevents PVS failures by alerting before flash memory fills up completely
