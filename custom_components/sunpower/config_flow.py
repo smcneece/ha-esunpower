@@ -61,10 +61,10 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             device_count = len(devices)
             _LOGGER.info("Setup validation: PVS returned %d devices", device_count)
             
-            # Validate we have reasonable device count (at least 10 for a real solar system)
-            if device_count < 10:
-                _LOGGER.warning("Setup validation: Suspiciously low device count: %d", device_count)
-                return False, f"Only {device_count} devices found - expected at least 10 for a solar system"
+            # Validate we have minimum device count (at least 3: PVS + 1 inverter + optional meter)
+            if device_count < 3:
+                _LOGGER.warning("Setup validation: Too few devices: %d", device_count)
+                return False, f"Only {device_count} devices found - need at least PVS + 1 inverter (minimum 3 devices)"
             
             # Validate we have required device types
             device_types = [device.get("DEVICE_TYPE") for device in devices]

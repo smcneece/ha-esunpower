@@ -60,8 +60,23 @@ async def add_pvs_route(target_network="172.27.153.0/24", gateway=None):
 
 
 async def tcp_connect_test(host, port=80, timeout=2):
-    """Fast TCP connect test to check if PVS is reachable"""
+    """Fast TCP connect test to check if PVS is reachable
+    Handles host strings with ports (e.g., '10.222.1.245:9090')
+    """
     try:
+        # Parse host string for embedded port
+        if ':' in host and not host.startswith('['):  # Not IPv6
+            host_part, port_part = host.rsplit(':', 1)
+            try:
+                port = int(port_part)
+                host = host_part
+                _LOGGER.debug("TCP test: parsed %s:%s from host string", host, port)
+            except ValueError:
+                # Invalid port in string, use default
+                _LOGGER.debug("TCP test: invalid port in host string, using default %d", port)
+        
+        _LOGGER.debug("TCP connect test: %s:%d (timeout=%ds)", host, port, timeout)
+        
         _, writer = await asyncio.wait_for(
             asyncio.open_connection(host, port),
             timeout=timeout
@@ -69,7 +84,8 @@ async def tcp_connect_test(host, port=80, timeout=2):
         writer.close()
         await writer.wait_closed()
         return True
-    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+    except (asyncio.TimeoutError, OSError, ConnectionRefusedError) as e:
+        _LOGGER.debug("TCP connect test failed: %s", e)
         return False
 
 

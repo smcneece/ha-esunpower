@@ -139,16 +139,16 @@ def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, 
 
 
 def get_cache_filename(host):
-    """Get consistent cache filename based on PVS IP address
+    """Get consistent cache filename based on PVS host address
     
     Args:
-        host: PVS IP address (e.g., '172.27.153.1')
+        host: PVS host address (e.g., '172.27.153.1' or '10.222.1.245:9090')
     
     Returns:
-        Cache filename string (e.g., 'sunpower_cache_172_27_153_1.json')
+        Cache filename string (e.g., 'sunpower_cache_172_27_153_1.json' or 'sunpower_cache_10_222_1_245_9090.json')
     """
-    # Replace dots with underscores to create valid filename
-    clean_host = host.replace(".", "_")
+    # Replace dots and colons with underscores to create valid filename for all OS
+    clean_host = host.replace(".", "_").replace(":", "_")
     return f"sunpower_cache_{clean_host}.json"
 
 

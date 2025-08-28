@@ -2,6 +2,18 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.8.26] - 2025-08-29
+
+### Critical Fixes
+- **Small System Support**: Reduced minimum device requirement from 10 to 3 devices during setup
+- **Proxy Compatibility**: Fixed TCP health checks for reverse proxy setups with custom ports
+- **Windows Cache Files**: Fixed cache file creation when using host addresses with ports
+
+### Impact
+- Small solar systems (condos, townhomes, EV charging) can now complete setup
+- Reverse proxy configurations work without manual intervention
+- Cross-platform compatibility improved
+
 ## [v2025.8.25] - 2025-08-25
 
 ### Critical Fixes
