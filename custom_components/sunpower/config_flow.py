@@ -12,8 +12,13 @@ from .notifications import get_mobile_devices
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default to 300 seconds for PVS safety
-DEFAULT_SUNPOWER_UPDATE_INTERVAL = 300
+# Import interval constants from const.py
+from .const import (
+    DEFAULT_SUNPOWER_UPDATE_INTERVAL,
+    DEFAULT_NIGHTTIME_UPDATE_INTERVAL,
+    MIN_SUNPOWER_UPDATE_INTERVAL,
+    MIN_NIGHTTIME_UPDATE_INTERVAL,
+)
 
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -133,7 +138,14 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("has_battery_system", default=False): selector.BooleanSelector(),
+            vol.Required("nighttime_polling_interval", default=DEFAULT_NIGHTTIME_UPDATE_INTERVAL): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=3600,
+                    unit_of_measurement="seconds",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
             vol.Required("route_gateway_ip", default=""): str,
         })
 
@@ -196,7 +208,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={
                     "host": complete_config["host"],
                     "polling_interval_seconds": complete_config["polling_interval_seconds"],
-                    "has_battery_system": complete_config["has_battery_system"],
+                    "nighttime_polling_interval": complete_config.get("nighttime_polling_interval", 0),
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
                     "route_gateway_ip": complete_config.get("route_gateway_ip", ""),
@@ -261,8 +273,12 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
 
         if user_input is not None:
             polling_interval = user_input["polling_interval_seconds"]
+            nighttime_interval = user_input["nighttime_polling_interval"]
+
             if polling_interval < 300:
                 errors["polling_interval_seconds"] = "MIN_INTERVAL"
+            elif nighttime_interval != 0 and nighttime_interval < MIN_NIGHTTIME_UPDATE_INTERVAL:
+                errors["nighttime_polling_interval"] = "MIN_NIGHTTIME_INTERVAL"
             else:
                 # Store basic config and proceed to solar step
                 self._basic_config = user_input.copy()
@@ -275,15 +291,15 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         )
         
         current_interval = self.config_entry.options.get(
-            "polling_interval_seconds", 
+            "polling_interval_seconds",
             self.config_entry.data.get("polling_interval_seconds", DEFAULT_SUNPOWER_UPDATE_INTERVAL)
         )
-        
-        current_battery = self.config_entry.options.get(
-            "has_battery_system",
-            self.config_entry.data.get("has_battery_system", False)
+
+        current_nighttime_interval = self.config_entry.options.get(
+            "nighttime_polling_interval",
+            self.config_entry.data.get("nighttime_polling_interval", DEFAULT_NIGHTTIME_UPDATE_INTERVAL)
         )
-        
+
         current_route_gateway_ip = self.config_entry.data.get("route_gateway_ip", "")
 
         # Page 1: Connection & Hardware schema
@@ -297,7 +313,14 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("has_battery_system", default=current_battery): selector.BooleanSelector(),
+            vol.Required("nighttime_polling_interval", default=current_nighttime_interval): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=3600,
+                    unit_of_measurement="seconds",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
             vol.Required("route_gateway_ip", default=current_route_gateway_ip): str,
         })
 
@@ -373,8 +396,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             data_updates = {}
             if complete_config["host"] != self.config_entry.data.get("host"):
                 data_updates["host"] = complete_config["host"]
-            if complete_config["has_battery_system"] != self.config_entry.data.get("has_battery_system"):
-                data_updates["has_battery_system"] = complete_config["has_battery_system"]
+            if complete_config.get("nighttime_polling_interval") != self.config_entry.data.get("nighttime_polling_interval"):
+                data_updates["nighttime_polling_interval"] = complete_config.get("nighttime_polling_interval", 0)
             if complete_config["polling_interval_seconds"] != self.config_entry.data.get("polling_interval_seconds"):
                 data_updates["polling_interval_seconds"] = complete_config["polling_interval_seconds"]
             if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):

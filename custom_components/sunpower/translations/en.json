@@ -7,28 +7,30 @@
             "cannot_connect": "Cannot Connect",
             "connection_failed": "PVS Connection Failed",
             "unknown": "Unknown Error",
-            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection",
+            "MIN_NIGHTTIME_INTERVAL": "Nighttime polling interval must be 0 (disabled) or at least 300 seconds (5 minutes) for PVS protection"
         },
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Basic Setup",
-                "description": "Configure essential Enhanced SunPower settings.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware from excessive requests.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.",
+                "description": "Configure essential Enhanced SunPower settings.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware from excessive requests.",
                 "data": {
                     "host": "PVS IP Address",
-                    "polling_interval_seconds": "Polling interval (seconds)",
-                    "has_battery_system": "I have a SunVault battery system",
+                    "polling_interval_seconds": "Daytime Polling Interval (seconds)",
+                    "nighttime_polling_interval": "Nighttime Polling Interval (seconds)",
                     "sunrise_elevation": "Sunrise elevation",
                     "sunset_elevation": "Sunset elevation",
-                    "use_descriptive_names": "Use descriptive names",
-                    "use_product_names": "Use product names"
+                    "use_descriptive_names": "Use Descriptive Names - ***Strongly recommended***",
+                    "use_product_names": "Use Product Names - ***Not recommended***"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval_seconds": "How often to check for new data (300-3600 seconds for PVS protection)",
-                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
+                    "polling_interval_seconds": "How often to check for new data during daylight hours (300-3600 seconds for PVS protection)",
+                    "nighttime_polling_interval": "How often to poll during nighttime hours (0 = disabled, minimum 300 seconds if enabled). Enables consumption tracking when solar panels are not producing.",
+                    "route_gateway_ip": "Gateway IP for automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)",
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
-                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001224370147208')",
                     "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
@@ -38,13 +40,13 @@
                 "data": {
                     "sunrise_elevation": "Sunrise elevation (degrees)",
                     "sunset_elevation": "Sunset elevation (degrees)",
-                    "use_descriptive_names": "Use descriptive names",
-                    "use_product_names": "Use product names"
+                    "use_descriptive_names": "Use Descriptive Names - ***Strongly recommended***",
+                    "use_product_names": "Use Product Names - ***Not recommended***"
                 },
                 "data_description": {
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
-                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001224370147208')",
                     "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
@@ -95,17 +97,17 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware.\n\n🔋 Battery System: Enable if you have SunVault batteries installed.\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
+                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 300-second minimum polling interval protects your PVS hardware.\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
                 "data": {
                     "host": "PVS IP Address",
-                    "polling_interval_seconds": "Polling interval (seconds)",
-                    "has_battery_system": "I have a SunVault battery system",
+                    "polling_interval_seconds": "Daytime Polling Interval (seconds)",
+                    "nighttime_polling_interval": "Nighttime Polling Interval (seconds)",
                     "route_gateway_ip": "Gateway IP for route repair"
                 },
                 "data_description": {
-                    "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval_seconds": "How often to check for new data (300-3600 seconds for PVS protection)",
-                    "has_battery_system": "Check if you have SunVault batteries (enables nighttime polling and health monitoring)",
+                    "host": "Hostname or IP of PVS (typically 172.27.153.1)\n",
+                    "polling_interval_seconds": "How often to check for new data during daylight hours (300-3600 seconds for PVS protection)",
+                    "nighttime_polling_interval": "How often to poll during nighttime hours (0 = disabled, minimum 300 seconds if enabled). Enables consumption tracking when solar panels are not producing.",
                     "route_gateway_ip": "Gateway IP for automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)"
                 }
             },
@@ -115,13 +117,13 @@
                 "data": {
                     "sunrise_elevation": "Sunrise elevation (degrees)",
                     "sunset_elevation": "Sunset elevation (degrees)",
-                    "use_descriptive_names": "Use descriptive names",
-                    "use_product_names": "Use product names"
+                    "use_descriptive_names": "Use Descriptive Names - ***Strongly recommended***",
+                    "use_product_names": "Use Product Names - ***Not recommended***"
                 },
                 "data_description": {
                     "sunrise_elevation": "Degrees above horizon to start morning polling (5° = early start for east-facing panels)",
                     "sunset_elevation": "Degrees above horizon to stop evening polling (5° = late stop for west-facing panels)",
-                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001221370442207')",
+                    "use_descriptive_names": "Show detailed inverter names in energy dashboard (e.g., 'Inverter E001224370147208')",
                     "use_product_names": "Add 'SunPower' prefix to entity names (e.g., 'SunPower Inverter')"
                 }
             },
@@ -168,7 +170,8 @@
             }
         },
         "error": {
-            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection",
+            "MIN_NIGHTTIME_INTERVAL": "Nighttime polling interval must be 0 (disabled) or at least 300 seconds (5 minutes) for PVS protection"
         }
     },
     "title": "Enhanced SunPower"

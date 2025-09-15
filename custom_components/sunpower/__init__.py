@@ -25,6 +25,8 @@ from .const import (
     PVS_DEVICE_TYPE,
     INVERTER_DEVICE_TYPE,
     DIAGNOSTIC_DEVICE_TYPE,
+    ESS_DEVICE_TYPE,
+    METER_DEVICE_TYPE,
     SUNPOWER_COORDINATOR,
     SUNPOWER_HOST,
     SUNPOWER_OBJECT,
@@ -42,13 +44,19 @@ from .data_processor import (
     get_device_summary,
 )
 
-# Import health check functions  
+# Import health check functions
 from .health_check import (
     smart_pvs_health_check,
     check_inverter_health,
     check_firmware_upgrade,
     check_flash_memory_level,
     update_diagnostic_stats,
+)
+
+# Import battery/ESS handling functions
+from .battery_handler import (
+    convert_ess_data,
+    get_battery_configuration,
 )
 
 # Import notification functions
@@ -71,10 +79,6 @@ from .notifications import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_battery_configuration(entry):
-    """Single battery configuration function"""
-    user_has_battery = entry.options.get("has_battery_system") or entry.data.get("has_battery_system", False)
-    return user_has_battery
 
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
@@ -107,22 +111,22 @@ def calculate_sun_elevation_fallback():
         return 15.0  # Safe default - assume day mode
 
 
-def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, has_battery):
+def determine_sun_polling_state(elevation, sunrise_threshold, sunset_threshold, nighttime_polling_enabled):
     """Determine if polling should be active based on sun elevation
-    
+
     Args:
         elevation: Current sun elevation in degrees
-        sunrise_threshold: Start polling threshold  
+        sunrise_threshold: Start polling threshold
         sunset_threshold: Stop polling threshold
-        has_battery: Whether battery system is installed
-        
+        nighttime_polling_enabled: Whether nighttime polling is configured
+
     Returns:
         tuple: (should_poll, state_reason, active_threshold)
     """
-    
-    # Battery systems poll 24/7 regardless of sun elevation
-    if has_battery:
-        return True, "battery_system_active", None
+
+    # Systems with nighttime polling enabled poll 24/7 regardless of sun elevation
+    if nighttime_polling_enabled:
+        return True, "nighttime_polling_active", None
     
     # For solar-only systems, use the lower threshold for maximum coverage
     active_threshold = min(sunrise_threshold, sunset_threshold)
@@ -437,8 +441,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     
     # Default to 300 seconds, minimum 300 seconds for PVS safety
     polling_interval = max(300, entry.options.get("polling_interval_seconds", entry.data.get("polling_interval_seconds", DEFAULT_POLLING_INTERVAL)))
-    
-    _LOGGER.info("Creating coordinator with %ds interval (minimum 300s for PVS protection)", polling_interval)
+
+    # Get nighttime polling interval with backward compatibility migration
+    # Check for old krbaker SUNVAULT_UPDATE_INTERVAL or has_battery_system settings
+    old_sunvault_interval = entry.options.get("ESS_UPDATE_INTERVAL") or entry.data.get("ESS_UPDATE_INTERVAL")
+    old_battery_system = entry.options.get("has_battery_system") or entry.data.get("has_battery_system")
+
+    # Get new nighttime polling setting
+    nighttime_config = entry.options.get("nighttime_polling_interval", entry.data.get("nighttime_polling_interval"))
+
+    # Migration logic: if no new setting but old settings exist, migrate them
+    if nighttime_config is None:
+        if old_sunvault_interval:
+            # Migrate from krbaker's SUNVAULT_UPDATE_INTERVAL
+            nighttime_config = old_sunvault_interval
+            _LOGGER.info("Migrated krbaker SUNVAULT_UPDATE_INTERVAL (%ds) to nighttime_polling_interval", nighttime_config)
+        elif old_battery_system:
+            # Migrate from old has_battery_system=True to 15-minute polling
+            nighttime_config = 900
+            _LOGGER.info("Migrated has_battery_system=True to nighttime_polling_interval=900s")
+        else:
+            # Default for new installations
+            nighttime_config = 0
+
+    nighttime_interval = max(300, nighttime_config) if nighttime_config > 0 else 0
+
+    _LOGGER.info("Creating coordinator with day=%ds, night=%ds intervals (minimum 300s for PVS protection)", polling_interval, nighttime_interval)
 
     async def async_update_data():
         """Enhanced data fetching with sunrise/sunset elevation logic"""
@@ -448,38 +476,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Get host IP for cache operations
         host_ip = entry.data['host']
         
+        # First determine if we should poll (day/night logic)
         # Check cache file age first
         cached_data, cache_age = await load_cache_file(hass, host_ip)
         poll_tolerance = 30
-        
-        if cached_data and cache_age < (polling_interval - poll_tolerance):
-            # Cache is fresh enough
-            remaining_time = polling_interval - cache_age
-            _LOGGER.info("Skipping poll - cache is only %ds old, waiting %ds more", cache_age, remaining_time)
-            
-            # Update cache object for compatibility
-            cache.previous_pvs_sample = cached_data
-            cache.previous_pvs_sample_time = time.time() - cache_age
-            
-            # Process cached data
-            data = convert_sunpower_data(cached_data)
-            is_valid, device_count, error_message = validate_converted_data(data)
-            if is_valid:
-                # Add diagnostic device
-                inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
-                data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
-                
-                notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age)
-                return data
-            else:
-                _LOGGER.warning("Cached data invalid, proceeding with fresh poll")
+
         
         # Sun state check with sunrise/sunset elevation
         try:
             sun_entity = hass.states.get("sun.sun")
             if sun_entity and sun_entity.attributes:
+                _LOGGER.debug("Sun entity found: state=%s, elevation=%s", sun_entity.state, sun_entity.attributes.get("elevation"))
                 elevation = float(sun_entity.attributes.get("elevation", -90))
                 
                 # Get sunrise and sunset thresholds with migration
@@ -499,7 +506,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                              elevation, sunrise_elevation, sunset_elevation)
                 
             else:
-                _LOGGER.warning("Sun entity unavailable, using fallback")
+                _LOGGER.info("Sun entity unavailable (entity=%s), using fallback calculation", sun_entity)
                 elevation = calculate_sun_elevation_fallback()
                 sunrise_elevation = entry.options.get("sunrise_elevation", 5)
                 sunset_elevation = entry.options.get("sunset_elevation", 5)
@@ -509,55 +516,98 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             sunrise_elevation = 5
             sunset_elevation = 5
 
-        # Get battery configuration
-        has_battery = get_battery_configuration(entry)
+        # Check for battery systems in data (automatic detection)
+        has_battery = False
+        if cached_data:
+            temp_data = convert_sunpower_data(cached_data)
+            has_battery = get_battery_configuration(entry, temp_data)
 
-        # Determine polling state
+        # Determine polling state based on nighttime polling configuration
+        nighttime_polling_enabled = nighttime_interval > 0
         should_poll, state_reason, active_threshold = determine_sun_polling_state(
-            elevation, sunrise_elevation, sunset_elevation, has_battery
+            elevation, sunrise_elevation, sunset_elevation, nighttime_polling_enabled
         )
 
-        # Handle night mode
-        if not should_poll:
-            _LOGGER.info("Night mode: %s - using cached data", convert_state_reason_to_text(state_reason))
-            notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, 
-                                      sunrise_elevation, sunset_elevation, active_threshold, state_reason)
-            
-            if not cached_data:
-                cached_data, cache_age = await load_cache_file(hass, host_ip)
-            
-            if cached_data:
-                cache.previous_pvs_sample = cached_data
-                cache.previous_pvs_sample_time = time.time() - cache_age
-                
-                data = convert_sunpower_data(cached_data)
-                is_valid, device_count, error_message = validate_converted_data(data)
-                if is_valid:
-                    inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-                    meter_data = data.get('Power Meter', {})
-                    diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
-                    data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
-                    
-                    _LOGGER.info("Night mode: Using cached data with %d devices", device_count)
-                    notify_using_cached_data(hass, entry, cache, state_reason, cache_age)
-                    return data
-            
-            _LOGGER.warning("Night mode: No cached data available")
-            raise UpdateFailed(f"Night mode ({convert_state_reason_to_text(state_reason)}): No cached data available")
-        
-        elif should_poll and state_reason != "battery_system_active":
-            # Day mode activated
-            _LOGGER.info("Day mode activated (%s)", convert_state_reason_to_text(state_reason))
-            cache.pvs_health_failures = 0
-            cache.health_backoff_until = 0
-            cache.last_health_check = 0
-            
-            notify_day_mode_elevation(hass, entry, cache, elevation, 
-                                    sunrise_elevation, sunset_elevation, active_threshold, state_reason)
+        # Determine which interval to use and proceed with polling
+        if should_poll:
+            # Determine if we're in nighttime polling mode or daytime mode
+            if state_reason == "nighttime_polling_active":
+                current_interval = nighttime_interval
+                _LOGGER.info("Nighttime polling: %s (interval=%ds)", convert_state_reason_to_text(state_reason), current_interval)
+            else:
+                current_interval = polling_interval
+                _LOGGER.info("Daytime polling: %s (interval=%ds)", convert_state_reason_to_text(state_reason), current_interval)
+
+            if state_reason != "battery_system_active":
+                # Day mode activated
+                cache.pvs_health_failures = 0
+                cache.health_backoff_until = 0
+                cache.last_health_check = 0
+
+                notify_day_mode_elevation(hass, entry, cache, elevation,
+                                        sunrise_elevation, sunset_elevation, active_threshold, state_reason)
+        else:
+            # Nighttime - check if nighttime polling is enabled
+            if nighttime_interval == 0:
+                # Nighttime polling disabled - return to old behavior (use cached data)
+                _LOGGER.info("Nighttime polling disabled: %s - using cached data", convert_state_reason_to_text(state_reason))
+                notify_night_mode_elevation(hass, entry, has_battery, cache, elevation,
+                                          sunrise_elevation, sunset_elevation, active_threshold, state_reason)
+
+                if not cached_data:
+                    cached_data, cache_age = await load_cache_file(hass, host_ip)
+
+                if cached_data:
+                    cache.previous_pvs_sample = cached_data
+                    cache.previous_pvs_sample_time = time.time() - cache_age
+
+                    data = convert_sunpower_data(cached_data)
+                    is_valid, device_count, error_message = validate_converted_data(data)
+                    if is_valid:
+                        # Add diagnostic device
+                        inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+                        meter_data = data.get(METER_DEVICE_TYPE, {})
+                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
+                        data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
+
+                        _LOGGER.info("Night mode: Using cached data with %d devices", device_count)
+                        notify_using_cached_data(hass, entry, cache, state_reason, cache_age)
+                        return data
+
+                _LOGGER.info("Night mode: No cached data available, will poll normally when sun rises")
+                # Instead of raising UpdateFailed, return empty data and let coordinator retry later
+                # This prevents integration setup failure during nighttime when no cache exists
+                return {}
+
+        # Check if we need to skip polling based on interval (after determining current_interval)
+        if cached_data and cache_age < (current_interval - poll_tolerance):
+            # Cache is fresh enough for the current interval
+            remaining_time = current_interval - cache_age
+            _LOGGER.info("Skipping poll - cache is only %ds old, waiting %ds more for %s polling",
+                        cache_age, remaining_time, "daytime" if should_poll else "nighttime")
+
+            # Update cache object for compatibility
+            cache.previous_pvs_sample = cached_data
+            cache.previous_pvs_sample_time = time.time() - cache_age
+
+            # Process cached data
+            data = convert_sunpower_data(cached_data)
+            is_valid, device_count, error_message = validate_converted_data(data)
+            if is_valid:
+                # Add diagnostic device
+                inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+                meter_data = data.get(METER_DEVICE_TYPE, {})
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
+                data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
+
+                notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age)
+                return data
+            else:
+                _LOGGER.warning("Cached data invalid, proceeding with fresh poll")
 
         # Polling attempt
         try:
-            fresh_data = await poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, entry)
+            fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_interval, cache, hass, entry)
             
             if fresh_data:
                 # Save to cache
@@ -571,6 +621,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if not is_valid:
                     raise UpdateFailed(f"Data conversion failed: {error_message}")
+
+                # Check for battery/ESS systems and poll ESS data if needed
+                if ESS_DEVICE_TYPE in data:
+                    try:
+                        _LOGGER.debug("ESS devices detected, polling ESS endpoint")
+                        ess_data = await sunpower_monitor.energy_storage_system_status_async()
+                        if ess_data:
+                            convert_ess_data(ess_data, data)
+                            _LOGGER.debug("ESS data integrated successfully")
+                    except Exception as e:
+                        _LOGGER.warning("ESS data polling failed, continuing with PVS data only: %s", e)
                 
                 # Check inverter health
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
@@ -640,16 +701,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             
             raise UpdateFailed(f"All data sources failed: {e}")
 
+    # Use shorter interval for coordinator to handle both day/night polling
+    # If nighttime polling disabled (0), just use daytime interval
+    if nighttime_interval > 0:
+        coordinator_interval = min(polling_interval, nighttime_interval)
+    else:
+        coordinator_interval = polling_interval
+
     # Create coordinator
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
         name="Enhanced SunPower PVS",
         update_method=async_update_data,
-        update_interval=timedelta(seconds=polling_interval),
+        update_interval=timedelta(seconds=coordinator_interval),
         request_refresh_debouncer=Debouncer(
-            hass, _LOGGER, 
-            cooldown=max(30, polling_interval // 4),
+            hass, _LOGGER,
+            cooldown=max(30, coordinator_interval // 4),
             immediate=False
         ),
     )

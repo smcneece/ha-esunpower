@@ -30,7 +30,6 @@
 - **Mobile Alert System**: Critical notifications sent directly to your phone with smart fallback
 - **Diagnostic Dashboard**: 8 real-time sensors tracking integration reliability and performance
 - **Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
-- **Human-Readable Time Display**: All notifications show user-friendly time formats
 - **PVS Hardware Protection**: Built-in throttling (300s minimum), health checking, and intelligent backoff
 
 **Technical Enhancements:**
@@ -126,8 +125,8 @@
 ![Notifications Configuration](images/config_pg3.png)
 
 ### Setup Process
-1. **Page 1**: Enter PVS IP address, polling interval, battery system, route gateway IP
-2. **Page 2**: Configure sunrise/sunset elevation thresholds and naming preferences  
+1. **Page 1**: Enter PVS IP address, polling intervals, and route gateway IP for VLAN's
+2. **Page 2**: Configure sunrise/sunset elevation thresholds and naming preferences
 3. **Page 3**: Set flash memory threshold, notification preferences, and mobile device
 
 ### Configuration Options
@@ -135,8 +134,8 @@
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
 | **Host** | PVS IP Address | N/A | `172.27.153.1` |
-| **Polling Interval** | Update frequency (seconds) | 300 | 300-600 seconds |
-| **Battery System** | Enable if you have SunVault | `false` | Check if you have batteries |
+| **Polling Interval** | Daytime update frequency (seconds) | 300 | 300-600 seconds |
+| **Nighttime Polling** | Nighttime update frequency (seconds) | 0 (disabled) | 0 = disabled, 300-1800 seconds |
 | **Gateway IP** | Route repair (leave empty to disable) | `` | Your router IP for VLAN setups |
 | **Sunrise Elevation** | Start polling threshold | 5° | See guide below |
 | **Sunset Elevation** | Stop polling threshold | 5° | See guide below |
@@ -147,6 +146,27 @@
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
+
+### Nighttime Polling
+
+**New Feature**: Configure separate polling intervals for day and night to optimize consumption monitoring:
+
+**Use Cases:**
+- **Granular consumption tracking**: Monitor overnight usage patterns every 10-15 minutes
+- **PVS resource optimization**: Reduce polling frequency when solar panels aren't producing
+- **Home automation**: Track appliance usage, HVAC cycles, and standby power consumption
+
+**Configuration Examples:**
+- **Disabled (default)**: Day 5 min, Night disabled (0) - traditional solar-only monitoring
+- **High-resolution monitoring**: Day 5 min, Night 10 min (detailed consumption tracking)
+- **Balanced approach**: Day 5 min, Night 15 min (good detail without overloading PVS)
+- **Conservative setup**: Day 10 min, Night 30 min (minimal PVS load)
+
+**Requirements:**
+- Set to 0 to disable nighttime polling (reverts to cached data behavior)
+- Set to 300+ seconds to enable continuous consumption monitoring
+- Solar/inverter data collection respects sunrise/sunset elevation settings
+- Battery systems are automatically detected - no manual configuration needed
 
 ### Sunrise/Sunset Elevation Guide
 
@@ -168,7 +188,7 @@
 - System load, uptime, memory usage, firmware version
 - Communication errors and scan statistics  
 - Flash storage availability with critical alerts
-- Real-time diagnostics and health monitoring
+- Diagnostics and health monitoring
 
 ### Solar Production
 - **Inverters**: Power output, individual MPPT data, temperature monitoring
@@ -181,7 +201,7 @@
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
 
 ### Individual Inverter Health Monitoring
-- Real-time status for each inverter with smart adaptation
+- Status for each inverter with smart adaptation
 - Failure detection when inverters stop reporting (5+ consecutive polls)
 - Recovery notifications when failed inverters return online
 - Performance tracking and temperature warnings
@@ -192,7 +212,7 @@
 - **Consecutive Poll Failures**: Current streak of failed PVS poll attempts for troubleshooting
 - **Last Successful Poll**: Timestamp of last successful data retrieval (e.g., "14:29 08-16-25")
 - **Average Response Time**: PVS performance monitoring
-- **Active Inverters**: Real-time count of responding inverters
+- **Active Inverters**: Count of responding inverters
 - **PVS Uptime**: System availability tracking
 - **Route Repairs**: Counter tracking automatic route fixes (when enabled)
 
@@ -247,7 +267,7 @@ For individual panel monitoring, add each inverter's lifetime power sensor:
 **Dedicated CT Energy Monitor (Recommended)**
 For comprehensive whole-home monitoring, we recommend dedicated current transformer (CT) systems:
 
-**[SEM-Meter (Smart Home Energy Meter)](https://www.amazon.com/Energy-Monitor-Circuit-Sensors-Real-Time/dp/B0F5QCB1X9)** *(Developer Tested)*
+**[SEM-Meter (Smart Home Energy Meter)](https://www.amazon.com/Energy-Monitor-Circuit-Sensors-Real-Time/dp/B0D6VZQBPF?th=1)** *(Developer Tested)*
 - **Whole house**: ~$100 for main monitoring
 - **Circuit-level**: ~$125 for 16 individual circuits  
 - **100% Local Operation** - No cloud dependency required

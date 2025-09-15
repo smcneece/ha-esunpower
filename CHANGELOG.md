@@ -2,6 +2,41 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.9.2] - 2025-09-15
+
+### New Features
+- **Nighttime Polling**: Added separate polling interval for nighttime consumption monitoring
+  - Configure different polling rates for day vs night (e.g., 5 min day, 15 min night)
+  - Disabled by default (0) - set to 300+ seconds to enable granular consumption tracking
+  - Enables overnight usage monitoring without overloading PVS during off-peak hours
+  - Perfect for tracking consumption patterns, appliance usage, and standby power
+
+### ⚠️ BREAKING CHANGES
+- **Removed "Battery System" Toggle**: The "I have a SunVault battery system" checkbox has been replaced with "Nighttime Polling Interval"
+- **Migration Required**: Existing users upgrading from krbaker or early Enhanced SunPower versions:
+  - Your old settings will be automatically migrated on first restart
+  - Previous `has_battery_system: true` converts to `nighttime_polling_interval: 900` (15 minutes)
+  - Previous krbaker `SUNVAULT_UPDATE_INTERVAL` values are preserved
+  - **Battery users must verify nighttime polling is enabled** (not 0) to maintain continuous monitoring
+
+### Configuration Changes
+- **Automatic Battery Detection**: Battery systems are now detected automatically from device data
+- **Granular Nighttime Control**: Set exact polling intervals (0 = disabled, 300-3600 seconds) instead of simple on/off
+- **Enhanced Default**: New installations default to nighttime polling disabled (traditional solar-only behavior)
+
+## [v2025.9.1 - 09-13-2025]
+
+### Bug Fixes
+- **Virtual Production Meter**: Removed erroneous "KWh to Home" sensor that always showed 0
+  - Virtual meters aggregate inverter data and cannot measure consumption direction
+  - Reduces sensor clutter and user confusion
+  - Real consumption meters still provide accurate bidirectional data
+
+### User Interface Improvements
+- **Enhanced Config Flow**: Added clear recommendations for naming options on setup page 2
+  - "Use Descriptive Names" now shows "***Strongly recommended***" with improved formatting
+  - "Use Product Names" now shows "***Not recommended***" with improved formatting
+  
 ## [v2025.8.26] - 2025-08-29
 
 ### Critical Fixes
