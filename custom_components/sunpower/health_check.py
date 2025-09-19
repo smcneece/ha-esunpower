@@ -113,7 +113,7 @@ async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backof
     notify_pvs_health_check_attempt(hass, entry, cache, host, max_retries)
     
     # Get user's polling interval for adaptive timeout
-    polling_interval = max(300, entry.options.get("polling_interval_seconds", entry.data.get("polling_interval_seconds", 300)))
+    polling_interval = max(300, entry.options.get("daytime_polling_interval", entry.data.get("daytime_polling_interval", 300)))
     tcp_timeout = min(5.0, polling_interval // 10)
     
     # Perform TCP connect test with retries

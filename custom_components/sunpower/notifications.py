@@ -312,16 +312,21 @@ def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
         safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True, 
                    notification_category="polling", cache=cache)
 
-def notify_using_cached_data(hass, entry, cache, reason, time_info=None):
+def notify_using_cached_data(hass, entry, cache, reason, time_info=None, polling_interval=None):
     """GENERAL: Cached data usage - FIXED TEXT CONVERSION"""
     # Convert state_reason codes to readable text
     readable_reason = convert_state_reason_to_text(reason)
-    
+
     if time_info:
         if isinstance(time_info, (int, float)):
             # Convert seconds to human-readable time
             time_str = format_time_duration(time_info)
-            msg = f"📦 Using cached data: {readable_reason} (last poll {time_str} ago)"
+            if polling_interval and reason == "polling_interval_not_elapsed":
+                # Special case for interval not elapsed - show the interval setting
+                interval_str = format_time_duration(polling_interval)
+                msg = f"📦 Using cached data: polling interval set to {interval_str}, last poll {time_str} ago"
+            else:
+                msg = f"📦 Using cached data: {readable_reason} (last poll {time_str} ago)"
         else:
             # Handle remaining seconds case
             try:
@@ -332,7 +337,7 @@ def notify_using_cached_data(hass, entry, cache, reason, time_info=None):
                 msg = f"📦 Using cached data: {readable_reason} ({time_info} remaining)"
     else:
         msg = f"📦 Using cached data: {readable_reason}"
-    safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True, 
+    safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True,
                notification_category="polling", cache=cache)
 
 
@@ -351,13 +356,20 @@ def notify_setup_success(hass, entry, cache):
                notification_category="debug", cache=cache)
 
 def notify_day_mode_elevation(hass, entry, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
-    """DEBUG: SIMPLE day mode activation"""
+    """DEBUG: Polling mode activation notification"""
     if state_reason == "daytime_polling_active":
         msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}° ≥ {active_threshold:.1f}° threshold"
+    elif state_reason == "nighttime_polling_active":
+        msg = f"🌙 Nighttime polling enabled: Sun elevation {elevation:.1f}° (consumption tracking active)"
+    elif state_reason == "battery_system_active":
+        if elevation >= min(sunrise_elevation, sunset_elevation):
+            msg = f"🔋 Battery system day polling: Sun elevation {elevation:.1f}° (24/7 monitoring active)"
+        else:
+            msg = f"🔋 Battery system night polling: Sun elevation {elevation:.1f}° (24/7 monitoring active)"
     else:
         msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}°"
-    
-    safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True, 
+
+    safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True,
                notification_category="daynight", cache=cache)
 
 def notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
@@ -380,7 +392,15 @@ def notify_diagnostic_coordinator_started(hass, entry, cache):
     """DEBUG: Coordinator cycle started"""
     current_time_str = datetime.now().strftime("%H:%M:%S")
     msg = f"🔄 DIAGNOSTIC: Coordinator cycle started at {current_time_str}"
-    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True, 
+    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
+               notification_category="debug", cache=cache, add_timestamp=False)
+
+def notify_diagnostic_coordinator_status(hass, entry, cache, current_interval, coordinator_interval, mode, elevation):
+    """DEBUG: Enhanced coordinator status with intervals and mode"""
+    current_time_str = datetime.now().strftime("%I:%M:%S %p %m-%d-%Y")
+    msg = (f"⚙️ COORDINATOR: current={current_interval}s, required={coordinator_interval:.1f}s, "
+           f"mode={mode}, elevation={elevation:.1f}° ({current_time_str})")
+    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
                notification_category="debug", cache=cache, add_timestamp=False)
 
 def notify_diagnostic_coordinator_creating(hass, entry, cache, polling_interval):

@@ -12,13 +12,8 @@ from .notifications import get_mobile_devices
 
 _LOGGER = logging.getLogger(__name__)
 
-# Import interval constants from const.py
-from .const import (
-    DEFAULT_SUNPOWER_UPDATE_INTERVAL,
-    DEFAULT_NIGHTTIME_UPDATE_INTERVAL,
-    MIN_SUNPOWER_UPDATE_INTERVAL,
-    MIN_NIGHTTIME_UPDATE_INTERVAL,
-)
+# Default to 300 seconds for PVS safety
+DEFAULT_SUNPOWER_UPDATE_INTERVAL = 300
 
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -106,11 +101,18 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         description_placeholders = {}
 
         if user_input is not None:
-            # Validate polling interval
-            polling_interval = user_input["polling_interval_seconds"]
-            if polling_interval < 300:
-                errors["polling_interval_seconds"] = "MIN_INTERVAL"
-            else:
+            # Validate daytime polling interval
+            daytime_interval = user_input["daytime_polling_interval"]
+            nighttime_interval = user_input["nighttime_polling_interval"]
+
+            if daytime_interval < 300:
+                errors["daytime_polling_interval"] = "MIN_INTERVAL"
+
+            # Validate nighttime polling interval (0 = disabled, or >= 300 for PVS protection)
+            if nighttime_interval > 0 and nighttime_interval < 300:
+                errors["nighttime_polling_interval"] = "MIN_INTERVAL"
+
+            if not errors:
                 # Test PVS connection before proceeding
                 _LOGGER.info("Setup: Validating PVS connection")
                 
@@ -130,7 +132,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
             vol.Required("host", default="172.27.153.1"): str,
-            vol.Required("polling_interval_seconds", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
+            vol.Required("daytime_polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=300,
                     max=3600,
@@ -138,7 +140,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("nighttime_polling_interval", default=DEFAULT_NIGHTTIME_UPDATE_INTERVAL): selector.NumberSelector(
+            vol.Required("nighttime_polling_interval", default=0): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=3600,
@@ -207,8 +209,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 title=f"Enhanced SunPower PVS {complete_config['host']}",
                 data={
                     "host": complete_config["host"],
-                    "polling_interval_seconds": complete_config["polling_interval_seconds"],
-                    "nighttime_polling_interval": complete_config.get("nighttime_polling_interval", 0),
+                    "daytime_polling_interval": complete_config["daytime_polling_interval"],
+                    "nighttime_polling_interval": complete_config["nighttime_polling_interval"],
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
                     "route_gateway_ip": complete_config.get("route_gateway_ip", ""),
@@ -272,14 +274,17 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
 
         if user_input is not None:
-            polling_interval = user_input["polling_interval_seconds"]
+            daytime_interval = user_input["daytime_polling_interval"]
             nighttime_interval = user_input["nighttime_polling_interval"]
 
-            if polling_interval < 300:
-                errors["polling_interval_seconds"] = "MIN_INTERVAL"
-            elif nighttime_interval != 0 and nighttime_interval < MIN_NIGHTTIME_UPDATE_INTERVAL:
-                errors["nighttime_polling_interval"] = "MIN_NIGHTTIME_INTERVAL"
-            else:
+            if daytime_interval < 300:
+                errors["daytime_polling_interval"] = "MIN_INTERVAL"
+
+            # Validate nighttime polling interval (0 = disabled, or >= 300 for PVS protection)
+            if nighttime_interval > 0 and nighttime_interval < 300:
+                errors["nighttime_polling_interval"] = "MIN_INTERVAL"
+
+            if not errors:
                 # Store basic config and proceed to solar step
                 self._basic_config = user_input.copy()
                 return await self.async_step_solar()
@@ -291,13 +296,13 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         )
         
         current_interval = self.config_entry.options.get(
-            "polling_interval_seconds",
-            self.config_entry.data.get("polling_interval_seconds", DEFAULT_SUNPOWER_UPDATE_INTERVAL)
+            "daytime_polling_interval", 
+            self.config_entry.data.get("daytime_polling_interval", DEFAULT_SUNPOWER_UPDATE_INTERVAL)
         )
-
+        
         current_nighttime_interval = self.config_entry.options.get(
             "nighttime_polling_interval",
-            self.config_entry.data.get("nighttime_polling_interval", DEFAULT_NIGHTTIME_UPDATE_INTERVAL)
+            self.config_entry.data.get("nighttime_polling_interval", 0)
         )
 
         current_route_gateway_ip = self.config_entry.data.get("route_gateway_ip", "")
@@ -305,7 +310,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
             vol.Required("host", default=current_host): str,
-            vol.Required("polling_interval_seconds", default=current_interval): selector.NumberSelector(
+            vol.Required("daytime_polling_interval", default=current_interval): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=300,
                     max=3600,
@@ -396,10 +401,10 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             data_updates = {}
             if complete_config["host"] != self.config_entry.data.get("host"):
                 data_updates["host"] = complete_config["host"]
-            if complete_config.get("nighttime_polling_interval") != self.config_entry.data.get("nighttime_polling_interval"):
-                data_updates["nighttime_polling_interval"] = complete_config.get("nighttime_polling_interval", 0)
-            if complete_config["polling_interval_seconds"] != self.config_entry.data.get("polling_interval_seconds"):
-                data_updates["polling_interval_seconds"] = complete_config["polling_interval_seconds"]
+            if complete_config["nighttime_polling_interval"] != self.config_entry.data.get("nighttime_polling_interval"):
+                data_updates["nighttime_polling_interval"] = complete_config["nighttime_polling_interval"]
+            if complete_config["daytime_polling_interval"] != self.config_entry.data.get("daytime_polling_interval"):
+                data_updates["daytime_polling_interval"] = complete_config["daytime_polling_interval"]
             if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):
                 data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
             if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):

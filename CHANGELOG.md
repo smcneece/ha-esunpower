@@ -2,27 +2,44 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
-## [v2025.9.2] - 2025-09-15
+## [unreleased]
 
-### New Features
-- **Nighttime Polling**: Added separate polling interval for nighttime consumption monitoring
-  - Configure different polling rates for day vs night (e.g., 5 min day, 15 min night)
-  - Disabled by default (0) - set to 300+ seconds to enable granular consumption tracking
-  - Enables overnight usage monitoring without overloading PVS during off-peak hours
-  - Perfect for tracking consumption patterns, appliance usage, and standby power
+> **Note**: v2025.9.2 was released but had buggy day/night transition behavior (stuck in wrong polling modes). Rolled back to stable v2025.8.26 and rebuilt the features properly with comprehensive testing.
+
+### 🆕 Major Features
+- **Dynamic Day/Night Polling**: Complete redesign of polling interval management
+  - **Daytime Polling Interval**: 300-3600 seconds for solar production monitoring
+  - **Nighttime Polling Interval**: 0 (disabled) or 300-3600 seconds for consumption tracking
+  - **Real-time Interval Switching**: Coordinator dynamically adjusts based on sun elevation
+  - **Perfect for consumption monitoring** when solar panels aren't producing
 
 ### ⚠️ BREAKING CHANGES
-- **Removed "Battery System" Toggle**: The "I have a SunVault battery system" checkbox has been replaced with "Nighttime Polling Interval"
-- **Migration Required**: Existing users upgrading from krbaker or early Enhanced SunPower versions:
-  - Your old settings will be automatically migrated on first restart
-  - Previous `has_battery_system: true` converts to `nighttime_polling_interval: 900` (15 minutes)
-  - Previous krbaker `SUNVAULT_UPDATE_INTERVAL` values are preserved
-  - **Battery users must verify nighttime polling is enabled** (not 0) to maintain continuous monitoring
+- **Removed "Battery System" Toggle**: Replaced with automatic battery detection + separate nighttime interval
+- **Automatic Migration**: Existing configurations are automatically updated on restart
+  - `has_battery_system: true` → `nighttime_polling_interval: <same_as_daytime>`
+  - `has_battery_system: false` → `nighttime_polling_interval: 0` (disabled)
 
-### Configuration Changes
-- **Automatic Battery Detection**: Battery systems are now detected automatically from device data
-- **Granular Nighttime Control**: Set exact polling intervals (0 = disabled, 300-3600 seconds) instead of simple on/off
-- **Enhanced Default**: New installations default to nighttime polling disabled (traditional solar-only behavior)
+### 🔧 Technical Improvements
+- **Automatic Battery Detection**: Batteries detected from actual PVS device data, no manual toggle needed
+- **Dynamic Coordinator Interval**: Home Assistant coordinator itself changes intervals in real-time
+- **Enhanced Config Validation**: Prevents dangerous intervals (<300s) that could harm PVS hardware
+- **Smart Battery Logic**: Battery systems use appropriate day/night intervals while maintaining 24/7 monitoring
+
+### 🐛 Bug Fixes
+- **Fixed Battery Interval Logic**: Battery systems now properly use day/night intervals instead of always using daytime
+- **Fixed Virtual Production Meter**: Removed erroneous "KWh To Home" sensor that always showed 0
+- **Fixed Config Validation**: Nighttime intervals properly validated (0 or ≥300 seconds)
+- **Fixed Battery Auto-Detection**: Tuple unpacking bug that caused false battery detection
+
+### 🎨 Enhanced Debugging
+- **Restored Coordinator Diagnostics**: Shows current/required intervals, mode, and elevation with precise timestamps
+- **Improved Polling Notifications**: Correctly shows "Daytime/Nighttime/Battery" polling status
+- **Enhanced Cache Notifications**: Shows current interval setting when using cached data
+- **Better Mode Detection**: Clear differentiation between day, night, battery, and disabled modes
+
+## [v2025.9.2] - 2025-01-15 [REMOVED]
+
+> **Status**: This version was released but had buggy day/night polling transitions (would get stuck in wrong modes). Rolled back to v2025.8.26. All features rebuilt and working correctly in v2025.9.3.
 
 ## [v2025.9.1 - 09-13-2025]
 
@@ -67,7 +84,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 - **Better Error Handling**: Enhanced status tracking for route repair operations
 - **System Stability**: Reduced code complexity and memory overhead
 
-## [Unreleased]
+## [v2025.9.3] - 2025-09-19
 
 ### Code Organization
 - **Internal Refactoring**: Moved hardware monitoring functions from `__init__.py` to `health_check.py` for better code organization

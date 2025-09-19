@@ -134,7 +134,6 @@ def create_vmeter(data):
             "net_ltea_3phsum_kwh": kwh,  # Lifetime Power
             "p_3phsum_kw": kw,  # Power
             "neg_ltea_3phsum_kwh": kwh,  # kWh To Grid (production meter shows all as export)
-            # Note: Removed "pos_ltea_3phsum_kwh" - virtual meters can't measure consumption direction
             "freq_hz": freq_avg,  # Frequency
             "i_a": amps,  # Amps
             "v12_v": volts_avg,  # Supply Volts

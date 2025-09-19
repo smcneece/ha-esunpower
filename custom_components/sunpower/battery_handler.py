@@ -443,23 +443,18 @@ def convert_ess_data(ess_data, data):
 
 
 def get_battery_configuration(entry, cache):
-    """Get battery configuration from user settings - SIMPLIFIED"""
-    user_has_battery = entry.options.get("has_battery_system") or entry.data.get("has_battery_system", False)
-    
-    # Simple detection from cache if available
+    """Auto-detect battery configuration from PVS data"""
+    # Auto-detection from cache if available
     has_battery_from_data = False
     if hasattr(cache, 'previous_pvs_sample') and cache.previous_pvs_sample and "devices" in cache.previous_pvs_sample:
         has_battery_from_data = any(
-            device.get("DEVICE_TYPE") in ("ESS", "Battery", "ESS BMS", "Energy Storage System")
+            device.get("DEVICE_TYPE") in ("ESS", "Battery", "ESS BMS", "Energy Storage System", "SunVault")
             for device in cache.previous_pvs_sample.get("devices", [])
         )
-    
-    has_battery = user_has_battery or has_battery_from_data
-    
-    _LOGGER.debug("Battery status: user_config=%s, detected=%s, final=%s", 
-                 user_has_battery, has_battery_from_data, has_battery)
-    
-    return has_battery, user_has_battery
+
+    _LOGGER.debug("Battery auto-detection: detected=%s", has_battery_from_data)
+
+    return has_battery_from_data, False  # Return (detected, legacy_user_setting)
 
 
 def reset_battery_failure_tracking(cache):
