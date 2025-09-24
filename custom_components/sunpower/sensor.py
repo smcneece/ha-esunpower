@@ -20,7 +20,7 @@ from .const import (
     SUNPOWER_SENSORS,
 )
 # UPDATED: Import battery constants from battery_handler.py
-from .battery_handler import BASIC_BATTERY_SENSORS, SUNVAULT_SENSORS
+from .battery_handler import SUNVAULT_SENSORS
 from .entity import SunPowerEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,23 +46,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     coordinator = sunpower_state[SUNPOWER_COORDINATOR]
     sunpower_data = coordinator.data
 
-    # Check for basic battery devices (always available from PVS)
-    has_battery_devices = False
-    if sunpower_data and (ESS_DEVICE_TYPE in sunpower_data or BATTERY_DEVICE_TYPE in sunpower_data or HUBPLUS_DEVICE_TYPE in sunpower_data):
-        has_battery_devices = True
-
-    # Check for full ESS data (requires successful ESS endpoint)
     do_ess = False
     if sunpower_data and ESS_DEVICE_TYPE in sunpower_data:
-        # Check if ESS devices have detailed fields (indicating successful ESS endpoint)
-        ess_device = next(iter(sunpower_data[ESS_DEVICE_TYPE].values()), {})
-        if "enclosure_temperature" in ess_device or "agg_power" in ess_device:
-            do_ess = True
-            _LOGGER.debug("Full ESS data available - enabling detailed battery sensors")
-        else:
-            _LOGGER.debug("ESS devices found but missing detailed data - using basic sensors only")
+        do_ess = True
     else:
-        _LOGGER.debug("No ESS devices found")
+        _LOGGER.debug("Found No ESS Data")
 
     if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
         _LOGGER.warning("Cannot find PVS Entry - coordinator may not have data yet, will retry on next update")
@@ -75,17 +63,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
 
         # UPDATED: Combine core sensors with battery sensors when needed
-        SENSORS = SUNPOWER_SENSORS.copy()
-
-        # Always add basic battery sensors when battery devices exist
-        if has_battery_devices:
-            SENSORS.update(BASIC_BATTERY_SENSORS)
-            _LOGGER.debug("Adding basic battery sensors for devices in PVS data")
-
-        # Additionally add full ESS sensors when ESS endpoint data available
+        SENSORS = SUNPOWER_SENSORS
         if do_ess:
             SENSORS.update(SUNVAULT_SENSORS)
-            _LOGGER.debug("Adding full ESS sensors - detailed battery data available")
 
         for device_type in SENSORS:
             if device_type not in sunpower_data:

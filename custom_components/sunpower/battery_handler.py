@@ -78,55 +78,6 @@ SUNVAULT_BINARY_SENSORS = {
     },
 }
 
-# Basic sensors that work with PVS data only (always available)
-BASIC_BATTERY_SENSORS = {
-    BATTERY_DEVICE_TYPE: {
-        "unique_id": "battery",
-        "sensors": {
-            "BATTERY_STATE": {
-                "field": "STATE",
-                "title": "{SUN_VAULT}Battery {index}State",
-                "icon": "mdi:battery",
-                "device": None,
-                "state": None,
-            },
-            "BATTERY_MODEL": {
-                "field": "MODEL",
-                "title": "{SUN_VAULT}Battery {index}Model",
-                "icon": "mdi:information",
-                "device": None,
-                "state": None,
-                "entity_category": EntityCategory.DIAGNOSTIC,
-            },
-        },
-    },
-    ESS_DEVICE_TYPE: {
-        "unique_id": "ess",
-        "sensors": {
-            "ESS_STATE": {
-                "field": "STATE",
-                "title": "{SUN_VAULT}ESS {index}State",
-                "icon": "mdi:battery-outline",
-                "device": None,
-                "state": None,
-            },
-        },
-    },
-    HUBPLUS_DEVICE_TYPE: {
-        "unique_id": "hubplus",
-        "sensors": {
-            "HUBPLUS_STATE": {
-                "field": "STATE",
-                "title": "{SUN_POWER}Hub Plus State",
-                "icon": "mdi:router-wireless",
-                "device": None,
-                "state": None,
-            },
-        },
-    },
-}
-
-# Full sensors that require ESS data (only available when ESS endpoint succeeds)
 SUNVAULT_SENSORS = {
     SUNVAULT_DEVICE_TYPE: {
         "unique_id": "sunvault",
@@ -392,6 +343,53 @@ SUNVAULT_SENSORS = {
             },
         },
     },
+    "Battery": {
+        "unique_id": "battery_actual",
+        "sensors": {
+            "BATTERY_AMPERAGE": {
+                "field": "battery_amperage",
+                "title": "{SUN_VAULT}Battery {index}Amps",
+                "unit": UnitOfElectricCurrent.AMPERE,
+                "icon": "mdi:flash",
+                "device": SensorDeviceClass.CURRENT,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "BATTERY_VOLTAGE": {
+                "field": "battery_voltage",
+                "title": "{SUN_VAULT}Battery {index}Voltage",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:flash",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "BATTERY_TEMPERATURE": {
+                "field": "temperature",
+                "title": "{SUN_VAULT}Battery {index}Temperature",
+                "unit": UnitOfTemperature.CELSIUS,
+                "icon": "mdi:thermometer",
+                "device": SensorDeviceClass.TEMPERATURE,
+                "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+            "BATTERY_CUSTOMER_STATE_OF_CHARGE": {
+                "field": "customer_state_of_charge",
+                "title": "{SUN_VAULT}Battery {index}Customer State of Charge",
+                "unit": PERCENTAGE,
+                "icon": "mdi:battery-charging-100",
+                "device": None,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "BATTERY_SYSTEM_STATE_OF_CHARGE": {
+                "field": "system_state_of_charge",
+                "title": "{SUN_VAULT}Battery {index}System State of Charge",
+                "unit": PERCENTAGE,
+                "icon": "mdi:battery-charging-100",
+                "device": None,
+                "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+        },
+    },
 }
 
 
@@ -413,14 +411,26 @@ def convert_ess_data(ess_data, data):
 
     for device in ess_data["ess_report"]["battery_status"]:
         battery_serial = device["serial_number"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_amperage"] = device["battery_amperage"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_voltage"] = device["battery_voltage"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["customer_state_of_charge"] = device["customer_state_of_charge"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["system_state_of_charge"] = device["system_state_of_charge"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["temperature"] = device["temperature"]["value"]
 
-        if data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"] != "working":
-            sunvault_state = data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"]
+        # Find the battery device - could be "ESS BMS" or "Battery" type
+        battery_device_type = None
+        if BATTERY_DEVICE_TYPE in data and battery_serial in data[BATTERY_DEVICE_TYPE]:
+            battery_device_type = BATTERY_DEVICE_TYPE
+        elif "Battery" in data and battery_serial in data["Battery"]:
+            battery_device_type = "Battery"
+
+        if not battery_device_type:
+            _LOGGER.warning("Battery %s from ESS data not found in PVS data", battery_serial)
+            continue
+
+        data[battery_device_type][battery_serial]["battery_amperage"] = device["battery_amperage"]["value"]
+        data[battery_device_type][battery_serial]["battery_voltage"] = device["battery_voltage"]["value"]
+        data[battery_device_type][battery_serial]["customer_state_of_charge"] = device["customer_state_of_charge"]["value"]
+        data[battery_device_type][battery_serial]["system_state_of_charge"] = device["system_state_of_charge"]["value"]
+        data[battery_device_type][battery_serial]["temperature"] = device["temperature"]["value"]
+
+        if data[battery_device_type][battery_serial]["STATE"] != "working":
+            sunvault_state = data[battery_device_type][battery_serial]["STATE"]
 
         sunvault_amperages.append(device["battery_amperage"]["value"])
         sunvault_voltages.append(device["battery_voltage"]["value"])

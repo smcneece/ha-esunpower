@@ -718,19 +718,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 if not is_valid:
                     raise UpdateFailed(f"Data conversion failed: {error_message}")
 
-                # Check for ESS devices and poll ESS endpoint if needed
-                if ESS_DEVICE_TYPE in data or BATTERY_DEVICE_TYPE in data or HUBPLUS_DEVICE_TYPE in data:
+                # Check for ESS devices and poll ESS endpoint if needed (krbaker approach)
+                if ESS_DEVICE_TYPE in data:  # Look for "Energy Storage System" in PVS data
                     _LOGGER.debug("Battery system detected, attempting ESS data poll")
 
                     try:
+                        _LOGGER.warning("DEBUG: Attempting ESS endpoint call...")
                         ess_data = await sunpower_monitor.energy_storage_system_status_async()
+                        _LOGGER.warning("DEBUG: ESS endpoint returned: %s", str(ess_data)[:500] if ess_data else "None")
+
                         if ess_data:
                             _LOGGER.debug("ESS data received, integrating with PVS data")
-                            data = convert_ess_data(ess_data, data)
+                            try:
+                                data = convert_ess_data(ess_data, data)
+                                _LOGGER.warning("DEBUG: ESS data integration successful")
+                            except Exception as convert_error:
+                                _LOGGER.error("DEBUG: ESS data conversion failed: %s", convert_error, exc_info=True)
+                                # Don't re-raise - continue with PVS data
                         else:
-                            _LOGGER.warning("ESS endpoint returned no data - battery sensors will show basic info only")
+                            _LOGGER.error("DEBUG: ESS endpoint returned no data")
                     except Exception as ess_error:
-                        _LOGGER.warning("ESS endpoint failed (%s) - battery devices will show basic state only", ess_error)
+                        _LOGGER.error("DEBUG: ESS endpoint failed: %s", ess_error, exc_info=True)
                         # Continue with PVS-only data - don't fail the entire update
 
                 # Check inverter health
