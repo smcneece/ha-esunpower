@@ -1,7 +1,10 @@
 # Enhanced SunPower Home Assistant Integration
 
-> **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**  
-> **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
+ **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
+
+ **Also if you have battery system hold off installing this until some bugs are worked out. (Sept 24 2025, I'll remove this warning when it is fixed)** 
+
+ **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
