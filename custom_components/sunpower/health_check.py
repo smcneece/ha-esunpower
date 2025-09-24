@@ -348,6 +348,25 @@ def check_firmware_upgrade(hass, entry, cache, pvs_data):
         cache.last_known_firmware = current_firmware
 
 
+def check_battery_system_health(hass, entry, cache, data):
+    """Check battery system health and return error counts"""
+    from .const import BATTERY_DEVICE_TYPE, ESS_DEVICE_TYPE, HUBPLUS_DEVICE_TYPE
+
+    error_count = 0
+    total_count = 0
+
+    # Count battery device states
+    for device_type in [BATTERY_DEVICE_TYPE, ESS_DEVICE_TYPE, HUBPLUS_DEVICE_TYPE]:
+        if device_type in data:
+            for device_serial, device_data in data[device_type].items():
+                total_count += 1
+                if device_data.get("STATE") != "working":
+                    error_count += 1
+
+    _LOGGER.debug("Battery health check: %d errors out of %d devices", error_count, total_count)
+    return error_count, total_count
+
+
 def check_flash_memory_level(hass, entry, cache, pvs_data):
     """Check PVS flash memory level and send critical alerts if below threshold"""
     from .notifications import notify_flash_memory_critical

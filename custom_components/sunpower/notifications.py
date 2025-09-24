@@ -406,5 +406,25 @@ def notify_diagnostic_coordinator_status(hass, entry, cache, current_interval, c
 def notify_diagnostic_coordinator_creating(hass, entry, cache, polling_interval):
     """DEBUG: Coordinator creation details"""
     msg = f"⚙️ DIAGNOSTIC: Creating coordinator with {polling_interval}s interval"
-    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True, 
+    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
                notification_category="debug", cache=cache)
+
+
+def notify_battery_system_error(hass, entry, cache, error_count, total_count, technical_reason):
+    """ESSENTIAL: Battery system error notifications"""
+    if error_count == total_count:
+        # Complete system failure
+        msg = (f"🔴 SunVault System Error\n\n"
+               f"All {total_count} battery devices are reporting error state. "
+               f"Battery entities will show basic status only.\n\n"
+               f"Technical: {technical_reason}\n\n"
+               f"This typically indicates a hardware malfunction requiring professional service.")
+    else:
+        # Partial system failure
+        msg = (f"⚠️ SunVault Partial Error\n\n"
+               f"{error_count} of {total_count} battery devices are in error state. "
+               f"Some battery data may be incomplete.\n\n"
+               f"Technical: {technical_reason}")
+
+    safe_notify(hass, msg, "Enhanced SunPower Battery Alert", entry, force_notify=True,
+               notification_category="battery_error", cache=cache)

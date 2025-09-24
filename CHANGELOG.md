@@ -2,7 +2,17 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
-## [unreleased]
+## [v2025.9.4] - 2025-09-23
+
+### 🐛 Bug Fixes
+- **Fixed Battery System Regression**: Restored ESS endpoint polling that was missing from krbaker's original version
+  - Battery systems now get proper sensor entities instead of sparse "1 entity" devices
+  - Added graceful fallback when ESS endpoint fails - basic sensors still created from PVS data
+  - Battery devices show appropriate state information even during hardware error conditions
+
+---
+
+## [v2025.9.3] - Released
 
 > **Note**: v2025.9.2 was released but had buggy day/night transition behavior (stuck in wrong polling modes). Rolled back to stable v2025.8.26 and rebuilt the features properly with comprehensive testing.
 
@@ -26,6 +36,10 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 - **Smart Battery Logic**: Battery systems use appropriate day/night intervals while maintaining 24/7 monitoring
 
 ### 🐛 Bug Fixes
+- **Fixed Battery System Regression**: Restored ESS endpoint polling that was missing from krbaker's original version
+  - Battery systems now get proper sensor entities instead of sparse "1 entity" devices
+  - Added graceful fallback when ESS endpoint fails - basic sensors still created from PVS data
+  - Battery devices show appropriate state information even during hardware error conditions
 - **Fixed Battery Interval Logic**: Battery systems now properly use day/night intervals instead of always using daytime
 - **Fixed Virtual Production Meter**: Removed erroneous "KWh To Home" sensor that always showed 0
 - **Fixed Config Validation**: Nighttime intervals properly validated (0 or ≥300 seconds)

@@ -220,14 +220,13 @@
 
 ### Smart Notification System
 
-Multi-channel notification system with human-readable time display:
+Multi-channel notification system:
 
 ![Debug Notifications](images/debug_notifications.png)
 
 **Notification Channels:**
 - Setup, Day/Night, Polling, Health, Inverter, Route status
 - Mobile notifications with smart fallback to persistent notifications
-- Human-readable time formats ("50 minutes ago" vs "3039s ago")
 
 ### Energy Dashboard Integration
 

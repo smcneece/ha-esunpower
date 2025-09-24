@@ -78,6 +78,55 @@ SUNVAULT_BINARY_SENSORS = {
     },
 }
 
+# Basic sensors that work with PVS data only (always available)
+BASIC_BATTERY_SENSORS = {
+    BATTERY_DEVICE_TYPE: {
+        "unique_id": "battery",
+        "sensors": {
+            "BATTERY_STATE": {
+                "field": "STATE",
+                "title": "{SUN_VAULT}Battery {index}State",
+                "icon": "mdi:battery",
+                "device": None,
+                "state": None,
+            },
+            "BATTERY_MODEL": {
+                "field": "MODEL",
+                "title": "{SUN_VAULT}Battery {index}Model",
+                "icon": "mdi:information",
+                "device": None,
+                "state": None,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+        },
+    },
+    ESS_DEVICE_TYPE: {
+        "unique_id": "ess",
+        "sensors": {
+            "ESS_STATE": {
+                "field": "STATE",
+                "title": "{SUN_VAULT}ESS {index}State",
+                "icon": "mdi:battery-outline",
+                "device": None,
+                "state": None,
+            },
+        },
+    },
+    HUBPLUS_DEVICE_TYPE: {
+        "unique_id": "hubplus",
+        "sensors": {
+            "HUBPLUS_STATE": {
+                "field": "STATE",
+                "title": "{SUN_POWER}Hub Plus State",
+                "icon": "mdi:router-wireless",
+                "device": None,
+                "state": None,
+            },
+        },
+    },
+}
+
+# Full sensors that require ESS data (only available when ESS endpoint succeeds)
 SUNVAULT_SENSORS = {
     SUNVAULT_DEVICE_TYPE: {
         "unique_id": "sunvault",

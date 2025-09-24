@@ -21,10 +21,13 @@ from homeassistant.helpers.debounce import Debouncer
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    DOMAIN,
-    PVS_DEVICE_TYPE,
-    INVERTER_DEVICE_TYPE,
+    BATTERY_DEVICE_TYPE,
     DIAGNOSTIC_DEVICE_TYPE,
+    DOMAIN,
+    ESS_DEVICE_TYPE,
+    HUBPLUS_DEVICE_TYPE,
+    INVERTER_DEVICE_TYPE,
+    PVS_DEVICE_TYPE,
     SUNPOWER_COORDINATOR,
     SUNPOWER_HOST,
     SUNPOWER_OBJECT,
@@ -44,34 +47,35 @@ from .data_processor import (
 
 # Import health check functions
 from .health_check import (
-    smart_pvs_health_check,
-    check_inverter_health,
     check_firmware_upgrade,
     check_flash_memory_level,
+    check_inverter_health,
+    smart_pvs_health_check,
     update_diagnostic_stats,
 )
 
 # Import battery handler functions
 from .battery_handler import (
+    convert_ess_data,
     get_battery_configuration,
 )
 
 # Import notification functions
 from .notifications import (
-    safe_notify,
-    notify_diagnostic_coordinator_started,
-    notify_diagnostic_coordinator_status,
-    notify_diagnostic_coordinator_creating,
-    notify_day_mode_elevation,
-    notify_night_mode_elevation,
-    notify_setup_success,
-    notify_data_update_success,
-    notify_polling_failed,
-    notify_setup_warning,
-    notify_using_cached_data,
-    notify_firmware_upgrade,
     convert_state_reason_to_text,
     format_time_duration,
+    notify_data_update_success,
+    notify_day_mode_elevation,
+    notify_diagnostic_coordinator_creating,
+    notify_diagnostic_coordinator_started,
+    notify_diagnostic_coordinator_status,
+    notify_firmware_upgrade,
+    notify_night_mode_elevation,
+    notify_polling_failed,
+    notify_setup_success,
+    notify_setup_warning,
+    notify_using_cached_data,
+    safe_notify,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -713,7 +717,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 is_valid, device_count, error_message = validate_converted_data(data)
                 if not is_valid:
                     raise UpdateFailed(f"Data conversion failed: {error_message}")
-                
+
+                # Check for ESS devices and poll ESS endpoint if needed
+                if ESS_DEVICE_TYPE in data or BATTERY_DEVICE_TYPE in data or HUBPLUS_DEVICE_TYPE in data:
+                    _LOGGER.debug("Battery system detected, attempting ESS data poll")
+
+                    try:
+                        ess_data = await sunpower_monitor.energy_storage_system_status_async()
+                        if ess_data:
+                            _LOGGER.debug("ESS data received, integrating with PVS data")
+                            data = convert_ess_data(ess_data, data)
+                        else:
+                            _LOGGER.warning("ESS endpoint returned no data - battery sensors will show basic info only")
+                    except Exception as ess_error:
+                        _LOGGER.warning("ESS endpoint failed (%s) - battery devices will show basic state only", ess_error)
+                        # Continue with PVS-only data - don't fail the entire update
+
                 # Check inverter health
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 if inverter_data:
