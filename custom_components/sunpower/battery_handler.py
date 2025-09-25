@@ -412,25 +412,15 @@ def convert_ess_data(ess_data, data):
     for device in ess_data["ess_report"]["battery_status"]:
         battery_serial = device["serial_number"]
 
-        # Find the battery device - could be "ESS BMS" or "Battery" type
-        battery_device_type = None
-        if BATTERY_DEVICE_TYPE in data and battery_serial in data[BATTERY_DEVICE_TYPE]:
-            battery_device_type = BATTERY_DEVICE_TYPE
-        elif "Battery" in data and battery_serial in data["Battery"]:
-            battery_device_type = "Battery"
+        # krbaker's exact approach - direct access to BATTERY_DEVICE_TYPE
+        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_amperage"] = device["battery_amperage"]["value"]
+        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_voltage"] = device["battery_voltage"]["value"]
+        data[BATTERY_DEVICE_TYPE][battery_serial]["customer_state_of_charge"] = device["customer_state_of_charge"]["value"]
+        data[BATTERY_DEVICE_TYPE][battery_serial]["system_state_of_charge"] = device["system_state_of_charge"]["value"]
+        data[BATTERY_DEVICE_TYPE][battery_serial]["temperature"] = device["temperature"]["value"]
 
-        if not battery_device_type:
-            _LOGGER.warning("Battery %s from ESS data not found in PVS data", battery_serial)
-            continue
-
-        data[battery_device_type][battery_serial]["battery_amperage"] = device["battery_amperage"]["value"]
-        data[battery_device_type][battery_serial]["battery_voltage"] = device["battery_voltage"]["value"]
-        data[battery_device_type][battery_serial]["customer_state_of_charge"] = device["customer_state_of_charge"]["value"]
-        data[battery_device_type][battery_serial]["system_state_of_charge"] = device["system_state_of_charge"]["value"]
-        data[battery_device_type][battery_serial]["temperature"] = device["temperature"]["value"]
-
-        if data[battery_device_type][battery_serial]["STATE"] != "working":
-            sunvault_state = data[battery_device_type][battery_serial]["STATE"]
+        if data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"] != "working":
+            sunvault_state = data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"]
 
         sunvault_amperages.append(device["battery_amperage"]["value"])
         sunvault_voltages.append(device["battery_voltage"]["value"])
@@ -462,42 +452,42 @@ def convert_ess_data(ess_data, data):
         data[ESS_DEVICE_TYPE][ess_serial]["meter_b_power"] = device["ess_meter_reading"]["meter_b"]["reading"]["power"]["value"]
         data[ESS_DEVICE_TYPE][ess_serial]["meter_b_voltage"] = device["ess_meter_reading"]["meter_b"]["reading"]["voltage"]["value"]
 
-    # Process hub plus status
-    device = ess_data["ess_report"]["hub_plus_status"]
-    hub_serial = device["serial_number"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["contactor_position"] = device["contactor_position"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["grid_frequency_state"] = device["grid_frequency_state"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["grid_phase1_voltage"] = device["grid_phase1_voltage"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["grid_phase2_voltage"] = device["grid_phase2_voltage"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["grid_voltage_state"] = device["grid_voltage_state"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["hub_humidity"] = device["hub_humidity"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["hub_temperature"] = device["hub_temperature"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["inverter_connection_voltage"] = device["inverter_connection_voltage"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["load_frequency_state"] = device["load_frequency_state"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["load_phase1_voltage"] = device["load_phase1_voltage"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["load_phase2_voltage"] = device["load_phase2_voltage"]["value"]
-    data[HUBPLUS_DEVICE_TYPE][hub_serial]["main_voltage"] = device["main_voltage"]["value"]
+    if True:
+        device = ess_data["ess_report"]["hub_plus_status"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["contactor_position"] = device["contactor_position"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_frequency_state"] = device["grid_frequency_state"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_phase1_voltage"] = device["grid_phase1_voltage"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_phase2_voltage"] = device["grid_phase2_voltage"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_voltage_state"] = device["grid_voltage_state"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["hub_humidity"] = device["hub_humidity"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["hub_temperature"] = device["hub_temperature"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["inverter_connection_voltage"] = device["inverter_connection_voltage"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_frequency_state"] = device["load_frequency_state"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_phase1_voltage"] = device["load_phase1_voltage"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_phase2_voltage"] = device["load_phase2_voltage"]["value"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_voltage_state"] = device["load_voltage_state"]
+        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["main_voltage"] = device["main_voltage"]["value"]
 
-    # Create virtual SunVault device
-    pvs_serial = next(iter(data[PVS_DEVICE_TYPE]))
-    sunvault_serial = f"sunvault_{pvs_serial}"
-    data[SUNVAULT_DEVICE_TYPE] = {sunvault_serial: {}}
-    data[SUNVAULT_DEVICE_TYPE][sunvault_serial].update({
-        "sunvault_amperage": sum(sunvault_amperages),
-        "sunvault_voltage": sum(sunvault_voltages) / len(sunvault_voltages) if sunvault_voltages else 0,
-        "sunvault_temperature": sum(sunvault_temperatures) / len(sunvault_temperatures) if sunvault_temperatures else 0,
-        "sunvault_customer_state_of_charge": sum(sunvault_customer_state_of_charges) / len(sunvault_customer_state_of_charges) if sunvault_customer_state_of_charges else 0,
-        "sunvault_system_state_of_charge": sum(sunvault_system_state_of_charges) / len(sunvault_system_state_of_charges) if sunvault_system_state_of_charges else 0,
-        "sunvault_power_input": sum(sunvault_power_inputs),
-        "sunvault_power_output": sum(sunvault_power_outputs),
-        "sunvault_power": sum(sunvault_power),
-        "STATE": sunvault_state,
-        "SERIAL": sunvault_serial,
-        "SWVER": "1.0",
-        "HWVER": "Virtual",
-        "DESCR": "Virtual SunVault",
-        "MODEL": "Virtual SunVault",
-    })
+    if True:
+        # Generate a usable serial number for this virtual device, use PVS serial as base
+        # since we must be talking through one and it has a serial
+        pvs_serial = next(iter(data[PVS_DEVICE_TYPE]))  # only one PVS
+        sunvault_serial = f"sunvault_{pvs_serial}"
+        data[SUNVAULT_DEVICE_TYPE] = {sunvault_serial: {}}
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_amperage"] = sum(sunvault_amperages)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_voltage"] = sum(sunvault_voltages) / len(sunvault_voltages)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_temperature"] = sum(sunvault_temperatures) / len(sunvault_temperatures)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_customer_state_of_charge"] = sum(sunvault_customer_state_of_charges) / len(sunvault_customer_state_of_charges)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_system_state_of_charge"] = sum(sunvault_system_state_of_charges) / len(sunvault_system_state_of_charges)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power_input"] = sum(sunvault_power_inputs)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power_output"] = sum(sunvault_power_outputs)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power"] = sum(sunvault_power)
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["STATE"] = sunvault_state
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["SERIAL"] = sunvault_serial
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["SWVER"] = "1.0"
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["HWVER"] = "Virtual"
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["DESCR"] = "Virtual SunVault"
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["MODEL"] = "Virtual SunVault"
     return data
 
 
