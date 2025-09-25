@@ -2,7 +2,7 @@
 
  **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
- **Also if you have battery system hold off installing this until some bugs are worked out. (Sept 24 2025, I'll remove this warning when it is fixed)** 
+ **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)** 
 
  **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
@@ -267,11 +267,11 @@ For individual panel monitoring, add each inverter's lifetime power sensor:
 - Grid-tied accuracy for billing reconciliation
 
 **Dedicated CT Energy Monitor (Recommended)**
-For comprehensive whole-home monitoring, we recommend dedicated current transformer (CT) systems:
+For comprehensive whole-home monitoring, I recommend dedicated current transformer (CT) systems:
 
 **[SEM-Meter (Smart Home Energy Meter)](https://www.amazon.com/Energy-Monitor-Circuit-Sensors-Real-Time/dp/B0D6VZQBPF?th=1)** *(Developer Tested)*
 - **Whole house**: ~$100 for main monitoring
-- **Circuit-level**: ~$125 for 16 individual circuits  
+- **Circuit-level**: ~$129 for 16 individual circuits & mains. 
 - **100% Local Operation** - No cloud dependency required
 - **Direct HA integration** via MQTT
 - **Real-time updates** (1-second intervals)
