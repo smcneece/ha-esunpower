@@ -19,22 +19,51 @@ class SunPowerMonitor:
     if you find this useful please complain to sunpower and your sunpower dealer that they
     do not have a public API"""
 
-    def __init__(self, host):
+    def __init__(self, host, auth_password=None):
         """Initialize."""
         self.host = host
+        self.auth_password = auth_password
         self.command_url = "http://{0}/cgi-bin/dl_cgi?Command=".format(host)
+        self._auth_header = None
+        if auth_password:
+            # Generate Basic Auth header for ssm_owner:password
+            import base64
+            auth_string = f"ssm_owner:{auth_password}"
+            auth_bytes = auth_string.encode('ascii')
+            auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+            self._auth_header = f"Basic {auth_b64}"
 
     async def generic_command_async(self, command):
         """All 'commands' to the PVS module use this url pattern and return json
-        The PVS system can take a very long time to respond so timeout is at 2 minutes"""
+        The PVS system can take a very long time to respond so timeout is at 2 minutes
+
+        Handles authentication fallback:
+        1. Try unauthenticated request first
+        2. If 401/403, retry with authentication (if password available)
+        """
         url = self.command_url + command
         timeout = aiohttp.ClientTimeout(total=120)
-        
+
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
+                # First attempt: unauthenticated
                 async with session.get(url) as response:
-                    text = await response.text()
-                    return simplejson.loads(text)
+                    if response.status in [401, 403]:
+                        # Authentication required
+                        if self._auth_header:
+                            # Retry with authentication
+                            headers = {"Authorization": self._auth_header}
+                            async with session.get(url, headers=headers) as auth_response:
+                                if auth_response.status in [401, 403]:
+                                    raise ConnectionException("Authentication failed - check PVS serial number")
+                                text = await auth_response.text()
+                                return simplejson.loads(text)
+                        else:
+                            raise ConnectionException("Authentication required but no PVS serial provided")
+                    else:
+                        # Success without authentication
+                        text = await response.text()
+                        return simplejson.loads(text)
         except aiohttp.ClientError as error:
             raise ConnectionException from error
         except simplejson.errors.JSONDecodeError as error:
@@ -97,15 +126,34 @@ class SunPowerMonitor:
             )
 
     async def energy_storage_system_status_async(self):
-        """Get the status of the energy storage system - ASYNC"""
+        """Get the status of the energy storage system - ASYNC
+
+        Note: This uses a different URL format than generic_command_async,
+        so we need custom authentication handling here.
+        """
         url = "http://{0}/cgi-bin/dl_cgi/energy-storage-system/status".format(self.host)
         timeout = aiohttp.ClientTimeout(total=120)
-        
+
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
+                # First attempt: unauthenticated
                 async with session.get(url) as response:
-                    text = await response.text()
-                    return simplejson.loads(text)
+                    if response.status in [401, 403]:
+                        # Authentication required
+                        if self._auth_header:
+                            # Retry with authentication
+                            headers = {"Authorization": self._auth_header}
+                            async with session.get(url, headers=headers) as auth_response:
+                                if auth_response.status in [401, 403]:
+                                    raise ConnectionException("Authentication failed for ESS endpoint - check PVS serial number")
+                                text = await auth_response.text()
+                                return simplejson.loads(text)
+                        else:
+                            raise ConnectionException("Authentication required for ESS endpoint but no PVS serial provided")
+                    else:
+                        # Success without authentication
+                        text = await response.text()
+                        return simplejson.loads(text)
         except aiohttp.ClientError as error:
             raise ConnectionException from error
         except simplejson.errors.JSONDecodeError as error:

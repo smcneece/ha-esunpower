@@ -398,7 +398,18 @@ SUNVAULT_SENSORS = {
 # ==========================================
 
 def convert_ess_data(ess_data, data):
-    """Integrate ESS data from its unique data source into the PVS data"""
+    """Integrate ESS data from its unique data source into the PVS data
+
+    FIXED: Handle mismatched serial numbers between DeviceList and ESS endpoints.
+    Instead of trying to merge data into physical battery devices (which have different serials),
+    we create virtual battery devices from ESS data and aggregate into SunVault.
+    """
+    # Safety check for ESS data structure
+    if not ess_data or "ess_report" not in ess_data:
+        _LOGGER.warning("Invalid ESS data structure, skipping battery processing")
+        return data
+
+    ess_report = ess_data["ess_report"]
     sunvault_amperages = []
     sunvault_voltages = []
     sunvault_temperatures = []
@@ -409,85 +420,215 @@ def convert_ess_data(ess_data, data):
     sunvault_power_outputs = []
     sunvault_state = "working"
 
-    for device in ess_data["ess_report"]["battery_status"]:
-        battery_serial = device["serial_number"]
+    # Process battery status from ESS endpoint
+    battery_status_list = ess_report.get("battery_status", [])
+    _LOGGER.debug("Processing %d battery status entries from ESS endpoint", len(battery_status_list))
 
-        # krbaker's exact approach - direct access to BATTERY_DEVICE_TYPE
-        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_amperage"] = device["battery_amperage"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["battery_voltage"] = device["battery_voltage"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["customer_state_of_charge"] = device["customer_state_of_charge"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["system_state_of_charge"] = device["system_state_of_charge"]["value"]
-        data[BATTERY_DEVICE_TYPE][battery_serial]["temperature"] = device["temperature"]["value"]
+    for i, device in enumerate(battery_status_list):
+        try:
+            battery_serial = device.get("serial_number", f"unknown_battery_{i}")
+            _LOGGER.debug("Processing ESS battery %d with serial: %s", i, battery_serial)
 
-        if data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"] != "working":
-            sunvault_state = data[BATTERY_DEVICE_TYPE][battery_serial]["STATE"]
+            # Create virtual battery device from ESS data instead of trying to match serials
+            # This handles the mismatch between physical battery serials (M00...) and BMS serial (BC...)
+            # Safe string slicing - ensure we have at least 6 chars, otherwise use full serial
+            serial_suffix = battery_serial[-6:] if len(battery_serial) >= 6 else battery_serial
+            virtual_battery_serial = f"ess_battery_{i}_{serial_suffix}"
 
-        sunvault_amperages.append(device["battery_amperage"]["value"])
-        sunvault_voltages.append(device["battery_voltage"]["value"])
-        sunvault_temperatures.append(device["temperature"]["value"])
-        sunvault_customer_state_of_charges.append(device["customer_state_of_charge"]["value"])
-        sunvault_system_state_of_charges.append(device["system_state_of_charge"]["value"])
-        sunvault_power.append(sunvault_amperages[-1] * sunvault_voltages[-1])
+            # Initialize virtual battery device
+            if BATTERY_DEVICE_TYPE not in data:
+                data[BATTERY_DEVICE_TYPE] = {}
 
-        if sunvault_amperages[-1] < 0:
-            sunvault_power_outputs.append(abs(sunvault_amperages[-1] * sunvault_voltages[-1]))
-            sunvault_power_inputs.append(0)
-        elif sunvault_amperages[-1] > 0:
-            sunvault_power_inputs.append(sunvault_amperages[-1] * sunvault_voltages[-1])
-            sunvault_power_outputs.append(0)
-        else:
-            sunvault_power_inputs.append(0)
-            sunvault_power_outputs.append(0)
+            # Safely extract values with defaults
+            battery_amperage = device.get("battery_amperage", {}).get("value", 0)
+            battery_voltage = device.get("battery_voltage", {}).get("value", 0)
+            customer_soc = device.get("customer_state_of_charge", {}).get("value", 0)
+            system_soc = device.get("system_state_of_charge", {}).get("value", 0)
+            temperature = device.get("temperature", {}).get("value", 0)
 
-    # Process ESS status
-    for device in ess_data["ess_report"]["ess_status"]:
-        ess_serial = device["serial_number"]
-        data[ESS_DEVICE_TYPE][ess_serial]["enclosure_humidity"] = device["enclosure_humidity"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["enclosure_temperature"] = device["enclosure_temperature"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["agg_power"] = device["ess_meter_reading"]["agg_power"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_a_current"] = device["ess_meter_reading"]["meter_a"]["reading"]["current"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_a_power"] = device["ess_meter_reading"]["meter_a"]["reading"]["power"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_a_voltage"] = device["ess_meter_reading"]["meter_a"]["reading"]["voltage"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_b_current"] = device["ess_meter_reading"]["meter_b"]["reading"]["current"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_b_power"] = device["ess_meter_reading"]["meter_b"]["reading"]["power"]["value"]
-        data[ESS_DEVICE_TYPE][ess_serial]["meter_b_voltage"] = device["ess_meter_reading"]["meter_b"]["reading"]["voltage"]["value"]
+            data[BATTERY_DEVICE_TYPE][virtual_battery_serial] = {
+                "battery_amperage": battery_amperage,
+                "battery_voltage": battery_voltage,
+                "customer_state_of_charge": customer_soc,
+                "system_state_of_charge": system_soc,
+                "temperature": temperature,
+                "STATE": "working",  # ESS data doesn't provide state, assume working
+                "SERIAL": virtual_battery_serial,
+                "SWVER": "ESS",
+                "HWVER": "ESS",
+                "DESCR": f"Virtual Battery {i+1}",
+                "MODEL": "ESS Battery",
+                "DEVICE_TYPE": BATTERY_DEVICE_TYPE
+            }
 
-    if True:
-        device = ess_data["ess_report"]["hub_plus_status"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["contactor_position"] = device["contactor_position"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_frequency_state"] = device["grid_frequency_state"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_phase1_voltage"] = device["grid_phase1_voltage"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_phase2_voltage"] = device["grid_phase2_voltage"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["grid_voltage_state"] = device["grid_voltage_state"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["hub_humidity"] = device["hub_humidity"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["hub_temperature"] = device["hub_temperature"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["inverter_connection_voltage"] = device["inverter_connection_voltage"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_frequency_state"] = device["load_frequency_state"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_phase1_voltage"] = device["load_phase1_voltage"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_phase2_voltage"] = device["load_phase2_voltage"]["value"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["load_voltage_state"] = device["load_voltage_state"]
-        data[HUBPLUS_DEVICE_TYPE][device["serial_number"]]["main_voltage"] = device["main_voltage"]["value"]
+            _LOGGER.debug("Created virtual battery device: %s (A=%.1f, V=%.1f, SOC=%.1f%%)",
+                         virtual_battery_serial, battery_amperage, battery_voltage, customer_soc)
 
-    if True:
+            # Aggregate for SunVault virtual device using safely extracted values
+            sunvault_amperages.append(battery_amperage)
+            sunvault_voltages.append(battery_voltage)
+            sunvault_temperatures.append(temperature)
+            sunvault_customer_state_of_charges.append(customer_soc)
+            sunvault_system_state_of_charges.append(system_soc)
+            sunvault_power.append(battery_amperage * battery_voltage)
+
+            if battery_amperage < 0:
+                sunvault_power_outputs.append(abs(battery_amperage * battery_voltage))
+                sunvault_power_inputs.append(0)
+            elif battery_amperage > 0:
+                sunvault_power_inputs.append(battery_amperage * battery_voltage)
+                sunvault_power_outputs.append(0)
+            else:
+                sunvault_power_inputs.append(0)
+                sunvault_power_outputs.append(0)
+
+        except Exception as e:
+            _LOGGER.error("Failed to process ESS battery %d: %s", i, e)
+            continue  # Skip this battery but continue with others
+
+    # Process ESS status - handle potential serial mismatches
+    ess_status_list = ess_report.get("ess_status", [])
+    _LOGGER.debug("Processing %d ESS status entries from ESS endpoint", len(ess_status_list))
+
+    for i, device in enumerate(ess_status_list):
+        try:
+            ess_serial = device.get("serial_number", f"unknown_ess_{i}")
+            _LOGGER.debug("Processing ESS device %d with serial: %s", i, ess_serial)
+
+            # Try to find matching ESS device in DeviceList data, but create virtual if not found
+            if ESS_DEVICE_TYPE in data and ess_serial in data[ESS_DEVICE_TYPE]:
+                # Direct match found, use existing device
+                target_device = data[ESS_DEVICE_TYPE][ess_serial]
+            else:
+                # No match or no ESS devices, create virtual ESS device
+                # Safe string slicing - ensure we have at least 8 chars, otherwise use full serial
+                serial_suffix = ess_serial[-8:] if len(ess_serial) >= 8 else ess_serial
+                virtual_ess_serial = f"ess_virtual_{i}_{serial_suffix}"
+                _LOGGER.debug("Creating virtual ESS device: %s (original: %s)", virtual_ess_serial, ess_serial)
+
+                if ESS_DEVICE_TYPE not in data:
+                    data[ESS_DEVICE_TYPE] = {}
+
+                data[ESS_DEVICE_TYPE][virtual_ess_serial] = {
+                    "STATE": "working",
+                    "SERIAL": virtual_ess_serial,
+                    "SWVER": "ESS",
+                    "HWVER": "ESS",
+                    "DESCR": f"Virtual ESS {i+1}",
+                    "MODEL": "ESS Device",
+                    "DEVICE_TYPE": ESS_DEVICE_TYPE
+                }
+                target_device = data[ESS_DEVICE_TYPE][virtual_ess_serial]
+
+            # Safely populate ESS data with defaults
+            target_device["enclosure_humidity"] = device.get("enclosure_humidity", {}).get("value", 0)
+            target_device["enclosure_temperature"] = device.get("enclosure_temperature", {}).get("value", 0)
+
+            # Handle nested ess_meter_reading structure safely
+            meter_reading = device.get("ess_meter_reading", {})
+            target_device["agg_power"] = meter_reading.get("agg_power", {}).get("value", 0)
+
+            meter_a = meter_reading.get("meter_a", {}).get("reading", {})
+            target_device["meter_a_current"] = meter_a.get("current", {}).get("value", 0)
+            target_device["meter_a_power"] = meter_a.get("power", {}).get("value", 0)
+            target_device["meter_a_voltage"] = meter_a.get("voltage", {}).get("value", 0)
+
+            meter_b = meter_reading.get("meter_b", {}).get("reading", {})
+            target_device["meter_b_current"] = meter_b.get("current", {}).get("value", 0)
+            target_device["meter_b_power"] = meter_b.get("power", {}).get("value", 0)
+            target_device["meter_b_voltage"] = meter_b.get("voltage", {}).get("value", 0)
+
+            _LOGGER.debug("Processed ESS device: %s (Power: %.3f kW)",
+                         target_device.get("SERIAL", "unknown"), target_device["agg_power"])
+
+        except Exception as e:
+            _LOGGER.error("Failed to process ESS device %d: %s", i, e)
+            continue  # Skip this ESS device but continue with others
+
+    # Process HubPlus status - handle potential serial mismatches
+    if "hub_plus_status" in ess_report:
+        try:
+            device = ess_report["hub_plus_status"]
+            hubplus_serial = device.get("serial_number", "unknown_hubplus")
+            _LOGGER.debug("Processing HubPlus device with serial: %s", hubplus_serial)
+
+            # Try to find matching HubPlus device in DeviceList data, but create virtual if not found
+            if HUBPLUS_DEVICE_TYPE in data and hubplus_serial in data[HUBPLUS_DEVICE_TYPE]:
+                # Direct match found, use existing device
+                target_device = data[HUBPLUS_DEVICE_TYPE][hubplus_serial]
+            else:
+                # No match or no HubPlus devices, create virtual HubPlus device
+                # Safe string slicing - ensure we have at least 8 chars, otherwise use full serial
+                serial_suffix = hubplus_serial[-8:] if len(hubplus_serial) >= 8 else hubplus_serial
+                virtual_hubplus_serial = f"hubplus_virtual_{serial_suffix}"
+                _LOGGER.debug("Creating virtual HubPlus device: %s (original: %s)", virtual_hubplus_serial, hubplus_serial)
+
+                if HUBPLUS_DEVICE_TYPE not in data:
+                    data[HUBPLUS_DEVICE_TYPE] = {}
+
+                data[HUBPLUS_DEVICE_TYPE][virtual_hubplus_serial] = {
+                    "STATE": "working",
+                    "SERIAL": virtual_hubplus_serial,
+                    "SWVER": "ESS",
+                    "HWVER": "ESS",
+                    "DESCR": "Virtual Hub Plus",
+                    "MODEL": "Hub Plus Device",
+                    "DEVICE_TYPE": HUBPLUS_DEVICE_TYPE
+                }
+                target_device = data[HUBPLUS_DEVICE_TYPE][virtual_hubplus_serial]
+
+            # Safely populate HubPlus data with defaults
+            target_device["contactor_position"] = device.get("contactor_position", "UNKNOWN")
+            target_device["grid_frequency_state"] = device.get("grid_frequency_state", "UNKNOWN")
+            target_device["grid_phase1_voltage"] = device.get("grid_phase1_voltage", {}).get("value", 0)
+            target_device["grid_phase2_voltage"] = device.get("grid_phase2_voltage", {}).get("value", 0)
+            target_device["grid_voltage_state"] = device.get("grid_voltage_state", "UNKNOWN")
+            target_device["hub_humidity"] = device.get("hub_humidity", {}).get("value", 0)
+            target_device["hub_temperature"] = device.get("hub_temperature", {}).get("value", 0)
+            target_device["inverter_connection_voltage"] = device.get("inverter_connection_voltage", {}).get("value", 0)
+            target_device["load_frequency_state"] = device.get("load_frequency_state", "UNKNOWN")
+            target_device["load_phase1_voltage"] = device.get("load_phase1_voltage", {}).get("value", 0)
+            target_device["load_phase2_voltage"] = device.get("load_phase2_voltage", {}).get("value", 0)
+            target_device["load_voltage_state"] = device.get("load_voltage_state", "UNKNOWN")
+            target_device["main_voltage"] = device.get("main_voltage", {}).get("value", 0)
+
+            _LOGGER.debug("Processed HubPlus device: %s (Grid V1: %.1f, V2: %.1f)",
+                         target_device.get("SERIAL", "unknown"),
+                         target_device["grid_phase1_voltage"], target_device["grid_phase2_voltage"])
+
+        except Exception as e:
+            _LOGGER.error("Failed to process HubPlus device: %s", e)
+
+    # Create SunVault aggregation device only if we have battery data
+    if sunvault_amperages:  # Only create if we have battery data
         # Generate a usable serial number for this virtual device, use PVS serial as base
         # since we must be talking through one and it has a serial
         pvs_serial = next(iter(data[PVS_DEVICE_TYPE]))  # only one PVS
         sunvault_serial = f"sunvault_{pvs_serial}"
-        data[SUNVAULT_DEVICE_TYPE] = {sunvault_serial: {}}
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_amperage"] = sum(sunvault_amperages)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_voltage"] = sum(sunvault_voltages) / len(sunvault_voltages)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_temperature"] = sum(sunvault_temperatures) / len(sunvault_temperatures)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_customer_state_of_charge"] = sum(sunvault_customer_state_of_charges) / len(sunvault_customer_state_of_charges)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_system_state_of_charge"] = sum(sunvault_system_state_of_charges) / len(sunvault_system_state_of_charges)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power_input"] = sum(sunvault_power_inputs)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power_output"] = sum(sunvault_power_outputs)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["sunvault_power"] = sum(sunvault_power)
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["STATE"] = sunvault_state
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["SERIAL"] = sunvault_serial
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["SWVER"] = "1.0"
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["HWVER"] = "Virtual"
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["DESCR"] = "Virtual SunVault"
-        data[SUNVAULT_DEVICE_TYPE][sunvault_serial]["MODEL"] = "Virtual SunVault"
+
+        if SUNVAULT_DEVICE_TYPE not in data:
+            data[SUNVAULT_DEVICE_TYPE] = {}
+
+        data[SUNVAULT_DEVICE_TYPE][sunvault_serial] = {
+            "sunvault_amperage": sum(sunvault_amperages),
+            "sunvault_voltage": sum(sunvault_voltages) / len(sunvault_voltages) if sunvault_voltages else 0,
+            "sunvault_temperature": sum(sunvault_temperatures) / len(sunvault_temperatures) if sunvault_temperatures else 0,
+            "sunvault_customer_state_of_charge": sum(sunvault_customer_state_of_charges) / len(sunvault_customer_state_of_charges) if sunvault_customer_state_of_charges else 0,
+            "sunvault_system_state_of_charge": sum(sunvault_system_state_of_charges) / len(sunvault_system_state_of_charges) if sunvault_system_state_of_charges else 0,
+            "sunvault_power_input": sum(sunvault_power_inputs),
+            "sunvault_power_output": sum(sunvault_power_outputs),
+            "sunvault_power": sum(sunvault_power),
+            "STATE": sunvault_state,
+            "SERIAL": sunvault_serial,
+            "SWVER": "1.0",
+            "HWVER": "Virtual",
+            "DESCR": "Virtual SunVault",
+            "MODEL": "Virtual SunVault",
+            "DEVICE_TYPE": SUNVAULT_DEVICE_TYPE
+        }
+        _LOGGER.debug("Created SunVault aggregation device: %s with %d batteries", sunvault_serial, len(sunvault_amperages))
+    else:
+        _LOGGER.debug("No battery data found, skipping SunVault aggregation device creation")
     return data
 
 

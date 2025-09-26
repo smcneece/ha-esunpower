@@ -17,13 +17,14 @@
                     "host": "PVS IP Address",
                     "daytime_polling_interval": "Daytime Polling Interval (seconds)",
                     "nighttime_polling_interval": "Nighttime Polling Interval (seconds)",
-                    "route_gateway_ip": "Gateway IP for route repair"
+                    "route_gateway_ip": "Gateway IP for route repair",
+                    "pvs_serial_last5": "PVS Serial (last 5 characters)"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "daytime_polling_interval": "How often to check for new data during daylight hours (300-3600 seconds for PVS protection)",
                     "nighttime_polling_interval": "How often to poll during nighttime hours (0 = disabled, minimum 300 seconds if enabled). Enables consumption tracking when solar panels are not producing.",
-                    "route_gateway_ip": "Gateway IP for automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)"
+                    "route_gateway_ip": "Gateway IP for automatic route repair (VLAN users only)"
                 }
             },
             "solar": {
@@ -80,7 +81,7 @@
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
                     "mobile_device": "Device for alerts",
                     "route_check_enabled": "Detect and repair missing network routes when TCP health check fails (for VLAN/custom routing setups)",
-                    "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
+                    "route_gateway_ip": "Gateway IP address for route setup/repair (VLAN users only who need a specific IP)"
                 }
             }
         }
@@ -94,13 +95,15 @@
                     "host": "PVS IP Address",
                     "daytime_polling_interval": "Daytime Polling Interval (seconds)",
                     "nighttime_polling_interval": "Nighttime Polling Interval (seconds)",
-                    "route_gateway_ip": "Gateway IP for route repair"
+                    "route_gateway_ip": "Gateway IP for route repair",
+                    "pvs_serial_last5": "PVS Serial (last 5 characters)"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
                     "daytime_polling_interval": "How often to check for new data during daylight hours (300-3600 seconds for PVS protection)",
                     "nighttime_polling_interval": "How often to poll during nighttime hours (0 = disabled, minimum 300 seconds if enabled). Enables consumption tracking when solar panels are not producing.",
-                    "route_gateway_ip": "Gateway IP for automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)"
+                    "route_gateway_ip": "Gateway IP for VLAN automatic route repair (leave empty to disable, enter your router IP like 192.168.1.1)",
+                    "pvs_serial_last5": "Last 5 characters of PVS serial number (found on device label)"
                 }
             },
             "solar": {

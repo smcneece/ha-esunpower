@@ -149,6 +149,28 @@
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
+| **PVS Serial (last 5)** | Authentication for PVS6 firmware 61840+ | `` | See guide below |
+
+### 🔒 PVS6 Authentication (Future-Ready)
+
+**Upcoming Change**: SunPower PVS6 firmware 61840+ will require authentication. This integration is ready!
+
+**Where to Find Your PVS Serial Number:**
+- **Physical Device**: Remove PVS cover - serial number is on the device label
+- **SunPower/SunStrong App**: Profile tab → System Info → Serial Number
+- **Config Field**: Enter only the **last 5 characters** (e.g., if serial is "ABC123XYZ78901", enter "78901")
+
+**How It Works:**
+- **Current Firmware**: Integration works exactly as before (no authentication needed)
+- **Future Firmware 61840+**: Integration automatically uses HTTP Basic Authentication when PVS requires it
+- **Smart Fallback**: Always tries without authentication first, then adds auth if needed
+- **Zero Impact**: Adding your serial number now prepares for the future without affecting current operation
+
+**Authentication Details:**
+- **Username**: `ssm_owner` (hardcoded by SunPower)
+- **Password**: Last 5 characters of your PVS serial number
+- **Coverage**: Applied to both main device polling and battery system endpoints
+- **Error Handling**: Clear messages when authentication fails or serial number needed
 
 ### Nighttime Polling
 

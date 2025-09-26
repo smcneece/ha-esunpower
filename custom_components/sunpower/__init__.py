@@ -385,6 +385,7 @@ async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, 
             update_diagnostic_stats(cache, False, elapsed_time)
             raise UpdateFailed("PVS returned no devices")
         
+
         # Success!
         update_diagnostic_stats(cache, True, elapsed_time)
         _LOGGER.info("PVS returned %d devices - poll successful", device_count)
@@ -504,6 +505,8 @@ async def migrate_config_if_needed(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.info("✅ Config migration completed successfully")
 
 
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Enhanced SunPower from a config entry"""
     _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP ===")
@@ -527,7 +530,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.info("Route checking disabled - no gateway IP configured")
 
     polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
-    sunpower_monitor = SunPowerMonitor(entry.data['host'])
+
+    # Get PVS serial last 5 characters for authentication (if provided)
+    pvs_serial_last5 = entry.data.get("pvs_serial_last5", "").strip()
+    auth_password = pvs_serial_last5 if pvs_serial_last5 else None
+
+    if auth_password:
+        _LOGGER.info("Authentication configured - PVS serial last 5 characters provided")
+    else:
+        _LOGGER.info("No authentication configured - will use unauthenticated requests")
+
+    sunpower_monitor = SunPowerMonitor(entry.data['host'], auth_password=auth_password)
     
     # Default to 300 seconds, minimum 300 seconds for PVS safety
     daytime_polling_interval = max(300, entry.options.get("daytime_polling_interval", entry.data.get("daytime_polling_interval", DEFAULT_POLLING_INTERVAL)))

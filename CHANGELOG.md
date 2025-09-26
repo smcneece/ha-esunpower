@@ -2,9 +2,31 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.9.7] - 2025-09-26
+
+###  New Feature: PVS6 Authentication Support
+- **Future-Ready Authentication**: Prepared for upcoming SunPower firmware 61840+ that will require authentication
+- **PVS Serial (Password) Field**: Added configuration field for last 5 characters of PVS serial number
+- **Automatic Fallback Logic**: Tries unauthenticated first, then uses Basic Auth if needed (backward compatible)
+- **Battery System Coverage**: Authentication applies to both main device polling and battery system endpoints
+- **Zero Impact**: Works perfectly with current firmware, ready when authentication becomes mandatory
+
+###  PVS Serial Number Location
+- **Physical Label**: Remove PVS cover to find serial number on device label
+- **SunPower App**: Available under Profile tab → System Info
+- **Config Flow**: Enter last 5 characters only (e.g., if serial is "ABC123XYZ78901", enter "78901")
+
+###  Technical Implementation
+- **HTTP Basic Authentication**: Username "ssm_owner", password is last 5 chars of PVS serial
+- **Smart Authentication Flow**: Attempts connection without auth first, adds auth on 401/403 responses
+- **Comprehensive Coverage**: Both `/cgi-bin/dl_cgi?Command=DeviceList` and `/cgi-bin/dl_cgi/energy-storage-system/status` endpoints
+- **Enhanced Error Messages**: Clear feedback when authentication fails or PVS serial needed
+
+---
+
 ## [v2025.9.5] - 2025-09-24
 
-### 🐛 Critical Bug Fixes
+###  Critical Bug Fixes
 - **Fixed Battery System Regression**: Restored ESS endpoint polling that was missing from krbaker's original version
   - Battery systems now get proper sensor entities instead of sparse "1 entity" devices
   - Fixed device type mapping issues causing battery conversion failures ("Battery" vs "ESS BMS" types)
@@ -12,7 +34,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
   - Enhanced debug logging to diagnose ESS endpoint accessibility issues
   - Integration now works exactly like krbaker's version but with better error handling
 
-### 🔧 Technical Improvements
+###  Technical Improvements
 - **Dual-endpoint polling**: Restored `/cgi-bin/dl_cgi/energy-storage-system/status` endpoint for detailed battery data
 - **Enhanced sensor definitions**: Support for all battery device type variations
 - **Comprehensive error handling**: ESS endpoint failures won't break entire integration
@@ -22,7 +44,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ## [v2025.9.4] - 2025-09-23
 
-### 🐛 Bug Fixes
+###  Bug Fixes
 - **Fixed Battery System Regression**: Restored ESS endpoint polling that was missing from krbaker's original version
   - Battery systems now get proper sensor entities instead of sparse "1 entity" devices
   - Added graceful fallback when ESS endpoint fails - basic sensors still created from PVS data

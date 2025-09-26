@@ -112,6 +112,14 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if nighttime_interval > 0 and nighttime_interval < 300:
                 errors["nighttime_polling_interval"] = "MIN_INTERVAL"
 
+            # Validate PVS serial last 5 chars if provided
+            pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()
+            if pvs_serial_last5:
+                if len(pvs_serial_last5) != 5:
+                    errors["pvs_serial_last5"] = "Must be exactly 5 characters"
+                elif not pvs_serial_last5.isalnum():
+                    errors["pvs_serial_last5"] = "Must contain only letters and numbers"
+
             if not errors:
                 # Test PVS connection before proceeding
                 _LOGGER.info("Setup: Validating PVS connection")
@@ -149,6 +157,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             ),
             vol.Required("route_gateway_ip", default=""): str,
+            vol.Optional("pvs_serial_last5", default=""): str,
         })
 
         return self.async_show_form(
@@ -214,6 +223,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
                     "route_gateway_ip": complete_config.get("route_gateway_ip", ""),
+                    "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
                 },
                 options={
                     "sunrise_elevation": complete_config["sunrise_elevation"],
@@ -284,6 +294,14 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             if nighttime_interval > 0 and nighttime_interval < 300:
                 errors["nighttime_polling_interval"] = "MIN_INTERVAL"
 
+            # Validate PVS serial last 5 chars if provided (options flow)
+            pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()
+            if pvs_serial_last5:
+                if len(pvs_serial_last5) != 5:
+                    errors["pvs_serial_last5"] = "Must be exactly 5 characters"
+                elif not pvs_serial_last5.isalnum():
+                    errors["pvs_serial_last5"] = "Must contain only letters and numbers"
+
             if not errors:
                 # Store basic config and proceed to solar step
                 self._basic_config = user_input.copy()
@@ -306,6 +324,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         current_route_gateway_ip = self.config_entry.data.get("route_gateway_ip", "")
+        current_pvs_serial = self.config_entry.data.get("pvs_serial_last5", "")
 
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
@@ -327,6 +346,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             ),
             vol.Required("route_gateway_ip", default=current_route_gateway_ip): str,
+            vol.Optional("pvs_serial_last5", default=current_pvs_serial): str,
         })
 
         return self.async_show_form(
@@ -411,6 +431,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 data_updates["use_product_names"] = complete_config["use_product_names"]
             if complete_config["route_gateway_ip"] != self.config_entry.data.get("route_gateway_ip"):
                 data_updates["route_gateway_ip"] = complete_config["route_gateway_ip"]
+            if complete_config.get("pvs_serial_last5", "") != self.config_entry.data.get("pvs_serial_last5", ""):
+                data_updates["pvs_serial_last5"] = complete_config.get("pvs_serial_last5", "")
             
             # Apply data updates if needed
             if data_updates:
