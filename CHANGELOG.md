@@ -4,23 +4,29 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ## [v2025.9.7] - 2025-09-26
 
-###  New Feature: PVS6 Authentication Support
+### ⚠️ Critical Bug Fixes
+- **Fixed Config Flow Blocker**: Gateway IP field was incorrectly marked as required, preventing users from completing setup. Now properly optional for VLAN users only.
+- **Battery System Serial Number Fix**: Completely resolved the critical bug where battery systems would show only "1 entity" instead of full sensor data. Fixed the serial number mismatch issue between DeviceList and ESS endpoints that was causing silent failures.
+
+### New Feature: PVS6 Authentication Support
 - **Future-Ready Authentication**: Prepared for upcoming SunPower firmware 61840+ that will require authentication
 - **PVS Serial (Password) Field**: Added configuration field for last 5 characters of PVS serial number
 - **Automatic Fallback Logic**: Tries unauthenticated first, then uses Basic Auth if needed (backward compatible)
 - **Battery System Coverage**: Authentication applies to both main device polling and battery system endpoints
 - **Zero Impact**: Works perfectly with current firmware, ready when authentication becomes mandatory
 
-###  PVS Serial Number Location
+### PVS Serial Number Location
 - **Physical Label**: Remove PVS cover to find serial number on device label
 - **SunPower App**: Available under Profile tab → System Info
 - **Config Flow**: Enter last 5 characters only (e.g., if serial is "ABC123XYZ78901", enter "78901")
 
-###  Technical Implementation
+### Technical Improvements
 - **HTTP Basic Authentication**: Username "ssm_owner", password is last 5 chars of PVS serial
 - **Smart Authentication Flow**: Attempts connection without auth first, adds auth on 401/403 responses
 - **Comprehensive Coverage**: Both `/cgi-bin/dl_cgi?Command=DeviceList` and `/cgi-bin/dl_cgi/energy-storage-system/status` endpoints
 - **Enhanced Error Messages**: Clear feedback when authentication fails or PVS serial needed
+- **Robust Battery Handler**: Complete rewrite of battery data processing with defensive programming, comprehensive error handling, and detailed logging
+- **Virtual Device Creation**: Creates operational battery devices from ESS data when physical device serials don't match
 
 ---
 
