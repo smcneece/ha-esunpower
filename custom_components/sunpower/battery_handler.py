@@ -406,7 +406,7 @@ def convert_ess_data(ess_data, data):
     """
     # Safety check for ESS data structure
     if not ess_data or "ess_report" not in ess_data:
-        _LOGGER.warning("Invalid ESS data structure, skipping battery processing")
+        _LOGGER.error("❌ BATTERY DEBUG: Invalid ESS data structure: ess_data=%s", type(ess_data).__name__ if ess_data else "None")
         return data
 
     ess_report = ess_data["ess_report"]
@@ -422,12 +422,29 @@ def convert_ess_data(ess_data, data):
 
     # Process battery status from ESS endpoint
     battery_status_list = ess_report.get("battery_status", [])
-    _LOGGER.debug("Processing %d battery status entries from ESS endpoint", len(battery_status_list))
+
+    # Only log detailed info if there's a problem (no battery data or processing fails)
+    if not battery_status_list:
+        _LOGGER.error("❌ BATTERY DEBUG: No battery_status entries found in ESS data")
+        _LOGGER.error("   ESS report keys: %s", list(ess_report.keys()))
+        return data
+
+    # Validate Max's specific data structure (BC212200611033751040 serial)
+    max_bms_serial = "BC212200611033751040"
+    for i, battery in enumerate(battery_status_list):
+        battery_serial = battery.get("serial_number", "")
+        if battery_serial == max_bms_serial:
+            _LOGGER.error("❌ BATTERY DEBUG: Found Max's BMS serial %s in battery_status[%d]", max_bms_serial, i)
+            _LOGGER.error("   Battery data keys: %s", list(battery.keys()))
+            _LOGGER.error("   SOC structure: %s", battery.get("customer_state_of_charge", "missing"))
+            _LOGGER.error("   Voltage structure: %s", battery.get("battery_voltage", "missing"))
+            _LOGGER.error("   Temperature structure: %s", battery.get("temperature", "missing"))
+            break
 
     for i, device in enumerate(battery_status_list):
         try:
             battery_serial = device.get("serial_number", f"unknown_battery_{i}")
-            _LOGGER.debug("Processing ESS battery %d with serial: %s", i, battery_serial)
+            # Only log processing details if debugging is needed - removed verbose logging
 
             # Create virtual battery device from ESS data instead of trying to match serials
             # This handles the mismatch between physical battery serials (M00...) and BMS serial (BC...)
@@ -461,8 +478,8 @@ def convert_ess_data(ess_data, data):
                 "DEVICE_TYPE": BATTERY_DEVICE_TYPE
             }
 
-            _LOGGER.debug("Created virtual battery device: %s (A=%.1f, V=%.1f, SOC=%.1f%%)",
-                         virtual_battery_serial, battery_amperage, battery_voltage, customer_soc)
+            # Track virtual device creation success
+            virtual_device_created = True
 
             # Aggregate for SunVault virtual device using safely extracted values
             sunvault_amperages.append(battery_amperage)

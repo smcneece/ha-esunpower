@@ -541,6 +541,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.info("No authentication configured - will use unauthenticated requests")
 
     sunpower_monitor = SunPowerMonitor(entry.data['host'], auth_password=auth_password)
+
+    # ONE-TIME ESS DEBUG ON STARTUP - Max doesn't need to do anything special
+    async def debug_ess_on_startup():
+        try:
+            _LOGGER.info("🔧 STARTUP ESS DEBUG: Testing ESS endpoint connectivity...")
+            fresh_data = await sunpower_monitor.device_list_async()
+            if fresh_data:
+                data = convert_sunpower_data(fresh_data)
+                if ESS_DEVICE_TYPE in data:
+                    _LOGGER.info("✅ STARTUP ESS DEBUG: Battery system detected in PVS data")
+                    try:
+                        ess_data = await sunpower_monitor.energy_storage_system_status_async()
+                        if ess_data:
+                            _LOGGER.info("✅ STARTUP ESS DEBUG: ESS endpoint successful!")
+                            if isinstance(ess_data, dict) and "ess_report" in ess_data:
+                                battery_status = ess_data["ess_report"].get("battery_status", [])
+                                _LOGGER.info("✅ STARTUP ESS DEBUG: Found %d battery entries", len(battery_status))
+                                # Check for Max's specific case
+                                max_serial = "BC212200611033751040"
+                                for i, battery in enumerate(battery_status):
+                                    if battery.get("serial_number") == max_serial:
+                                        _LOGGER.info("✅ STARTUP ESS DEBUG: Found Max's BMS serial - data looks good!")
+                                        soc = battery.get("customer_state_of_charge", {}).get("value", "missing")
+                                        _LOGGER.info("✅ STARTUP ESS DEBUG: SOC value: %s", soc)
+                                        break
+                            else:
+                                _LOGGER.error("❌ STARTUP ESS DEBUG: No ess_report in response")
+                        else:
+                            _LOGGER.error("❌ STARTUP ESS DEBUG: ESS endpoint returned no data")
+                    except Exception as ess_error:
+                        _LOGGER.error("❌ STARTUP ESS DEBUG: ESS endpoint failed: %s", ess_error)
+                else:
+                    _LOGGER.info("ℹ️ STARTUP ESS DEBUG: No battery system detected")
+        except Exception as debug_error:
+            _LOGGER.error("❌ STARTUP ESS DEBUG: Failed: %s", debug_error)
+
+    # Run startup debug (Max just needs to restart HA)
+    await debug_ess_on_startup()
     
     # Default to 300 seconds, minimum 300 seconds for PVS safety
     daytime_polling_interval = max(300, entry.options.get("daytime_polling_interval", entry.data.get("daytime_polling_interval", DEFAULT_POLLING_INTERVAL)))
@@ -733,26 +771,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 # Check for ESS devices and poll ESS endpoint if needed (krbaker approach)
                 if ESS_DEVICE_TYPE in data:  # Look for "Energy Storage System" in PVS data
-                    _LOGGER.debug("Battery system detected, attempting ESS data poll")
-
                     try:
-                        _LOGGER.warning("DEBUG: Attempting ESS endpoint call...")
                         ess_data = await sunpower_monitor.energy_storage_system_status_async()
-                        _LOGGER.warning("DEBUG: ESS endpoint returned: %s", str(ess_data)[:500] if ess_data else "None")
 
                         if ess_data:
-                            _LOGGER.debug("ESS data received, integrating with PVS data")
                             try:
+                                old_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
                                 data = convert_ess_data(ess_data, data)
-                                _LOGGER.warning("DEBUG: ESS data integration successful")
+                                new_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
+
+                                # Only log if virtual devices were NOT created (indicating a problem)
+                                if old_battery_count == new_battery_count:
+                                    _LOGGER.error("❌ BATTERY DEBUG: ESS data processed but no virtual devices created!")
+                                    _LOGGER.error("   ESS endpoint returned data but convert_ess_data didn't create batteries")
+                                    _LOGGER.error("   ESS data structure: %s", {k: type(v).__name__ for k, v in ess_data.items()} if isinstance(ess_data, dict) else type(ess_data).__name__)
+                                    if isinstance(ess_data, dict) and "ess_report" in ess_data:
+                                        battery_status = ess_data["ess_report"].get("battery_status", [])
+                                        _LOGGER.error("   Found %d battery entries in ESS data", len(battery_status))
+
                             except Exception as convert_error:
-                                _LOGGER.error("DEBUG: ESS data conversion failed: %s", convert_error, exc_info=True)
+                                _LOGGER.error("❌ BATTERY DEBUG: ESS data conversion failed: %s", convert_error, exc_info=True)
                                 # Don't re-raise - continue with PVS data
                         else:
-                            _LOGGER.error("DEBUG: ESS endpoint returned no data")
+                            _LOGGER.error("❌ BATTERY DEBUG: ESS endpoint returned no data - authentication or network issue")
                     except Exception as ess_error:
-                        _LOGGER.error("DEBUG: ESS endpoint failed: %s", ess_error, exc_info=True)
+                        _LOGGER.error("❌ BATTERY DEBUG: ESS endpoint failed: %s", ess_error, exc_info=True)
                         # Continue with PVS-only data - don't fail the entire update
+                else:
+                    # Only log once per restart that no battery system detected
+                    if not hasattr(cache, '_logged_no_battery'):
+                        _LOGGER.info("ℹ️  No battery system detected in PVS data - battery features disabled")
+                        cache._logged_no_battery = True
 
                 # Check inverter health
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})

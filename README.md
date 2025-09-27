@@ -2,7 +2,10 @@
 
  **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
- **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)** 
+> ## 🔒 **NEW FIRMWARE AUTHENTICATION READY**
+> **This integration is prepared for SunPower's upcoming firmware authentication requirements but remains UNTESTED with the new firmware.** If you are selected for the firmware update, please contact us immediately to help test and verify compatibility before the update affects all users.
+
+ **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)**
 
  **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
@@ -30,13 +33,13 @@
 - **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
 - **Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
-- **Mobile Alert System**: Critical notifications sent directly to your phone with smart fallback
-- **Diagnostic Dashboard**: 8 real-time sensors tracking integration reliability and performance
+- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI. 
+- **Diagnostic Dashboard**: 8 sensors tracking integration reliability and performance
 - **Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
 - **PVS Hardware Protection**: Built-in throttling (300s minimum), health checking, and intelligent backoff
 
 **Technical Enhancements:**
-- **Multi-Channel Notifications**: 6 separate notification streams with computer status light paradigm
+- **Multi-Channel Notifications**: 6 separate notification streams
 - **Enhanced Battery Support**: Improved SunVault detection and monitoring with smart fallbacks
 - **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns
 - **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
