@@ -3,7 +3,7 @@
  **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
 > ## 🔒 **NEW FIRMWARE AUTHENTICATION READY**
-> **This integration is prepared for SunPower's upcoming firmware authentication requirements but remains UNTESTED with the new firmware.** If you are selected for the firmware update, please contact us immediately to help test and verify compatibility before the update affects all users.
+> **This integration is prepared for SunPower's upcoming firmware authentication requirements but remains UNTESTED with the new firmware.** If you are selected for the firmware update, please contact us immediately if you encounter any issues.
 
  **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)**
 
