@@ -140,20 +140,22 @@
 | **Polling Interval** | Daytime update frequency (seconds) | 300 | 300-600 seconds |
 | **Nighttime Polling** | Nighttime update frequency (seconds) | 0 (disabled) | 0 = disabled, 300-1800 seconds |
 | **Gateway IP** | Route repair (leave empty to disable) | `` | Your router IP for VLAN setups |
+| **PVS Serial (last 5)** | Authentication for PVS6 firmware 61840+ | `` | See guide below |
 | **Sunrise Elevation** | Start polling threshold | 5° | See guide below |
 | **Sunset Elevation** | Stop polling threshold | 5° | See guide below |
 | **Use Descriptive Names** | Show detailed inverter names | `true` | Enable for energy dashboard |
 | **Use Product Names** | Add 'SunPower' prefix | `false` | Personal preference |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
+| **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
+| **Email Recipient** | Override recipient address | `` | Leave empty for service default |
 | **General Notifications** | Show status updates | `true` | Enable for monitoring |
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
-| **PVS Serial (last 5)** | Authentication for PVS6 firmware 61840+ | `` | See guide below |
 
-### 🔒 PVS6 Authentication (Future-Ready)
+### 🔒 PVS Authentication (Future-Ready)
 
-**Upcoming Change**: SunPower PVS6 firmware 61840+ will require authentication. This integration is ready!
+**Upcoming Change**: Future SunStrong PVS firmware will require authentication . This integration is ready!
 
 **Where to Find Your PVS Serial Number:**
 - **Physical Device**: Remove PVS cover - serial number is on the device label
@@ -252,6 +254,46 @@ Multi-channel notification system:
 **Notification Channels:**
 - Setup, Day/Night, Polling, Health, Inverter, Route status
 - Mobile notifications with smart fallback to persistent notifications
+- Email notifications for critical alerts (PVS offline, inverter failures, flash memory critical)
+
+#### Email Notification Setup
+
+**Prerequisites:**
+1. **Email Integration**: Set up a Home Assistant email integration (Gmail, SMTP, etc.)
+2. **Service Detection**: The integration auto-detects available email services
+
+**Configuration:**
+1. **Navigate**: Configuration → Page 3 (Notifications)
+2. **Select Service**: Choose your email service from dropdown (e.g., "Gmail" or "SMTP")
+3. **Custom Recipient** (Optional): Override default with dedicated notification address
+4. **Submit**: Email notifications are automatically enabled
+
+**Critical Alerts That Trigger Emails:**
+- ⚠️ **Flash Memory Critical**: PVS storage below threshold
+- 🔴 **PVS Offline**: System connectivity failures
+- ⚠️ **Inverter Failures**: Individual inverter offline detection
+- 🔑 **Authentication Errors**: PVS6 firmware authentication issues
+- 🔧 **Hardware Issues**: Critical system protection alerts
+
+**Example Gmail Setup:**
+```yaml
+# configuration.yaml
+notify:
+  - name: gmail_smtp
+    platform: smtp
+    server: smtp.gmail.com
+    port: 587
+    sender: your-email@gmail.com
+    username: your-email@gmail.com
+    password: your-app-password
+    recipient: homeassistant-alerts@gmail.com
+```
+
+**Best Practices:**
+- **Dedicated Account**: Use separate email for HA notifications
+- **App Passwords**: Use Gmail app passwords (not account password)
+- **Test**: Use Flash Memory Threshold = 199 MB to trigger test email
+- **Recipient Override**: Enter custom email for dedicated notification accounts
 
 ### Energy Dashboard Integration
 

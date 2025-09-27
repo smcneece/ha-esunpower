@@ -8,7 +8,7 @@ from homeassistant.helpers import selector
 
 from .const import DOMAIN
 from .sunpower import SunPowerMonitor, ConnectionException, ParseException
-from .notifications import get_mobile_devices
+from .notifications import get_mobile_devices, get_email_notification_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("route_gateway_ip", default=""): str,
+            vol.Optional("route_gateway_ip", default=""): str,
             vol.Optional("pvs_serial_last5", default=""): str,
         })
 
@@ -209,12 +209,24 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Combine all config and create entry
-            complete_config = self._basic_config.copy()
-            complete_config.update(user_input)
-            
-            _LOGGER.info("Setup: Creating integration with complete configuration")
-            return self.async_create_entry(
+            # Validate email configuration
+            email_service = user_input.get("email_notification_service", "none")
+            email_recipient = user_input.get("email_notification_recipient", "").strip()
+
+            if email_service != "none" and not email_recipient:
+                errors["email_notification_recipient"] = "email_recipient_required"
+
+            if not errors:
+                # Clear email recipient if service is disabled
+                if email_service == "none":
+                    user_input["email_notification_recipient"] = ""
+
+                # Combine all config and create entry
+                complete_config = self._basic_config.copy()
+                complete_config.update(user_input)
+
+                _LOGGER.info("Setup: Creating integration with complete configuration")
+                return self.async_create_entry(
                 title=f"Enhanced SunPower PVS {complete_config['host']}",
                 data={
                     "host": complete_config["host"],
@@ -233,6 +245,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
                     "mobile_device": complete_config.get("mobile_device"),
                     "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
+                    "email_notification_service": complete_config.get("email_notification_service"),
+                    "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
                 }
             )
 
@@ -240,6 +254,11 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         mobile_devices = await get_mobile_devices(self.hass)
         mobile_options = {"none": "Disabled"}
         mobile_options.update(mobile_devices)
+
+        # Get available email notification services
+        email_services = await get_email_notification_services(self.hass)
+        email_options = {"none": "Disabled"}
+        email_options.update(email_services)
 
         # Page 3: Notifications schema
         schema = vol.Schema({
@@ -260,6 +279,13 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
+            vol.Required("email_notification_service", default="none"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[{"value": k, "label": v} for k, v in email_options.items()],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional("email_notification_recipient", default=""): str,
         })
 
         return self.async_show_form(
@@ -345,7 +371,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("route_gateway_ip", default=current_route_gateway_ip): str,
+            vol.Optional("route_gateway_ip", default=current_route_gateway_ip): str,
             vol.Optional("pvs_serial_last5", default=current_pvs_serial): str,
         })
 
@@ -413,9 +439,21 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
 
         if user_input is not None:
-            # Combine all config and update entry
-            complete_config = self._basic_config.copy()
-            complete_config.update(user_input)
+            # Validate email configuration
+            email_service = user_input.get("email_notification_service", "none")
+            email_recipient = user_input.get("email_notification_recipient", "").strip()
+
+            if email_service != "none" and not email_recipient:
+                errors["email_notification_recipient"] = "email_recipient_required"
+
+            if not errors:
+                # Clear email recipient if service is disabled
+                if email_service == "none":
+                    user_input["email_notification_recipient"] = ""
+
+                # Combine all config and update entry
+                complete_config = self._basic_config.copy()
+                complete_config.update(user_input)
             
             # Update data if basic settings changed
             data_updates = {}
@@ -456,6 +494,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
                 "mobile_device": complete_config.get("mobile_device"),
                 "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
+                "email_notification_service": complete_config.get("email_notification_service"),
+                "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
             }
             
             return self.async_create_entry(title="", data=options)
@@ -465,12 +505,23 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         mobile_options = {"none": "Disabled"}
         mobile_options.update(mobile_devices)
 
+        # Get available email notification services
+        email_services = await get_email_notification_services(self.hass)
+        email_options = {"none": "Disabled"}
+        email_options.update(email_services)
+
         # Get current values
         current_general = self.config_entry.options.get("general_notifications", True)
         current_debug = self.config_entry.options.get("deep_debug_notifications", False)
         current_overwrite = self.config_entry.options.get("overwrite_general_notifications", True)
         current_mobile_device = self.config_entry.options.get("mobile_device", "none")
         current_flash_threshold = self.config_entry.options.get("flash_memory_threshold_mb", 0)
+        current_email_service = self.config_entry.options.get("email_notification_service", "none")
+        current_email_recipient = self.config_entry.options.get("email_notification_recipient", "")
+
+        # Clear recipient display if email service is disabled
+        if current_email_service == "none":
+            current_email_recipient = ""
 
         # Page 3: Notifications schema
         schema = vol.Schema({
@@ -491,6 +542,13 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
+            vol.Required("email_notification_service", default=current_email_service): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[{"value": k, "label": v} for k, v in email_options.items()],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional("email_notification_recipient", default=current_email_recipient): str,
         })
 
         return self.async_show_form(

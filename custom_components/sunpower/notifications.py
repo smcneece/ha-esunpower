@@ -64,9 +64,75 @@ async def get_mobile_devices(hass):
                 
         _LOGGER.debug("Found %d mobile devices: %s", len(mobile_devices), list(mobile_devices.keys()))
         return mobile_devices
-        
+
     except Exception as e:
         _LOGGER.error("Failed to get mobile devices: %s", e)
+        return {}
+
+
+async def get_email_notification_services(hass):
+    """Get list of available email notification services"""
+    email_services = {}
+
+    try:
+        # Get all available services
+        services = hass.services.async_services()
+        notify_services = services.get('notify', {})
+
+        # Look for specific email notification service patterns only
+        email_patterns = [
+            'smtp',
+            'email',
+            'gmail',
+            'outlook',
+            'sendmail',
+            'mailgun',
+            'sendgrid',
+            'ses',
+            'mail'  # Added 'mail' pattern
+        ]
+
+        # Services to explicitly exclude (not email)
+        exclude_patterns = [
+            'alexa',
+            'mobile_app_',
+            'html5',
+            'persistent_notification',
+            'telegram',
+            'discord',
+            'slack',
+            'pushbullet',
+            'pushover',
+            'clicksend',
+            'twilio',
+            'signal'
+        ]
+
+        for service_name in notify_services:
+            service_lower = service_name.lower()
+
+            # Skip explicitly excluded services
+            if any(pattern in service_lower for pattern in exclude_patterns):
+                continue
+
+            # Check for email-related patterns
+            is_email_service = any(pattern in service_lower for pattern in email_patterns)
+
+            if is_email_service:
+                # Format service name for display
+                display_name = service_name.replace('_', ' ').title()
+                email_services[service_name] = display_name
+            elif service_name not in ['persistent_notification', 'html5']:
+                # Include other notify services that might be email (but mark them)
+                display_name = service_name.replace('_', ' ').title()
+                email_services[service_name] = f"{display_name} (notify service)"
+
+        _LOGGER.debug("All notify services: %s", list(notify_services.keys()))
+        _LOGGER.debug("Found %d email services: %s", len(email_services), list(email_services.keys()))
+        return email_services
+
+    except Exception as e:
+        _LOGGER.error("Failed to get email notification services: %s", e)
         return {}
 
 
@@ -98,6 +164,43 @@ async def send_mobile_notification(hass, message, title, mobile_service=None):
         return False
 
 
+async def send_email_notification(hass, message, title, email_service=None, email_recipient=None):
+    """Send email notification via configured email service"""
+    if not email_service or email_service == "none":
+        return False
+
+    try:
+        # Prepare email data
+        email_data = {
+            "message": message,
+            "title": title,
+            "data": {
+                "priority": "high"
+            }
+        }
+
+        # Add custom recipient if provided (non-empty)
+        if email_recipient and email_recipient.strip():
+            email_data["target"] = email_recipient.strip()
+            _LOGGER.warning("Using custom email recipient: %s", email_recipient.strip())
+        else:
+            _LOGGER.warning("Using email service default recipient (no target specified)")
+
+        # Send email notification
+        _LOGGER.warning("Attempting email via service: %s, data: %s", email_service, email_data)
+        await hass.services.async_call(
+            "notify",
+            email_service,
+            email_data
+        )
+        _LOGGER.warning("Email notification sent successfully via %s", email_service)
+        return True
+
+    except Exception as e:
+        _LOGGER.warning("Email notification failed via %s: %s", email_service, e)
+        return False
+
+
 def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None, 
                force_notify=False, is_general=False, is_debug=False, 
                notification_category="general", cache=None, add_timestamp=True):
@@ -110,6 +213,9 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
             overwrite_general = config_entry.options.get("overwrite_general_notifications", True)
             mobile_device = config_entry.options.get("mobile_device")
             mobile_enabled = mobile_device is not None and mobile_device != "none"
+            email_service = config_entry.options.get("email_notification_service")
+            email_enabled = email_service is not None and email_service != "none"
+            email_recipient = config_entry.options.get("email_notification_recipient", "")
         else:
             # Fallback defaults if no config available
             show_general = True
@@ -117,6 +223,9 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
             overwrite_general = True
             mobile_enabled = False
             mobile_device = None
+            email_service = None
+            email_enabled = False
+            email_recipient = ""
         
         # Determine notification level and if it should be shown
         if force_notify:
@@ -161,21 +270,42 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
             timestamp = datetime.now().strftime("%I:%M:%S %p %m-%d-%Y").lstrip("0")
             final_message = f"{message} ({timestamp})"
         
-        # Try mobile notification first for critical alerts
+        # Try mobile and email notifications first for critical alerts
         mobile_sent = False
-        if mobile_enabled and mobile_device and notification_type == "critical":
-            # Use asyncio to send mobile notification
+        email_sent = False
+
+        if notification_type == "critical":
             import asyncio
-            try:
-                # Create task for mobile notification
-                task = asyncio.create_task(
-                    send_mobile_notification(hass, message, title, mobile_device)
-                )
-                # Don't wait for completion - fire and forget
-                mobile_sent = True
-                _LOGGER.debug("Mobile notification dispatched for critical alert")
-            except Exception as e:
-                _LOGGER.warning("Failed to dispatch mobile notification: %s", e)
+
+            # Try mobile notification
+            if mobile_enabled and mobile_device:
+                try:
+                    # Create task for mobile notification
+                    task = asyncio.create_task(
+                        send_mobile_notification(hass, message, title, mobile_device)
+                    )
+                    # Don't wait for completion - fire and forget
+                    mobile_sent = True
+                    _LOGGER.debug("Mobile notification dispatched for critical alert")
+                except Exception as e:
+                    _LOGGER.warning("Failed to dispatch mobile notification: %s", e)
+
+            # Try email notification
+            _LOGGER.warning("Email check: enabled=%s, service=%s, type=%s", email_enabled, email_service, notification_type)
+            if email_enabled and email_service and email_service != "none":
+                try:
+                    _LOGGER.warning("Dispatching email notification for critical alert")
+                    # Create task for email notification
+                    task = asyncio.create_task(
+                        send_email_notification(hass, message, title, email_service, email_recipient)
+                    )
+                    # Don't wait for completion - fire and forget
+                    email_sent = True
+                    _LOGGER.warning("Email notification dispatched for critical alert")
+                except Exception as e:
+                    _LOGGER.warning("Failed to dispatch email notification: %s", e)
+            else:
+                _LOGGER.warning("Email notification skipped: enabled=%s, service=%s", email_enabled, email_service)
         
         # MULTI-CHANNEL NOTIFICATION ID LOGIC
         if notification_type == "general" and overwrite_general:
@@ -271,7 +401,7 @@ def notify_flash_memory_critical(hass, entry, cache, available_mb, threshold_mb)
     """ESSENTIAL: Flash memory critical alert - UI + mobile"""
     msg = f"⚠️ PVS FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb}MB)"
     # This is critical hardware protection - always notify + mobile
-    safe_notify(hass, msg, "Enhanced SunPower Critical", entry, force_notify=True, 
+    safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True, 
                notification_category="flash_memory", cache=cache)
 
 def notify_polling_failed(hass, entry, cache, polling_url, error):
@@ -298,6 +428,12 @@ def notify_setup_warning(hass, entry, cache, polling_url, polling_interval):
 
 
 # GENERAL NOTIFICATIONS - POLLING CHANNEL (is_general=True, category="polling")
+
+def test_email_notification(hass, entry, cache):
+    """TEST: Send test email notification to verify configuration"""
+    msg = "📧 TEST: Email notification system is working correctly!"
+    safe_notify(hass, msg, "Enhanced SunPower Email Test", entry, force_notify=True,
+               notification_category="email_test", cache=cache)
 
 def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
     """GENERAL: Successful data update"""

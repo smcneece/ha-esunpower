@@ -2,6 +2,23 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.9.8] - 2025-09-27
+
+### New Feature: Email Notifications for Critical Alerts
+- **Critical Alert Email System**: Send email notifications for critical hardware alerts alongside mobile notifications
+- **Auto-Detection**: Automatically detects available email notification services (Gmail, SMTP, etc.)
+- **Custom Recipients**: Optional email recipient override for dedicated notification accounts
+- **Critical Alerts Only**: Emails sent only for essential alerts (PVS offline, inverter failures, flash memory critical)
+- **Service Integration**: Works with any Home Assistant notify service (Gmail, Outlook, SMTP, etc.)
+- **Clean Configuration**: Simply select email service to enable - no confusing toggles
+
+### Critical Alerts That Trigger Emails
+- ⚠️ **Flash Memory Critical**: When PVS storage drops below threshold
+- 🔴 **PVS Offline**: System connectivity failures
+- ⚠️ **Inverter Failures**: Individual inverter offline detection
+- 🔑 **Authentication Errors**: PVS6 firmware authentication issues
+- 🔧 **Hardware Issues**: Critical system protection alerts
+
 ## [v2025.9.7] - 2025-09-26
 
 ### ⚠️ Critical Bug Fixes

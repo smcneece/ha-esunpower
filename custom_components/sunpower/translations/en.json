@@ -7,7 +7,8 @@
             "cannot_connect": "Cannot Connect",
             "connection_failed": "PVS Connection Failed",
             "unknown": "Unknown Error",
-            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection",
+            "email_recipient_required": "Email recipient is required when email service is selected"
         },
         "step": {
             "user": {
@@ -51,18 +52,22 @@
                     "deep_debug_notifications": "Show debug diagnostics",
                     "overwrite_general_notifications": "Replace status notifications",
                     "mobile_device": "Mobile device for critical alerts",
+                    "email_notification_service": "Email notification service",
+                    "email_notification_recipient": "Email recipient",
                     "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
                 },
                 "data_description": {
                     "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
+                    "email_notification_recipient": "Recipient email address (required when email service selected)",
                     "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
                 }
             },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
-                "description": "Configure advanced Enhanced SunPower features.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n\n🔔 Notification Options:\n• General notifications provide 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Select your phone/tablet for critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
+                "description": "Configure advanced Enhanced SunPower features.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n\n🔔 Notification Options:\n• General notifications provide 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n• Email notifications send critical alerts via email\n\n📱 Mobile Device: Select your phone/tablet for critical alerts\n📧 Email Notifications: Enable critical alerts via email service\n\n🛜 Route Check: Automatically detect and repair lost network routes (VLAN setups only)",
                 "data": {
                     "minimum_sun_elevation": "Minimum sun elevation (degrees)",
                     "general_notifications": "Show status notifications",
@@ -79,7 +84,7 @@
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
-                    "mobile_device": "Device for alerts",
+                    "mobile_device": "TEST: This should show up below the mobile device dropdown if translations are working correctly",
                     "route_check_enabled": "Detect and repair missing network routes when TCP health check fails (for VLAN/custom routing setups)",
                     "route_gateway_ip": "Gateway IP address for route setup/repair (VLAN users only who need a specific IP)"
                 }
@@ -130,18 +135,22 @@
                     "deep_debug_notifications": "Show debug diagnostics",
                     "overwrite_general_notifications": "Replace status notifications",
                     "mobile_device": "Mobile device for critical alerts",
+                    "email_notification_service": "Email notification service",
+                    "email_notification_recipient": "Email recipient",
                     "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
                 },
                 "data_description": {
                     "general_notifications": "Day/night transitions, polling success, 'integration is working' feedback",
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
+                    "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
+                    "email_notification_recipient": "Recipient email address (required when email service selected)",
                     "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
                 }
             },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
-                "description": "🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n\n📱 Mobile Device: Choose which device receives critical alerts\n\n🛜 Route Check: Automatically detect and repair lost network routes when connection fails",
+                "description": "🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n• Email notifications send critical alerts via email\n\n📱 Mobile Device: Choose which device receives critical alerts (PVS offline, inverter failures, flash memory critical)\n📧 Email Notifications: Enable critical alerts via email service\n\n🛜 Route Check: Automatically detect and repair lost network routes when connection fails",
                 "data": {
                     "minimum_sun_elevation": "Minimum sun elevation (degrees)",
                     "general_notifications": "Show status notifications",
@@ -158,14 +167,15 @@
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) directly to your mobile device",
-                    "mobile_device": "Device for alerts",
+                    "mobile_device": "TEST: This should show up below the mobile device dropdown if translations are working correctly",
                     "route_check_enabled": "Automatically check and repair missing network routes when PVS becomes unreachable (for VLAN/custom routing setups)",
                     "route_gateway_ip": "Gateway IP address for route setup/repair (typically your router IP like 192.168.1.1 or switch IP)"
                 }
             }
         },
         "error": {
-            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection"
+            "MIN_INTERVAL": "Polling interval must be at least 300 seconds (5 minutes) for PVS protection",
+            "email_recipient_required": "Email recipient is required when email service is selected"
         }
     },
     "title": "Enhanced SunPower"
