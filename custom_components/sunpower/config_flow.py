@@ -121,12 +121,15 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["pvs_serial_last5"] = "Must contain only letters and numbers"
 
             if not errors:
+                # Update user_input with stripped serial (or None if empty)
+                user_input["pvs_serial_last5"] = pvs_serial_last5 if pvs_serial_last5 else ""
+
                 # Test PVS connection before proceeding
                 _LOGGER.info("Setup: Validating PVS connection")
 
                 success, message = await self._test_pvs_connection(
                     user_input["host"],
-                    user_input.get("pvs_serial_last5")
+                    pvs_serial_last5 if pvs_serial_last5 else None
                 )
                 
                 if success:
@@ -332,6 +335,9 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     errors["pvs_serial_last5"] = "Must contain only letters and numbers"
 
             if not errors:
+                # Update user_input with stripped serial (or empty string if blank)
+                user_input["pvs_serial_last5"] = pvs_serial_last5 if pvs_serial_last5 else ""
+
                 # Store basic config and proceed to solar step
                 self._basic_config = user_input.copy()
                 return await self.async_step_solar()
