@@ -22,13 +22,13 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._basic_config = {}
 
-    async def _test_pvs_connection(self, host):
+    async def _test_pvs_connection(self, host, pvs_serial_last5=None):
         """Test PVS connection and validate real device data during setup"""
         try:
             _LOGGER.info("Setup validation: Testing PVS connection to %s", host)
-            
-            # Create monitor and test connection
-            monitor = SunPowerMonitor(host)
+
+            # Create monitor with authentication if serial provided
+            monitor = SunPowerMonitor(host, auth_password=pvs_serial_last5)
             
             # Test with reasonable timeout for setup
             try:
@@ -123,8 +123,11 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 # Test PVS connection before proceeding
                 _LOGGER.info("Setup: Validating PVS connection")
-                
-                success, message = await self._test_pvs_connection(user_input["host"])
+
+                success, message = await self._test_pvs_connection(
+                    user_input["host"],
+                    user_input.get("pvs_serial_last5")
+                )
                 
                 if success:
                     # Store basic config and proceed to solar config
