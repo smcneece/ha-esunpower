@@ -10,7 +10,7 @@
 - **Old firmware (< 61840)**: ✅ **Tested and working** on developer's production system
 - **New firmware (61840+)**: ⚠️ **COMPLETELY UNTESTED** - Authentication and varserver support built from SunStrong's code.
 
-- **Help wanted**: If you have firmware 61840+, please test and report back!  Developer waiting for firmware update to validate. When reporting please report with logs and current version of the integration you are running, in an attempt to fix this sadly I have pushed more versions than I should have. 
+- **Help wanted**: If you have firmware 61840+, please test and report back!  I'm waiting for firmware update to validate. When reporting please report with logs and current version of the integration you are running, in an attempt to fix this sadly I have pushed more versions than I should have. 
 
 
 **⚠️ IMPORTANT**: PVS serial number (last 5 characters) now **required** during setup for firmware 61840+ authentication, existing users please be pro-active and enter your serial number now.
