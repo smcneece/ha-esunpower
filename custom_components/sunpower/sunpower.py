@@ -1,4 +1,4 @@
-""" Basic Sunpower PVS Tool - ASYNC VERSION - Enhanced with Cookie-Based Auth """
+""" Basic Sunpower PVS Tool - ASYNC VERSION - Enhanced with Varserver Support """
 
 import aiohttp
 import asyncio
@@ -6,6 +6,8 @@ import simplejson
 import logging
 
 _LOGGER = logging.getLogger(__name__)
+
+PVS_AUTH_USERNAME = "ssm_owner"
 
 
 class ConnectionException(Exception):
@@ -16,13 +18,17 @@ class ParseException(Exception):
     """Any failure to connect to sunpower PVS"""
 
 
+class VarserverError(Exception):
+    """Varserver operation failed"""
+
+
 class SunPowerMonitor:
     """Basic Class to talk to sunpower pvs 5/6 via the management interface 'API'.
     This is not a public API so it might fail at any time.
     if you find this useful please complain to sunpower and your sunpower dealer that they
     do not have a public API
 
-    Enhanced for firmware 61839+ with cookie-based session authentication"""
+    Enhanced for firmware 61839+ with cookie-based session authentication and varserver support"""
 
     def __init__(self, host, auth_password=None):
         """Initialize SunPower PVS monitor.
@@ -42,7 +48,7 @@ class SunPowerMonitor:
             # Generate Basic Auth header for ssm_owner:password
             # Use lowercase "basic" per pypvs standard
             import base64
-            auth_string = f"ssm_owner:{auth_password}"
+            auth_string = f"{PVS_AUTH_USERNAME}:{auth_password}"
             auth_bytes = auth_string.encode('utf-8')
             auth_b64 = base64.b64encode(auth_bytes).decode('utf-8')
             self._auth_header = f"basic {auth_b64}"
@@ -77,11 +83,13 @@ class SunPowerMonitor:
             auth_url = f"https://{self.host}/auth?login"
             headers = {"Authorization": self._auth_header}
 
+            _LOGGER.debug("Attempting authentication to %s", auth_url)
+
             async with self._session.get(auth_url, headers=headers, ssl=False) as response:
                 if response.status == 200:
                     # Session cookie should now be stored in session
                     self._authenticated = True
-                    _LOGGER.debug("Cookie-based authentication successful")
+                    _LOGGER.info("Cookie-based authentication successful")
                     return True
                 else:
                     response_text = await response.text()
@@ -170,59 +178,9 @@ class SunPowerMonitor:
         except asyncio.TimeoutError as error:
             raise ConnectionException from error
 
-    def generic_command(self, command):
-        """DEPRECATED: Sync wrapper for backward compatibility
-        WARNING: This may cause issues in async environments like Home Assistant.
-        Use generic_command_async() instead."""
-        import warnings
-        warnings.warn(
-            "generic_command() is deprecated. Use generic_command_async() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-
-        # Try to run in existing event loop if possible
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No running loop, safe to use asyncio.run()
-            return asyncio.run(self.generic_command_async(command))
-        else:
-            # Already in a loop, we can't use asyncio.run()
-            # This should not happen in proper async code
-            raise RuntimeError(
-                "Cannot use sync method from within async context. "
-                "Use generic_command_async() instead."
-            )
-
     async def device_list_async(self):
         """Get a list of all devices connected to the PVS - ASYNC"""
         return await self.generic_command_async("DeviceList")
-
-    def device_list(self):
-        """DEPRECATED: Get a list of all devices connected to the PVS - SYNC WRAPPER
-        WARNING: This may cause issues in async environments like Home Assistant.
-        Use device_list_async() instead."""
-        import warnings
-        warnings.warn(
-            "device_list() is deprecated. Use device_list_async() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-
-        # Try to run in existing event loop if possible
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No running loop, safe to use asyncio.run()
-            return asyncio.run(self.device_list_async())
-        else:
-            # Already in a loop, we can't use asyncio.run()
-            # This should not happen in proper async code
-            raise RuntimeError(
-                "Cannot use sync method from within async context. "
-                "Use device_list_async() instead."
-            )
 
     async def energy_storage_system_status_async(self):
         """Get the status of the energy storage system - ASYNC
@@ -263,56 +221,6 @@ class SunPowerMonitor:
         except asyncio.TimeoutError as error:
             raise ConnectionException from error
 
-    def energy_storage_system_status(self):
-        """DEPRECATED: Get the status of the energy storage system - SYNC WRAPPER
-        WARNING: This may cause issues in async environments like Home Assistant.
-        Use energy_storage_system_status_async() instead."""
-        import warnings
-        warnings.warn(
-            "energy_storage_system_status() is deprecated. Use energy_storage_system_status_async() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-
-        # Try to run in existing event loop if possible
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No running loop, safe to use asyncio.run()
-            return asyncio.run(self.energy_storage_system_status_async())
-        else:
-            # Already in a loop, we can't use asyncio.run()
-            # This should not happen in proper async code
-            raise RuntimeError(
-                "Cannot use sync method from within async context. "
-                "Use energy_storage_system_status_async() instead."
-            )
-
     async def network_status_async(self):
         """Get a list of network interfaces on the PVS - ASYNC"""
         return await self.generic_command_async("Get_Comm")
-
-    def network_status(self):
-        """DEPRECATED: Get a list of network interfaces on the PVS - SYNC WRAPPER
-        WARNING: This may cause issues in async environments like Home Assistant.
-        Use network_status_async() instead."""
-        import warnings
-        warnings.warn(
-            "network_status() is deprecated. Use network_status_async() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-
-        # Try to run in existing event loop if possible
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No running loop, safe to use asyncio.run()
-            return asyncio.run(self.network_status_async())
-        else:
-            # Already in a loop, we can't use asyncio.run()
-            # This should not happen in proper async code
-            raise RuntimeError(
-                "Cannot use sync method from within async context. "
-                "Use network_status_async() instead."
-            )
