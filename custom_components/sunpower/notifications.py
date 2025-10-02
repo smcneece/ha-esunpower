@@ -29,22 +29,7 @@ def format_time_duration(seconds):
         return f"{seconds}s"  # Fallback to original format
 
 
-def convert_state_reason_to_text(state_reason):
-    """Convert state_reason codes to human-readable text"""
-    reason_map = {
-        "nighttime_polling_disabled": "nighttime mode",
-        "daytime_polling_active": "daytime mode", 
-        "battery_system_active": "battery system active",
-        "above_sunrise_threshold": "above sunrise threshold",
-        "above_sunset_threshold": "above sunset threshold", 
-        "below_sunrise_threshold": "below sunrise threshold",
-        "below_sunset_threshold": "below sunset threshold",
-        "polling_interval_not_elapsed": "polling interval not elapsed",
-        "PVS_health_check_failed": "PVS health check failed",
-        "polling_error": "polling error"
-    }
-    
-    return reason_map.get(state_reason, state_reason)
+# Removed day/night state conversion - simplified polling only
 
 
 async def get_mobile_devices(hass):
@@ -182,18 +167,18 @@ async def send_email_notification(hass, message, title, email_service=None, emai
         # Add custom recipient if provided (non-empty)
         if email_recipient and email_recipient.strip():
             email_data["target"] = email_recipient.strip()
-            _LOGGER.warning("Using custom email recipient: %s", email_recipient.strip())
+            _LOGGER.debug("Using custom email recipient: %s", email_recipient.strip())
         else:
-            _LOGGER.warning("Using email service default recipient (no target specified)")
+            _LOGGER.debug("Using email service default recipient (no target specified)")
 
         # Send email notification
-        _LOGGER.warning("Attempting email via service: %s, data: %s", email_service, email_data)
+        _LOGGER.debug("Attempting email via service: %s, data: %s", email_service, email_data)
         await hass.services.async_call(
             "notify",
             email_service,
             email_data
         )
-        _LOGGER.warning("Email notification sent successfully via %s", email_service)
+        _LOGGER.debug("Email notification sent successfully via %s", email_service)
         return True
 
     except Exception as e:
@@ -291,21 +276,21 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
                     _LOGGER.warning("Failed to dispatch mobile notification: %s", e)
 
             # Try email notification
-            _LOGGER.warning("Email check: enabled=%s, service=%s, type=%s", email_enabled, email_service, notification_type)
+            _LOGGER.debug("Email check: enabled=%s, service=%s, type=%s", email_enabled, email_service, notification_type)
             if email_enabled and email_service and email_service != "none":
                 try:
-                    _LOGGER.warning("Dispatching email notification for critical alert")
+                    _LOGGER.info("Dispatching email notification for critical alert")
                     # Create task for email notification
                     task = asyncio.create_task(
                         send_email_notification(hass, message, title, email_service, email_recipient)
                     )
                     # Don't wait for completion - fire and forget
                     email_sent = True
-                    _LOGGER.warning("Email notification dispatched for critical alert")
+                    _LOGGER.info("Email notification dispatched for critical alert")
                 except Exception as e:
                     _LOGGER.warning("Failed to dispatch email notification: %s", e)
             else:
-                _LOGGER.warning("Email notification skipped: enabled=%s, service=%s", email_enabled, email_service)
+                _LOGGER.debug("Email notification skipped: enabled=%s, service=%s", email_enabled, email_service)
         
         # MULTI-CHANNEL NOTIFICATION ID LOGIC
         if notification_type == "general" and overwrite_general:
@@ -358,44 +343,43 @@ def notify_firmware_upgrade(hass, entry, cache, old_version, new_version):
                notification_category="firmware", cache=cache)
 
 
-def notify_route_missing(hass, entry, cache):
-    """ESSENTIAL: Route missing notification"""
-    msg = f"🚨 CRITICAL: Route to PVS network missing! Attempting automatic repair..."
-    safe_notify(hass, msg, "Enhanced SunPower Route", entry, force_notify=True, 
-               notification_category="route", cache=cache)
+
+# notify_pvs_offline function removed - unused function
+
+# Legacy individual notification functions removed - replaced by notify_batched_inverter_issues()
 
 
-def notify_route_repaired(hass, entry, cache):
-    """ESSENTIAL: Route repair notification"""
-    msg = f"✅ ROUTE REPAIRED: PVS network route restored automatically"
-    safe_notify(hass, msg, "Enhanced SunPower Route", entry, force_notify=True, 
-               notification_category="route", cache=cache)
 
 
-def notify_pvs_unreachable_route_ok(hass, entry, cache):
-    """ESSENTIAL: PVS unreachable but route exists"""
-    msg = f"⚠️ PVS UNREACHABLE: Route exists but PVS not responding (hardware issue?)"
-    safe_notify(hass, msg, "Enhanced SunPower Status", entry, force_notify=True, 
-               notification_category="health", cache=cache)
+def notify_batched_inverter_issues(hass, entry, cache, persistent_errors, recoveries):
+    """ESSENTIAL: Batched inverter notifications for UI, mobile, and email"""
+    messages = []
 
+    # Build persistent error message
+    if persistent_errors:
+        if len(persistent_errors) == 1:
+            error = persistent_errors[0]
+            messages.append(f"🔴 PERSISTENT INVERTER ISSUE: {error['serial']} in error state for {error['duration_hours']} hours")
+        else:
+            error_serials = [error['serial'] for error in persistent_errors]
+            max_hours = max(error['duration_hours'] for error in persistent_errors)
+            messages.append(f"🔴 PERSISTENT INVERTER ISSUES: {len(persistent_errors)} inverters in error state for 24+ hours ({', '.join(error_serials[:3])}{'...' if len(error_serials) > 3 else ''})")
 
-def notify_pvs_offline(hass, entry, cache, reason):
-    """ESSENTIAL: PVS offline notifications"""
-    msg = f"🔴 PVS OFFLINE: {reason} - using cached data"
-    safe_notify(hass, msg, "Enhanced SunPower Status", entry, force_notify=True, 
-               notification_category="health", cache=cache)
+    # Build recovery message
+    if recoveries:
+        if len(recoveries) == 1:
+            recovery = recoveries[0]
+            messages.append(f"✅ INVERTER RECOVERED: {recovery['serial']} back online after {recovery['duration_hours']} hours")
+        else:
+            recovery_serials = [recovery['serial'] for recovery in recoveries]
+            messages.append(f"✅ INVERTERS RECOVERED: {len(recoveries)} inverters back online ({', '.join(recovery_serials[:3])}{'...' if len(recovery_serials) > 3 else ''})")
 
-def notify_inverter_failure(hass, entry, cache, inverter_serial, consecutive_failures):
-    """ESSENTIAL: Inverter failure notifications"""
-    msg = f"⚠️ INVERTER FAILURE: {inverter_serial} missing for {consecutive_failures} consecutive polls"
-    safe_notify(hass, msg, "Enhanced SunPower Alert", entry, force_notify=True, 
-               notification_category="inverter", cache=cache)
-
-def notify_inverter_recovery(hass, entry, cache, inverter_serial, downtime_polls):
-    """ESSENTIAL: Inverter recovery notifications"""
-    msg = f"✅ INVERTER RECOVERED: {inverter_serial} back online after {downtime_polls} failed polls"
-    safe_notify(hass, msg, "Enhanced SunPower Recovery", entry, force_notify=True, 
-               notification_category="inverter", cache=cache)
+    # Send combined message
+    if messages:
+        combined_message = " | ".join(messages)
+        title = "Enhanced SunPower Critical Alert" if persistent_errors else "Enhanced SunPower Recovery"
+        safe_notify(hass, combined_message, title, entry, force_notify=True,
+                   notification_category="inverter", cache=cache)
 
 def notify_flash_memory_critical(hass, entry, cache, available_mb, threshold_mb):
     """ESSENTIAL: Flash memory critical alert - UI + mobile"""
@@ -450,8 +434,8 @@ def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
 
 def notify_using_cached_data(hass, entry, cache, reason, time_info=None, polling_interval=None):
     """GENERAL: Cached data usage - FIXED TEXT CONVERSION"""
-    # Convert state_reason codes to readable text
-    readable_reason = convert_state_reason_to_text(reason)
+    # Simplified polling - just use reason directly
+    readable_reason = reason
 
     if time_info:
         if isinstance(time_info, (int, float)):
@@ -491,38 +475,7 @@ def notify_setup_success(hass, entry, cache):
     safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True, 
                notification_category="debug", cache=cache)
 
-def notify_day_mode_elevation(hass, entry, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
-    """DEBUG: Polling mode activation notification"""
-    if state_reason == "daytime_polling_active":
-        msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}° ≥ {active_threshold:.1f}° threshold"
-    elif state_reason == "nighttime_polling_active":
-        msg = f"🌙 Nighttime polling enabled: Sun elevation {elevation:.1f}° (consumption tracking active)"
-    elif state_reason == "battery_system_active":
-        if elevation >= min(sunrise_elevation, sunset_elevation):
-            msg = f"🔋 Battery system day polling: Sun elevation {elevation:.1f}° (24/7 monitoring active)"
-        else:
-            msg = f"🔋 Battery system night polling: Sun elevation {elevation:.1f}° (24/7 monitoring active)"
-    else:
-        msg = f"☀️ Daytime polling enabled: Sun elevation {elevation:.1f}°"
-
-    safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True,
-               notification_category="daynight", cache=cache)
-
-def notify_night_mode_elevation(hass, entry, has_battery, cache, elevation, sunrise_elevation, sunset_elevation, active_threshold, state_reason):
-    """DEBUG: SIMPLE night mode activation"""
-    if has_battery:
-        if state_reason == "nighttime_polling_disabled":
-            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° < {active_threshold:.1f}° threshold - battery system continues polling"
-        else:
-            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° - battery system continues polling"
-    else:
-        if state_reason == "nighttime_polling_disabled":
-            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° < {active_threshold:.1f}° threshold - solar polling disabled"
-        else:
-            msg = f"🌙 Nighttime mode: Sun elevation {elevation:.1f}° - solar polling disabled"
-    
-    safe_notify(hass, msg, "Enhanced SunPower", entry, is_debug=True, 
-               notification_category="daynight", cache=cache)
+# Removed day/night elevation notification functions - simplified polling only
 
 def notify_diagnostic_coordinator_started(hass, entry, cache):
     """DEBUG: Coordinator cycle started"""
@@ -531,36 +484,22 @@ def notify_diagnostic_coordinator_started(hass, entry, cache):
     safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
                notification_category="debug", cache=cache, add_timestamp=False)
 
-def notify_diagnostic_coordinator_status(hass, entry, cache, current_interval, coordinator_interval, mode, elevation):
-    """DEBUG: Enhanced coordinator status with intervals and mode"""
+def notify_diagnostic_coordinator_status(hass, entry, cache, current_interval, coordinator_interval, mode):
+    """DEBUG: Simplified coordinator status"""
     current_time_str = datetime.now().strftime("%I:%M:%S %p %m-%d-%Y")
-    msg = (f"⚙️ COORDINATOR: current={current_interval}s, required={coordinator_interval:.1f}s, "
-           f"mode={mode}, elevation={elevation:.1f}° ({current_time_str})")
+    msg = (f"⚙️ COORDINATOR: interval={current_interval}s, simplified_polling "
+           f"({current_time_str})")
     safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
                notification_category="debug", cache=cache, add_timestamp=False)
 
-def notify_diagnostic_coordinator_creating(hass, entry, cache, polling_interval):
-    """DEBUG: Coordinator creation details"""
-    msg = f"⚙️ DIAGNOSTIC: Creating coordinator with {polling_interval}s interval"
-    safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True,
-               notification_category="debug", cache=cache)
+# notify_diagnostic_coordinator_creating function removed - imported but never called
 
-
-def notify_battery_system_error(hass, entry, cache, error_count, total_count, technical_reason):
-    """ESSENTIAL: Battery system error notifications"""
-    if error_count == total_count:
-        # Complete system failure
-        msg = (f"🔴 SunVault System Error\n\n"
-               f"All {total_count} battery devices are reporting error state. "
-               f"Battery entities will show basic status only.\n\n"
-               f"Technical: {technical_reason}\n\n"
-               f"This typically indicates a hardware malfunction requiring professional service.")
-    else:
-        # Partial system failure
-        msg = (f"⚠️ SunVault Partial Error\n\n"
-               f"{error_count} of {total_count} battery devices are in error state. "
-               f"Some battery data may be incomplete.\n\n"
-               f"Technical: {technical_reason}")
+def notify_battery_system_issue(hass, entry, cache, consecutive_failures):
+    """ESSENTIAL: Battery system connectivity issues"""
+    msg = (f"⚠️ SunVault Connectivity Issue\n\n"
+           f"{consecutive_failures} consecutive polling failures detected. "
+           f"Battery data may be temporarily unavailable.\n\n"
+           f"This usually resolves automatically - if persistent, check network connectivity.")
 
     safe_notify(hass, msg, "Enhanced SunPower Battery Alert", entry, force_notify=True,
-               notification_category="battery_error", cache=cache)
+               notification_category="battery", cache=cache)

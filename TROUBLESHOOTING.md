@@ -25,19 +25,18 @@
 ## Common Issues
 
 ### PVS Not Responding
-1. **Check Network Connectivity**: Ensure PVS LAN port isolation is working properly
-2. **Verify IP Address**: PVS typically uses `172.27.153.1`
+1. **Verify IP Address**: PVS typically uses `172.27.153.1`
+2. **Check Authentication**: Ensure PVS serial number (last 5 digits) is correct in integration settings
 3. **Monitor Health Checks**: Integration shows health check attempts in notifications
 4. **Check Backoff Status**: Integration may be in cooldown period after failures
-5. **Route Status**: If route checking enabled, verify route exists vs PVS down
-6. **PVS Reboot**: If persistent, power cycle the PVS (turn off breaker for 60 seconds)
+5. **PVS Reboot**: If persistent, power cycle the PVS (turn off breaker for 60 seconds)
 
-### 🛜 **Route Issues (VLAN/Custom Networks)**
-1. **Enable Route Check**: Turn on automatic route checking in advanced settings
-2. **Configure Gateway**: Set correct gateway IP for your network topology
-3. **Monitor Route Alerts**: Watch for route missing vs PVS unreachable notifications
-4. **Manual Route Check**: `ip route show 172.27.153.0/24` to verify route exists
-5. **Test Route Setup/Repair**: Integration will automatically add missing routes
+### 🔐 **Authentication Issues (New Firmware)**
+1. **Check Serial Number**: Verify last 5 digits of PVS serial in integration configuration
+2. **Firmware Detection**: Integration automatically detects if authentication is required
+3. **Authentication Alerts**: Watch for critical authentication failure notifications
+4. **Reset Integration**: Reconfigure if authentication settings are incorrect
+5. **Contact Support**: If serial number is correct but authentication still fails
 
 ### ⚡ **Hardware/Power Issues (USB Setups)**
 1. **Check Power Draw**: Measure combined USB device power consumption
@@ -91,19 +90,6 @@
 3. **Check Notifications**: Look for battery detection warnings
 4. **ESS Communication**: Battery data requires separate ESS API endpoint
 
-### Sunrise/Sunset Elevation Issues
-1. **Check Sun Entity**: Ensure `sun.sun` entity exists in Home Assistant
-2. **Verify Configuration**: Review sunrise and sunset elevation settings (-10° to 45° allowed)
-3. **Monitor Transitions**: Check day/night notifications for elevation values and which threshold is active
-4. **Adjust Thresholds**: Fine-tune elevation based on your panel orientation and generation patterns
-5. **Custom Values**: Try east-facing (5°/15°), west-facing (15°/5°), or balanced (10°/10°) presets
-
-### 🕒 **Time Display Issues**
-1. **Notification Format**: All time values should show human-readable format
-2. **Cache Age**: Should display "50 minutes ago" instead of "3039s ago"
-3. **Diagnostic Sensors**: "Last Successful Poll" should show readable time
-4. **Consistency**: All notification channels should use same time formatting
-
 ## Network Setup Issues
 
 ### **Hardware Power Requirements & Known Issues**
@@ -120,7 +106,7 @@ Many users power their Raspberry Pi directly from the PVS USB ports. However, th
 - **Combined load** can exceed PVS USB power capacity
 
 **Real-World Example:**
-*Developer experienced random PVS connectivity issues using **two SunPower-approved USB-Ethernet adapters** (one for WAN, one for LAN) powered from PVS USB ports. Problem completely resolved by switching PVS back to WiFi for WAN connection, leaving only one USB-Ethernet adapter for LAN polling.*
+*I experienced random PVS connectivity issues using **two SunPower-approved USB-Ethernet adapters** (one for WAN, one for LAN) powered from PVS USB ports. Problem completely resolved by switching PVS back to WiFi for WAN connection, leaving only one USB-Ethernet adapter for LAN polling.*
 
 **Symptoms of PVS USB Power Overload:**
 - **Random "PVS OFFLINE" alerts** despite network functioning normally
@@ -159,12 +145,12 @@ PVS WAN Port   PVS LAN Port (172.27.153.1)
  Cloud)        └── Isolated Network → Home Assistant
 ```
 
-### Community Solutions
-The community has developed several proven approaches for PVS network isolation:
+### Network Setup
+With authentication support, network setup is simplified:
 
-- **VLAN Isolation** (Recommended for managed switches) - **Auto route setup/repair supported**
-- **Raspberry Pi Proxy** (Popular community solution)
-- **Dedicated Network Interface** (Direct connection approach)
+- **Direct Connection**: PVS can be accessed directly using standard IP addressing
+- **Legacy Setups**: Existing VLAN or proxy configurations will continue to work
+- **Simplified Troubleshooting**: Authentication eliminates most network isolation issues
 
 **For detailed network setup guidance**, see existing community resources and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
 
@@ -179,5 +165,5 @@ Enable debug notifications to monitor:
 - Auto-recovery events and cache usage
 - Individual inverter health status
 - Mobile notification delivery status
-- Route detection, setup, and repair activities
+- Authentication status and session management
 - Time conversion accuracy

@@ -2,6 +2,72 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.10.5] - 2025-10-01
+
+### New Firmware Support (61840+)
+- **Varserver Support**: Added full varserver (FCGI) support for firmware 61840+ with automatic fallback to dl_cgi for older firmware
+- **Cookie-Based Authentication**: Implemented session cookie authentication matching SunStrong's pypvs library
+- **DeviceList via Varserver**: Efficient device data fetching from varserver with backward compatibility conversion
+
+### Critical Authentication Fixes
+- **Lowercase "basic" Header**: Fixed auth header to use lowercase "basic" per pypvs/RFC standard (was uppercase "Basic")
+- **UTF-8 Encoding**: Changed from ASCII to UTF-8 encoding for authentication credentials
+- **Cookie Jar Clearing**: Applied pypvs PR#7 fix to prevent aiohttp cookie caching interference
+- **Required PVS Serial**: PVS serial number now required for all installations (firmware 61840+ requires authentication)
+
+### Performance Improvements
+- **Fast Varserver Probe**: Reduced varserver capability detection timeout from 120s to 10s to prevent startup delays
+- **Skip First Health Check**: Health check now skipped on first poll after HA restart to prevent false backoff
+
+### Bug Fixes
+- **Startup Polling**: Fixed health check failure on first poll after restart causing 1-minute delay
+- **Varserver Timeout**: Prevented long varserver probe from blocking integration startup on old firmware
+
+## [Unreleased] - 2025-09-29
+
+### Code Quality Improvements
+- **Enhanced Error Logging**: Added HTTP status codes and response bodies to all PVS communication errors for better troubleshooting
+- **Refactored Error Handling**: Broke down 104-line try-catch block into 7 focused error handling steps for easier debugging
+- **Improved Documentation**: Added comprehensive docstrings to key functions and classes
+- **Reduced Log Noise**: Changed email notification success messages from WARNING to DEBUG level
+
+### Bug Fixes
+- **Fixed Polling Failure Rate**: Corrected regression where `None` from health checks was treated as error instead of normal cache fallback
+- **Eliminated False Notifications**: Removed spurious "PVS polling returned no data" errors during normal backoff periods
+- **Fixed State Class Warning**: Changed communication_errors sensor from `TOTAL_INCREASING` to `TOTAL` to handle PVS counter resets
+- **Increased Health Check Timeout**: Changed from 2s to 5s to improve reliability on slower networks
+
+## [v2025.9.9] - 2025-09-29
+
+###  Major Architecture Simplification
+- **Simplified Polling System**: Removed complex day/night/elevation-based polling variations in favor of consistent 24/7 operation
+- **Streamlined Config Flow**: Reduced from 3-page configuration to 2-page setup, removing unused elevation settings
+- **Eliminated Solar Tracking**: Removed sunrise/sunset elevation controls
+- **Unified Polling Logic**: Single polling interval for all conditions, dramatically simplifying codebase maintenance
+- **Legacy Code Removal**: Eliminated hundreds of lines of complex conditional logic for cleaner, more reliable operation
+
+###  Critical Bug Fix: Inverter Failure Notification Flood
+- **Root Cause**: Code simplification accidentally removed nighttime dormancy understanding, causing all 30 inverters to trigger false failures
+- **24-Hour Persistent Error Tracking**: Revolutionary approach that only alerts after 24+ hours of continuous problems
+- **Eliminated False Positives**: Fixed critical regression where normal STATE="error" during inverter dormancy triggered 30+ notifications nightly
+- **Smart Recovery Detection**: Automatic notifications when persistent issues resolve after extended periods
+- **Batched Notifications**: Multiple inverter issues now grouped into single notification instead of 20+ separate emails
+- **Gmail Rate Limit Protection**: Prevents overwhelming email services with notification floods that could lock accounts
+
+###  Enhanced Varserver Migration Support (Future Firmware 61840+)
+- **Complete Compatibility Layer**: Full varserver support for upcoming SunPower firmware migration
+- **Minimal Dependencies**: Custom lightweight varserver wrapper avoids external library dependencies
+- **Automatic Detection**: Seamlessly detects and enables varserver capabilities when firmware supports it
+- **Zero Breaking Changes**: Maintains 100% backwards compatibility with existing dl_cgi endpoints
+- **Battery System Enhancement**: Modern ESS data processing via authenticated varserver endpoints
+- **FCGI Authentication**: Full support for ssm_owner + PVS serial authentication scheme
+
+### 🔍 Restored Original Failure Detection Logic
+- **Presence-Based Detection**: Returned to original github_staging logic of detecting missing inverters vs state changes
+- **Context-Aware Monitoring**: Fixed regression that confused normal operational cycles with equipment failures
+- **Eliminated State-Based Failures**: Stopped treating present inverters with STATE="error" as failed (normal at night)
+- **Persistent Issue Focus**: Only genuine hardware problems that persist across multiple day/night cycles trigger alerts
+
 ## [v2025.9.8] - 2025-09-27
 
 ### New Feature: Email Notifications for Critical Alerts

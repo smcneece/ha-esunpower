@@ -27,10 +27,15 @@ SUNPOWER_OBJECT = "sunpower"
 SUNPOWER_HOST = "host"
 SUNPOWER_COORDINATOR = "coordinator"
 CONF_PVS_SERIAL_LAST5 = "pvs_serial_last5"
-DEFAULT_SUNPOWER_UPDATE_INTERVAL = 120
+
+# Authentication constants
+PVS_AUTH_USERNAME = "ssm_owner"  # SunStrong Management authentication username
+
+# Polling intervals - reduced per SunStrong guidance while keeping conservative defaults
+DEFAULT_SUNPOWER_UPDATE_INTERVAL = 300  # Keep 5 min default for testing
 DEFAULT_SUNVAULT_UPDATE_INTERVAL = 60
-MIN_SUNPOWER_UPDATE_INTERVAL = 60
-MIN_SUNVAULT_UPDATE_INTERVAL = 20
+MIN_SUNPOWER_UPDATE_INTERVAL = 10  # Reduced minimum for non-battery systems
+MIN_SUNVAULT_UPDATE_INTERVAL = 20  # Battery systems minimum
 SUNPOWER_UPDATE_INTERVAL = "PVS_UPDATE_INTERVAL"
 SUNVAULT_UPDATE_INTERVAL = "ESS_UPDATE_INTERVAL"
 SETUP_TIMEOUT_MIN = 5
@@ -110,7 +115,7 @@ SUNPOWER_SENSORS = {
                 "unit": "",
                 "icon": "mdi:network-off",
                 "device": None,
-                "state": SensorStateClass.TOTAL_INCREASING,
+                "state": SensorStateClass.TOTAL,  # Changed from TOTAL_INCREASING - counter can reset on PVS reboot
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
             "PVS_SKIPPED_SCANS": {
@@ -469,15 +474,6 @@ SUNPOWER_SENSORS = {
                 "icon": "mdi:server-network",
                 "device": None,
                 "state": SensorStateClass.MEASUREMENT,
-                "entity_category": EntityCategory.DIAGNOSTIC,
-            },
-            "ROUTE_REPAIRS": {
-                "field": "route_repairs_count",
-                "title": "Route Repairs",
-                "unit": "",
-                "icon": "mdi:router-network",
-                "device": None,
-                "state": SensorStateClass.TOTAL_INCREASING,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
         },

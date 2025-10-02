@@ -6,8 +6,20 @@ from .const import DOMAIN
 
 
 class SunPowerEntity(CoordinatorEntity):
+    """Base entity for Enhanced SunPower integration.
+
+    Provides common functionality for all SunPower sensors and binary sensors,
+    including device info generation and unique ID management.
+    """
+
     def __init__(self, coordinator, my_info, parent_info):
-        """Initialize the sensor."""
+        """Initialize the entity.
+
+        Args:
+            coordinator: DataUpdateCoordinator instance
+            my_info: Device-specific information dict
+            parent_info: Parent device information dict (for grouped devices)
+        """
         super().__init__(coordinator)
         self._my_info = my_info
         self._parent_info = parent_info

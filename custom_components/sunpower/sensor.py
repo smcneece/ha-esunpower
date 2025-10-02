@@ -74,18 +74,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             unique_id = SENSORS[device_type]["unique_id"]
             sensors = SENSORS[device_type]["sensors"]
             
-            # Special handling for diagnostic sensors with route repair counter
-            if device_type == "Enhanced SunPower Diagnostics":
-                # Check if route checking is enabled (valid gateway IP)
-                route_gateway_ip = config_entry.data.get("route_gateway_ip", "")
-                route_check_enabled = route_gateway_ip and route_gateway_ip != "0.0.0.0" and route_gateway_ip.strip() != ""
-                
-                # Filter out route repairs sensor if route checking is disabled
-                if not route_check_enabled and "ROUTE_REPAIRS" in sensors:
-                    sensors = {k: v for k, v in sensors.items() if k != "ROUTE_REPAIRS"}
-                    _LOGGER.debug("Route checking disabled - excluding route repairs sensor")
-                else:
-                    _LOGGER.debug("Route checking enabled - including route repairs sensor")
             
             for index, sensor_data in enumerate(sunpower_data[device_type].values()):
                 for sensor_name in sensors:

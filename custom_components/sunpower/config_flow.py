@@ -6,21 +6,61 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
-from .const import DOMAIN
+from .const import DOMAIN, DEFAULT_SUNPOWER_UPDATE_INTERVAL, MIN_SUNPOWER_UPDATE_INTERVAL
 from .sunpower import SunPowerMonitor, ConnectionException, ParseException
 from .notifications import get_mobile_devices, get_email_notification_services
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default to 300 seconds for PVS safety
-DEFAULT_SUNPOWER_UPDATE_INTERVAL = 300
+# Removed duplicate - using const.py values
 
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Config flow for Enhanced SunPower integration.
+
+    Handles 3-step configuration:
+    1. Basic setup (host, auth, polling interval)
+    2. Solar configuration (naming preferences)
+    3. Notifications (mobile devices, email services, flash memory monitoring)
+    """
     VERSION = 1
 
     def __init__(self):
         """Initialize the config flow."""
         self._basic_config = {}
+
+    async def _adjust_polling_for_battery_system(self):
+        """Check for battery system and adjust polling interval if needed"""
+        try:
+            host = self._basic_config["host"]
+            polling_interval = self._basic_config["polling_interval"]
+            pvs_serial_last5 = self._basic_config.get("pvs_serial_last5")
+
+            # Only adjust if user set interval <= 20 seconds
+            if polling_interval > 20:
+                return
+
+            # Quick battery detection poll with authentication
+            sunpower_monitor = SunPowerMonitor(host, auth_password=pvs_serial_last5)
+            pvs_data = await sunpower_monitor.device_list_async()
+
+            if pvs_data:
+                # Check for battery devices in response
+                has_battery = False
+                for device in pvs_data.values():
+                    device_type = device.get("TYPE", "").lower()
+                    if any(battery_type in device_type for battery_type in ["battery", "ess", "storage", "sunvault"]):
+                        has_battery = True
+                        break
+
+                # Adjust interval if battery system detected
+                if has_battery and polling_interval < 20:
+                    old_interval = polling_interval
+                    self._basic_config["polling_interval"] = 20
+                    _LOGGER.info("Adjusted polling interval from %ds to 20s for battery system (SunStrong guidance)", old_interval)
+
+        except Exception as e:
+            # Don't fail setup if battery detection fails
+            _LOGGER.debug("Battery detection failed during setup: %s", e)
 
     async def _test_pvs_connection(self, host, pvs_serial_last5=None):
         """Test PVS connection and validate real device data during setup"""
@@ -101,16 +141,11 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         description_placeholders = {}
 
         if user_input is not None:
-            # Validate daytime polling interval
-            daytime_interval = user_input["daytime_polling_interval"]
-            nighttime_interval = user_input["nighttime_polling_interval"]
+            # Validate polling interval
+            polling_interval = user_input["polling_interval"]
 
-            if daytime_interval < 300:
-                errors["daytime_polling_interval"] = "MIN_INTERVAL"
-
-            # Validate nighttime polling interval (0 = disabled, or >= 300 for PVS protection)
-            if nighttime_interval > 0 and nighttime_interval < 300:
-                errors["nighttime_polling_interval"] = "MIN_INTERVAL"
+            if polling_interval < 300:
+                errors["polling_interval"] = "MIN_INTERVAL"
 
             # Validate PVS serial last 5 chars if provided
             pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()
@@ -133,10 +168,11 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 
                 if success:
-                    # Store basic config and proceed to solar config
+                    # Store basic config and check for battery system adjustment
                     self._basic_config = user_input.copy()
-                    _LOGGER.info("Setup: Connection validated, proceeding to solar configuration")
-                    return await self.async_step_solar()
+                    await self._adjust_polling_for_battery_system()
+                    _LOGGER.info("Setup: Connection validated, proceeding to notifications")
+                    return await self.async_step_notifications()
                 else:
                     # Connection failed - show error
                     _LOGGER.warning("Setup: PVS validation failed: %s", message)
@@ -146,23 +182,14 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
             vol.Required("host", default="172.27.153.1"): str,
-            vol.Required("daytime_polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
+            vol.Required("polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=300,
+                    min=MIN_SUNPOWER_UPDATE_INTERVAL,
                     max=3600,
                     unit_of_measurement="seconds",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("nighttime_polling_interval", default=0): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=3600,
-                    unit_of_measurement="seconds",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Optional("route_gateway_ip", default=""): str,
             vol.Required("pvs_serial_last5"): str,
         })
 
@@ -173,42 +200,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders=description_placeholders
         )
 
-    async def async_step_solar(self, user_input=None):
-        """Handle solar optimization configuration."""
-        errors = {}
-
-        if user_input is not None:
-            # Store solar config and proceed to notifications
-            self._basic_config.update(user_input)
-            return await self.async_step_notifications()
-
-        # Page 2: Solar Optimization schema
-        schema = vol.Schema({
-            vol.Required("sunrise_elevation", default=5): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=-10,
-                    max=45,
-                    unit_of_measurement="degrees",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required("sunset_elevation", default=5): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=-10,
-                    max=45,
-                    unit_of_measurement="degrees",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required("use_descriptive_names", default=True): selector.BooleanSelector(),
-            vol.Required("use_product_names", default=False): selector.BooleanSelector(),
-        })
-
-        return self.async_show_form(
-            step_id="solar",
-            data_schema=schema,
-            errors=errors
-        )
+    # Solar step removed - descriptive names forced to True
 
     async def async_step_notifications(self, user_input=None):
         """Handle notifications and advanced configuration."""
@@ -230,22 +222,23 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Combine all config and create entry
                 complete_config = self._basic_config.copy()
                 complete_config.update(user_input)
+                # Force descriptive names to True (better for energy dashboard)
+                complete_config["use_descriptive_names"] = True
+                complete_config["use_product_names"] = False
 
                 _LOGGER.info("Setup: Creating integration with complete configuration")
                 return self.async_create_entry(
                 title=f"Enhanced SunPower PVS {complete_config['host']}",
                 data={
                     "host": complete_config["host"],
-                    "daytime_polling_interval": complete_config["daytime_polling_interval"],
-                    "nighttime_polling_interval": complete_config["nighttime_polling_interval"],
+                    "polling_interval": complete_config["polling_interval"],
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
-                    "route_gateway_ip": complete_config.get("route_gateway_ip", ""),
                     "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
                 },
                 options={
-                    "sunrise_elevation": complete_config["sunrise_elevation"],
-                    "sunset_elevation": complete_config["sunset_elevation"],
+                    "sunrise_elevation": 5,  # Default preserved for future use
+                    "sunset_elevation": 5,  # Default preserved for future use
                     "general_notifications": complete_config["general_notifications"],
                     "deep_debug_notifications": complete_config["deep_debug_notifications"],
                     "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
@@ -316,15 +309,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
 
         if user_input is not None:
-            daytime_interval = user_input["daytime_polling_interval"]
-            nighttime_interval = user_input["nighttime_polling_interval"]
+            polling_interval = user_input["polling_interval"]
 
-            if daytime_interval < 300:
-                errors["daytime_polling_interval"] = "MIN_INTERVAL"
-
-            # Validate nighttime polling interval (0 = disabled, or >= 300 for PVS protection)
-            if nighttime_interval > 0 and nighttime_interval < 300:
-                errors["nighttime_polling_interval"] = "MIN_INTERVAL"
+            # Validate polling interval with appropriate minimum
+            if polling_interval < MIN_SUNPOWER_UPDATE_INTERVAL:
+                errors["polling_interval"] = "MIN_INTERVAL"
 
             # Validate PVS serial last 5 chars if provided (options flow)
             pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()
@@ -335,12 +324,9 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     errors["pvs_serial_last5"] = "Must contain only letters and numbers"
 
             if not errors:
-                # Update user_input with stripped serial (or empty string if blank)
-                user_input["pvs_serial_last5"] = pvs_serial_last5 if pvs_serial_last5 else ""
-
-                # Store basic config and proceed to solar step
+                # Store basic config and proceed to notifications (skip solar page)
                 self._basic_config = user_input.copy()
-                return await self.async_step_solar()
+                return await self.async_step_notifications()
 
         # Get current values from either options or data (fallback)
         current_host = self.config_entry.options.get(
@@ -349,38 +335,25 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         )
         
         current_interval = self.config_entry.options.get(
-            "daytime_polling_interval", 
-            self.config_entry.data.get("daytime_polling_interval", DEFAULT_SUNPOWER_UPDATE_INTERVAL)
-        )
-        
-        current_nighttime_interval = self.config_entry.options.get(
-            "nighttime_polling_interval",
-            self.config_entry.data.get("nighttime_polling_interval", 0)
+            "polling_interval",
+            self.config_entry.data.get("polling_interval",
+                DEFAULT_SUNPOWER_UPDATE_INTERVAL
+            )
         )
 
-        current_route_gateway_ip = self.config_entry.data.get("route_gateway_ip", "")
         current_pvs_serial = self.config_entry.data.get("pvs_serial_last5", "")
 
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
             vol.Required("host", default=current_host): str,
-            vol.Required("daytime_polling_interval", default=current_interval): selector.NumberSelector(
+            vol.Required("polling_interval", default=current_interval): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=300,
+                    min=MIN_SUNPOWER_UPDATE_INTERVAL,
                     max=3600,
                     unit_of_measurement="seconds",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("nighttime_polling_interval", default=current_nighttime_interval): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=3600,
-                    unit_of_measurement="seconds",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Optional("route_gateway_ip", default=current_route_gateway_ip): str,
             vol.Required("pvs_serial_last5", default=current_pvs_serial): str,
         })
 
@@ -399,40 +372,12 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             self._basic_config.update(user_input)
             return await self.async_step_notifications()
 
-        # Get current sun elevation values with migration
-        current_sunrise = self.config_entry.options.get("sunrise_elevation")
-        current_sunset = self.config_entry.options.get("sunset_elevation")
-        
-        # Migration: If no sunrise/sunset values but old minimum_sun_elevation exists
-        if current_sunrise is None or current_sunset is None:
-            old_elevation = self.config_entry.options.get("minimum_sun_elevation", 5)
-            current_sunrise = old_elevation if current_sunrise is None else current_sunrise
-            current_sunset = old_elevation if current_sunset is None else current_sunset
-            _LOGGER.info("Migrating from minimum_sun_elevation=%s to sunrise=%s, sunset=%s", 
-                        old_elevation, current_sunrise, current_sunset)
-
         # Get current naming values with fallback to data
         current_descriptive = self.config_entry.data.get("use_descriptive_names", True)
         current_product = self.config_entry.data.get("use_product_names", False)
 
-        # Page 2: Solar Optimization schema
+        # Page 2: Naming Preferences schema (elevation settings removed - not used in simplified polling)
         schema = vol.Schema({
-            vol.Required("sunrise_elevation", default=current_sunrise): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=-10,
-                    max=45,
-                    unit_of_measurement="degrees",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required("sunset_elevation", default=current_sunset): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=-10,
-                    max=45,
-                    unit_of_measurement="degrees",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
             vol.Required("use_descriptive_names", default=current_descriptive): selector.BooleanSelector(),
             vol.Required("use_product_names", default=current_product): selector.BooleanSelector(),
         })
@@ -463,21 +408,20 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 # Combine all config and update entry
                 complete_config = self._basic_config.copy()
                 complete_config.update(user_input)
+                # Force descriptive names to True (better for energy dashboard)
+                complete_config["use_descriptive_names"] = True
+                complete_config["use_product_names"] = False
             
             # Update data if basic settings changed
             data_updates = {}
             if complete_config["host"] != self.config_entry.data.get("host"):
                 data_updates["host"] = complete_config["host"]
-            if complete_config["nighttime_polling_interval"] != self.config_entry.data.get("nighttime_polling_interval"):
-                data_updates["nighttime_polling_interval"] = complete_config["nighttime_polling_interval"]
-            if complete_config["daytime_polling_interval"] != self.config_entry.data.get("daytime_polling_interval"):
-                data_updates["daytime_polling_interval"] = complete_config["daytime_polling_interval"]
+            if complete_config["polling_interval"] != self.config_entry.data.get("polling_interval"):
+                data_updates["polling_interval"] = complete_config["polling_interval"]
             if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):
                 data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
             if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):
                 data_updates["use_product_names"] = complete_config["use_product_names"]
-            if complete_config["route_gateway_ip"] != self.config_entry.data.get("route_gateway_ip"):
-                data_updates["route_gateway_ip"] = complete_config["route_gateway_ip"]
             if complete_config.get("pvs_serial_last5", "") != self.config_entry.data.get("pvs_serial_last5", ""):
                 data_updates["pvs_serial_last5"] = complete_config.get("pvs_serial_last5", "")
             
@@ -496,8 +440,8 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             
             # Create options
             options = {
-                "sunrise_elevation": complete_config["sunrise_elevation"],
-                "sunset_elevation": complete_config["sunset_elevation"],
+                "sunrise_elevation": 5,  # Default preserved for future use
+                "sunset_elevation": 5,  # Default preserved for future use
                 "general_notifications": complete_config["general_notifications"],
                 "deep_debug_notifications": complete_config["deep_debug_notifications"],
                 "overwrite_general_notifications": complete_config["overwrite_general_notifications"],

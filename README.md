@@ -1,12 +1,23 @@
-# Enhanced SunPower Home Assistant Integration
+# Enhanced SunPower/SunStrong Home Assistant Integration
 
+## 🔒 **FIRMWARE COMPATIBILITY**
+
+**✅ Works (I hope) with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
+- **Firmware 61840+**: Uses modern varserver (FCGI) endpoints with cookie-based authentication
+- **Older firmware**: Falls back to legacy dl_cgi endpoints (no authentication required)
+
+**⚠️ TESTING STATUS**:
+- **Old firmware (< 61840)**: ✅ **Tested and working** on developer's production system
+- **New firmware (61840+)**: ⚠️ **COMPLETELY UNTESTED** - Authentication and varserver support built from SunStrong's code.
+
+- **Help wanted**: If you have firmware 61840+, please test and report back!  Developer waiting for firmware update to validate. When reporting please report with logs and current version of the integration you are running, in an attempt to fix this sadly I have pushed more versions than I should have. 
+
+
+**⚠️ IMPORTANT**: PVS serial number (last 5 characters) now **required** during setup for firmware 61840+ authentication, existing users please be pro-active and enter your serial number now.
+
+---
 
  **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
-
-> ## 🔒 **NEW FIRMWARE AUTHENTICATION is having some problems, sorry I am trying to fix this now. Even today SunStrong patched some stuff with authentication in their pypvs library.
-> **This integration is prepared for SunPower's upcoming firmware authentication requirements but remains UNTESTED with the new firmware.** If you are selected for the firmware update, please contact me immediately if you encounter any issues please open an issue here:  [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
-
- **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)**
 
  **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
@@ -20,7 +31,7 @@
 
 > [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) <-- Why not sponsor me, even a few bucks shows you appreciate the work and gives encouragement. You can sponser me monthly, or just a one time thing. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) while you're here. 
 
-> **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with intelligent solar optimization, comprehensive PVS protection, individual inverter health monitoring, automatic route repair and sunrise/sunset elevation control.
+> **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with simplified 24/7 polling, comprehensive PVS protection, individual inverter health monitoring, and authentication support.
 
 > ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository to help other SunPower owners discover these improvements!
 > 
@@ -32,11 +43,11 @@
 
 **Core Improvements:**
 - **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
-- **Sunrise/Sunset Elevation Control**: Separate thresholds for morning and evening optimization - perfect for east/west-facing panels
+- **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI. 
 - **Diagnostic Dashboard**: 8 sensors tracking integration reliability and performance
-- **Automatic Route Setup/Repair**: Sets up and fixes lost network routes for VLAN setups
+- **Authentication Ready**: Supports SunPower's new firmware authentication requirements
 - **PVS Hardware Protection**: Built-in throttling (300s minimum), health checking, and intelligent backoff
 
 **Technical Enhancements:**
@@ -66,17 +77,16 @@
 
 **Disclaimers:**
 - Extensively tested on a 30-panel SunPower system **without batteries**. Battery system users welcome to test and provide feedback.
-- You assume all risk using this integration. It accesses unofficial PVS APIs not intended for continuous monitoring.
 
 ## Installation
 
 ### Requirements
 
 **STRONGLY RECOMMENDED: Install during daylight hours**
-- Sun elevation must be above configured threshold for proper validation
+- Inverters are powered by the sun and offline at night
 - Integration validates real PVS connection during setup process
 
-### Upgrading from Original SunPower Integration
+### Upgrading from Original Keith Baker (krbaker) SunPower Integration
 
 **⚠️ This upgrade is a one-way process** - backup recommended before proceeding.
 
@@ -132,23 +142,19 @@
 ![Notifications Configuration](images/config_pg3.png)
 
 ### Setup Process
-1. **Page 1**: Enter PVS IP address, polling intervals, and route gateway IP for VLAN's
-2. **Page 2**: Configure sunrise/sunset elevation thresholds and naming preferences
-3. **Page 3**: Set flash memory threshold, notification preferences, and mobile device
+1. **Page 1**: Enter PVS IP address, polling interval, and PVS serial number for authentication
+2. **Page 2**: Set flash memory threshold, notification preferences, and mobile device
+
+*Note: Descriptive names are automatically enabled for better energy dashboard integration.*
 
 ### Configuration Options
 
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
 | **Host** | PVS IP Address | N/A | `172.27.153.1` |
-| **Polling Interval** | Daytime update frequency (seconds) | 300 | 300-600 seconds |
-| **Nighttime Polling** | Nighttime update frequency (seconds) | 0 (disabled) | 0 = disabled, 300-1800 seconds |
-| **Gateway IP** | Route repair (leave empty to disable) | `` | Your router IP for VLAN setups |
+| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (20s min for battery systems, per SunStrong guidance) |
 | **PVS Serial (last 5)** | Authentication for PVS6 firmware 61840+ | `` | See guide below |
-| **Sunrise Elevation** | Start polling threshold | 5° | See guide below |
-| **Sunset Elevation** | Stop polling threshold | 5° | See guide below |
-| **Use Descriptive Names** | Show detailed inverter names | `true` | Enable for energy dashboard |
-| **Use Product Names** | Add 'SunPower' prefix | `false` | Personal preference |
+| **Descriptive Names** | Show detailed inverter names | `true` | Automatically enabled for energy dashboard |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
 | **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
 | **Email Recipient** | Override recipient address | `` | Leave empty for service default |
@@ -173,45 +179,45 @@
 - **Zero Impact**: Adding your serial number now prepares for the future without affecting current operation
 
 **Authentication Details:**
-- **Username**: `ssm_owner` (hardcoded by SunPower)
+- **Username**: `ssm_owner` (configured by SunStrong Management)
 - **Password**: Last 5 characters of your PVS serial number
 - **Coverage**: Applied to both main device polling and battery system endpoints
 - **Error Handling**: Clear messages when authentication fails or serial number needed
 
-### Nighttime Polling
+### Polling Configuration
 
-**New Feature**: Configure separate polling intervals for day and night to optimize consumption monitoring:
+**Simplified Architecture**: Single consistent polling interval for reliable 24/7 monitoring:
 
 **Use Cases:**
-- **Granular consumption tracking**: Monitor overnight usage patterns every 10-15 minutes
-- **PVS resource optimization**: Reduce polling frequency when solar panels aren't producing
-- **Home automation**: Track appliance usage, HVAC cycles, and standby power consumption
+- **Continuous monitoring**: Track both solar production and consumption throughout the day
+- **PVS hardware protection**: 300-second minimum protects against overloading
+- **Battery support**: Automatic detection and monitoring of SunVault systems
+- **Home automation**: Reliable data for automations and energy tracking
 
-**Configuration Examples:**
-- **Disabled (default)**: Day 5 min, Night disabled (0) - traditional solar-only monitoring
-- **High-resolution monitoring**: Day 5 min, Night 10 min (detailed consumption tracking)
-- **Balanced approach**: Day 5 min, Night 15 min (good detail without overloading PVS)
-- **Conservative setup**: Day 10 min, Night 30 min (minimal PVS load)
+**Configuration:**
+- **Standard setup**: 300 seconds (5 minutes) - recommended default balancing data freshness with hardware protection
+- **Faster updates**: 10-60 seconds for frequent data updates (preparing for varserver capabilities)
+- **Conservative setup**: 600-3600 seconds for minimal PVS load
+- **Battery systems**: 20-second minimum (per SunStrong guidance for less aggressive polling)
 
-**Requirements:**
-- Set to 0 to disable nighttime polling (reverts to cached data behavior)
-- Set to 300+ seconds to enable continuous consumption monitoring
-- Solar/inverter data collection respects sunrise/sunset elevation settings
-- Battery systems are automatically detected - no manual configuration needed
-
-### Sunrise/Sunset Elevation Guide
-
-**Panel Orientation Optimization:**
-- **East-facing panels**: Sunrise 1°, Sunset 15° (early morning start, standard evening stop)
-- **West-facing panels**: Sunrise 15°, Sunset 1° (standard morning start, late evening stop)  
-- **Mixed installation**: Sunrise 7°, Sunset 7° (balanced for mixed orientations)
-- **Maximum coverage**: Both at 1° (dawn-to-dusk polling for maximum generation capture)
-- **Standard residential**: Both at 10° (typical residential setup)
+**SunStrong Recommendations:**
+- **Battery systems**: Use less aggressive polling intervals to reduce system load
+- **Non-battery systems**: 10-second minimum supported for future varserver compatibility
+- **Current default**: 300 seconds maintained for proven stability
 
 **Benefits:**
-- Precision control optimizes for your specific panel layout
-- Reduces unnecessary polling during non-productive periods
-- Integration automatically uses appropriate threshold based on time of day
+- Consistent behavior - no complex day/night mode switching
+- Simpler troubleshooting - predictable polling schedule
+- Better battery support - continuous monitoring with appropriate intervals
+- Hardware protection - built-in minimums prevent system overload
+- Future-ready - prepared for varserver's faster capabilities
+
+**Performance Considerations:**
+- **Faster polling (10-60s)**: Significantly increases Home Assistant database size - 10s polling creates 30x more data than 300s polling
+- **Database growth**: With ~50 solar entities, 10s polling generates ~180,000 database entries per hour vs 600 entries with 300s polling
+- **Hardware impact**: Larger databases slow performance on Raspberry Pi systems, affect backup times, and increase storage requirements
+- **Standard polling (300s)**: Recommended default balances data freshness with manageable database size
+- **Conservative polling (600-3600s)**: Minimal database growth, ideal for basic monitoring and slower hardware
 
 ## Available Data
 
@@ -232,10 +238,11 @@
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
 
 ### Individual Inverter Health Monitoring
-- Status for each inverter with smart adaptation
-- Failure detection when inverters stop reporting (5+ consecutive polls)
-- Recovery notifications when failed inverters return online
-- Performance tracking and temperature warnings
+- **24-Hour Persistent Error Tracking**: Only alerts after 24+ hours of continuous problems, eliminating false positives
+- **Batched Notifications**: Multiple inverter issues grouped into single notification instead of spam
+- **Smart Recovery Detection**: Automatic notifications when persistent issues resolve after extended periods
+- **Context-Aware Monitoring**: Understands normal inverter dormancy (nighttime STATE="error") vs actual hardware failures
+- **Gmail Rate Limit Protection**: Prevents overwhelming email services with notification floods
 
 ### Diagnostic Dashboard
 - **Poll Success Rate**: Real-time percentage of successful PVS polls
@@ -245,7 +252,6 @@
 - **Average Response Time**: PVS performance monitoring
 - **Active Inverters**: Count of responding inverters
 - **PVS Uptime**: System availability tracking
-- **Route Repairs**: Counter tracking automatic route fixes (when enabled)
 
 ![Diagnostic Sensors](images/diagnostic_sensors.png)
 
@@ -256,7 +262,7 @@ Multi-channel notification system:
 ![Debug Notifications](images/debug_notifications.png)
 
 **Notification Channels:**
-- Setup, Day/Night, Polling, Health, Inverter, Route status
+- Setup, Polling, Health, Inverter status
 - Mobile notifications with smart fallback to persistent notifications
 - Email notifications for critical alerts (PVS offline, inverter failures, flash memory critical)
 
@@ -353,8 +359,8 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 - **Equipment maintenance** - Temperature monitoring, MPPT analysis, inverter health tracking
 - **Solar-specific metrics** - Frequency analysis, power factor, voltage regulation
 - **System reliability** - Integration performance and diagnostic monitoring
-- **Network troubleshooting** - Route status and automatic setup/repair capabilities
-- **Sunrise/sunset optimization** - Panel-specific polling schedules
+- **Network troubleshooting** - Connection monitoring and diagnostic capabilities
+- **Simplified polling** - Consistent 24/7 monitoring
 
 **Why Separate Monitoring Systems?**
 
@@ -372,23 +378,18 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 - Inverter health tracking (individual panel monitoring)
 - MPPT monitoring (DC-side performance analysis)
 - Integration reliability (diagnostic dashboard monitoring)
-- Network intelligence (route detection, setup, and repair)
-- Panel optimization (sunrise/sunset elevation control)
+- Network intelligence (connection monitoring and diagnostics)
+- Simplified 24/7 polling
 
 **Together:** Complete solar installation monitoring from grid-level accuracy down to individual panel performance, network connectivity, and panel-specific scheduling.
 
-**Polling Frequency:** Enhanced SunPower polls every 5-10 minutes (300-600 seconds), which is perfectly adequate for energy statistics and equipment monitoring. This protects your PVS hardware while providing comprehensive solar system insights.
+**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals (20s minimum for battery systems per SunStrong guidance), with a conservative 300-second default. Fast polling capabilities prepare for upcoming varserver migration while maintaining hardware protection.
 
 ## Network Setup
 
-**CRITICAL**: The PVS LAN port runs its own DHCP/DNS services and **MUST BE ISOLATED** from your main network to prevent conflicts.
+**Simple Setup:** With authentication support, the integration can connect directly to your PVS using its standard IP address (typically `172.27.153.1`). No special network isolation or proxy setup required.
 
-**Community Solutions:**
-- **VLAN Isolation** (Recommended for managed switches) - Auto route setup/repair supported
-- **Raspberry Pi Proxy** (Popular community solution)
-- **Dedicated Network Interface** (Direct connection approach)
-
-**For detailed network setup guidance**, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
+**For legacy systems or troubleshooting**, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
 
 ## Troubleshooting
 
@@ -437,4 +438,4 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 
 ---
 
-**Enjoying reliable SunPower monitoring with intelligent solar optimization, sunrise/sunset elevation control, mobile alerts, individual inverter health tracking, automatic route setup/repair, and diagnostic dashboard monitoring? Consider starring this repository to help others find these improvements!**
+**Enjoying reliable SunPower monitoring with simplified 24/7 polling, mobile alerts, individual inverter health tracking, authentication support, and diagnostic dashboard monitoring? Consider starring this repository to help others find these improvements!**

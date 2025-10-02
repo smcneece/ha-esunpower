@@ -1,4 +1,4 @@
-"""SunPower SunVault Battery System Handler - WITH EXTRACTED CONSTANTS"""
+"""SunPower SunVault Battery System Handler"""
 
 import logging
 import time
@@ -27,9 +27,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# ==========================================
-# EXTRACTED BATTERY CONSTANTS FROM const.py
-# ==========================================
+# Battery sensor definitions - kept here to avoid bloating const.py for solar-only systems
 
 SUNVAULT_BINARY_SENSORS = {
     HUBPLUS_DEVICE_TYPE: {
@@ -343,70 +341,14 @@ SUNVAULT_SENSORS = {
             },
         },
     },
-    "Battery": {
-        "unique_id": "battery_actual",
-        "sensors": {
-            "BATTERY_AMPERAGE": {
-                "field": "battery_amperage",
-                "title": "{SUN_VAULT}Battery {index}Amps",
-                "unit": UnitOfElectricCurrent.AMPERE,
-                "icon": "mdi:flash",
-                "device": SensorDeviceClass.CURRENT,
-                "state": SensorStateClass.MEASUREMENT,
-            },
-            "BATTERY_VOLTAGE": {
-                "field": "battery_voltage",
-                "title": "{SUN_VAULT}Battery {index}Voltage",
-                "unit": UnitOfElectricPotential.VOLT,
-                "icon": "mdi:flash",
-                "device": SensorDeviceClass.VOLTAGE,
-                "state": SensorStateClass.MEASUREMENT,
-            },
-            "BATTERY_TEMPERATURE": {
-                "field": "temperature",
-                "title": "{SUN_VAULT}Battery {index}Temperature",
-                "unit": UnitOfTemperature.CELSIUS,
-                "icon": "mdi:thermometer",
-                "device": SensorDeviceClass.TEMPERATURE,
-                "state": SensorStateClass.MEASUREMENT,
-                "entity_category": EntityCategory.DIAGNOSTIC,
-            },
-            "BATTERY_CUSTOMER_STATE_OF_CHARGE": {
-                "field": "customer_state_of_charge",
-                "title": "{SUN_VAULT}Battery {index}Customer State of Charge",
-                "unit": PERCENTAGE,
-                "icon": "mdi:battery-charging-100",
-                "device": None,
-                "state": SensorStateClass.MEASUREMENT,
-            },
-            "BATTERY_SYSTEM_STATE_OF_CHARGE": {
-                "field": "system_state_of_charge",
-                "title": "{SUN_VAULT}Battery {index}System State of Charge",
-                "unit": PERCENTAGE,
-                "icon": "mdi:battery-charging-100",
-                "device": None,
-                "state": SensorStateClass.MEASUREMENT,
-                "entity_category": EntityCategory.DIAGNOSTIC,
-            },
-        },
-    },
 }
 
 
-# ==========================================
-# EXISTING BATTERY HANDLER FUNCTIONS
-# ==========================================
 
 def convert_ess_data(ess_data, data):
-    """Integrate ESS data from its unique data source into the PVS data
-
-    FIXED: Handle mismatched serial numbers between DeviceList and ESS endpoints.
-    Instead of trying to merge data into physical battery devices (which have different serials),
-    we create virtual battery devices from ESS data and aggregate into SunVault.
-    """
+    """Integrate ESS data from its unique data source into the PVS data"""
     # Safety check for ESS data structure
     if not ess_data or "ess_report" not in ess_data:
-        _LOGGER.error("❌ BATTERY DEBUG: Invalid ESS data structure: ess_data=%s", type(ess_data).__name__ if ess_data else "None")
         return data
 
     ess_report = ess_data["ess_report"]
@@ -423,40 +365,18 @@ def convert_ess_data(ess_data, data):
     # Process battery status from ESS endpoint
     battery_status_list = ess_report.get("battery_status", [])
 
-    # Only log detailed info if there's a problem (no battery data or processing fails)
     if not battery_status_list:
-        _LOGGER.error("❌ BATTERY DEBUG: No battery_status entries found in ESS data")
-        _LOGGER.error("   ESS report keys: %s", list(ess_report.keys()))
         return data
-
-    # Validate Max's specific data structure (BC212200611033751040 serial)
-    max_bms_serial = "BC212200611033751040"
-    for i, battery in enumerate(battery_status_list):
-        battery_serial = battery.get("serial_number", "")
-        if battery_serial == max_bms_serial:
-            _LOGGER.error("❌ BATTERY DEBUG: Found Max's BMS serial %s in battery_status[%d]", max_bms_serial, i)
-            _LOGGER.error("   Battery data keys: %s", list(battery.keys()))
-            _LOGGER.error("   SOC structure: %s", battery.get("customer_state_of_charge", "missing"))
-            _LOGGER.error("   Voltage structure: %s", battery.get("battery_voltage", "missing"))
-            _LOGGER.error("   Temperature structure: %s", battery.get("temperature", "missing"))
-            break
 
     for i, device in enumerate(battery_status_list):
         try:
             battery_serial = device.get("serial_number", f"unknown_battery_{i}")
-            # Only log processing details if debugging is needed - removed verbose logging
-
-            # Create virtual battery device from ESS data instead of trying to match serials
-            # This handles the mismatch between physical battery serials (M00...) and BMS serial (BC...)
-            # Safe string slicing - ensure we have at least 6 chars, otherwise use full serial
             serial_suffix = battery_serial[-6:] if len(battery_serial) >= 6 else battery_serial
             virtual_battery_serial = f"ess_battery_{i}_{serial_suffix}"
 
-            # Initialize virtual battery device
             if BATTERY_DEVICE_TYPE not in data:
                 data[BATTERY_DEVICE_TYPE] = {}
 
-            # Safely extract values with defaults
             battery_amperage = device.get("battery_amperage", {}).get("value", 0)
             battery_voltage = device.get("battery_voltage", {}).get("value", 0)
             customer_soc = device.get("customer_state_of_charge", {}).get("value", 0)
@@ -469,7 +389,7 @@ def convert_ess_data(ess_data, data):
                 "customer_state_of_charge": customer_soc,
                 "system_state_of_charge": system_soc,
                 "temperature": temperature,
-                "STATE": "working",  # ESS data doesn't provide state, assume working
+                "STATE": "working",
                 "SERIAL": virtual_battery_serial,
                 "SWVER": "ESS",
                 "HWVER": "ESS",
@@ -477,11 +397,6 @@ def convert_ess_data(ess_data, data):
                 "MODEL": "ESS Battery",
                 "DEVICE_TYPE": BATTERY_DEVICE_TYPE
             }
-
-            # Track virtual device creation success
-            virtual_device_created = True
-
-            # Aggregate for SunVault virtual device using safely extracted values
             sunvault_amperages.append(battery_amperage)
             sunvault_voltages.append(battery_voltage)
             sunvault_temperatures.append(temperature)
@@ -503,25 +418,18 @@ def convert_ess_data(ess_data, data):
             _LOGGER.error("Failed to process ESS battery %d: %s", i, e)
             continue  # Skip this battery but continue with others
 
-    # Process ESS status - handle potential serial mismatches
+    # Process ESS status
     ess_status_list = ess_report.get("ess_status", [])
-    _LOGGER.debug("Processing %d ESS status entries from ESS endpoint", len(ess_status_list))
 
     for i, device in enumerate(ess_status_list):
         try:
             ess_serial = device.get("serial_number", f"unknown_ess_{i}")
-            _LOGGER.debug("Processing ESS device %d with serial: %s", i, ess_serial)
 
-            # Try to find matching ESS device in DeviceList data, but create virtual if not found
             if ESS_DEVICE_TYPE in data and ess_serial in data[ESS_DEVICE_TYPE]:
-                # Direct match found, use existing device
                 target_device = data[ESS_DEVICE_TYPE][ess_serial]
             else:
-                # No match or no ESS devices, create virtual ESS device
-                # Safe string slicing - ensure we have at least 8 chars, otherwise use full serial
                 serial_suffix = ess_serial[-8:] if len(ess_serial) >= 8 else ess_serial
                 virtual_ess_serial = f"ess_virtual_{i}_{serial_suffix}"
-                _LOGGER.debug("Creating virtual ESS device: %s (original: %s)", virtual_ess_serial, ess_serial)
 
                 if ESS_DEVICE_TYPE not in data:
                     data[ESS_DEVICE_TYPE] = {}
@@ -536,12 +444,9 @@ def convert_ess_data(ess_data, data):
                     "DEVICE_TYPE": ESS_DEVICE_TYPE
                 }
                 target_device = data[ESS_DEVICE_TYPE][virtual_ess_serial]
-
-            # Safely populate ESS data with defaults
             target_device["enclosure_humidity"] = device.get("enclosure_humidity", {}).get("value", 0)
             target_device["enclosure_temperature"] = device.get("enclosure_temperature", {}).get("value", 0)
 
-            # Handle nested ess_meter_reading structure safely
             meter_reading = device.get("ess_meter_reading", {})
             target_device["agg_power"] = meter_reading.get("agg_power", {}).get("value", 0)
 
@@ -555,30 +460,21 @@ def convert_ess_data(ess_data, data):
             target_device["meter_b_power"] = meter_b.get("power", {}).get("value", 0)
             target_device["meter_b_voltage"] = meter_b.get("voltage", {}).get("value", 0)
 
-            _LOGGER.debug("Processed ESS device: %s (Power: %.3f kW)",
-                         target_device.get("SERIAL", "unknown"), target_device["agg_power"])
-
         except Exception as e:
             _LOGGER.error("Failed to process ESS device %d: %s", i, e)
             continue  # Skip this ESS device but continue with others
 
-    # Process HubPlus status - handle potential serial mismatches
+    # Process HubPlus status
     if "hub_plus_status" in ess_report:
         try:
             device = ess_report["hub_plus_status"]
             hubplus_serial = device.get("serial_number", "unknown_hubplus")
-            _LOGGER.debug("Processing HubPlus device with serial: %s", hubplus_serial)
 
-            # Try to find matching HubPlus device in DeviceList data, but create virtual if not found
             if HUBPLUS_DEVICE_TYPE in data and hubplus_serial in data[HUBPLUS_DEVICE_TYPE]:
-                # Direct match found, use existing device
                 target_device = data[HUBPLUS_DEVICE_TYPE][hubplus_serial]
             else:
-                # No match or no HubPlus devices, create virtual HubPlus device
-                # Safe string slicing - ensure we have at least 8 chars, otherwise use full serial
                 serial_suffix = hubplus_serial[-8:] if len(hubplus_serial) >= 8 else hubplus_serial
                 virtual_hubplus_serial = f"hubplus_virtual_{serial_suffix}"
-                _LOGGER.debug("Creating virtual HubPlus device: %s (original: %s)", virtual_hubplus_serial, hubplus_serial)
 
                 if HUBPLUS_DEVICE_TYPE not in data:
                     data[HUBPLUS_DEVICE_TYPE] = {}
@@ -593,8 +489,6 @@ def convert_ess_data(ess_data, data):
                     "DEVICE_TYPE": HUBPLUS_DEVICE_TYPE
                 }
                 target_device = data[HUBPLUS_DEVICE_TYPE][virtual_hubplus_serial]
-
-            # Safely populate HubPlus data with defaults
             target_device["contactor_position"] = device.get("contactor_position", "UNKNOWN")
             target_device["grid_frequency_state"] = device.get("grid_frequency_state", "UNKNOWN")
             target_device["grid_phase1_voltage"] = device.get("grid_phase1_voltage", {}).get("value", 0)
@@ -609,18 +503,12 @@ def convert_ess_data(ess_data, data):
             target_device["load_voltage_state"] = device.get("load_voltage_state", "UNKNOWN")
             target_device["main_voltage"] = device.get("main_voltage", {}).get("value", 0)
 
-            _LOGGER.debug("Processed HubPlus device: %s (Grid V1: %.1f, V2: %.1f)",
-                         target_device.get("SERIAL", "unknown"),
-                         target_device["grid_phase1_voltage"], target_device["grid_phase2_voltage"])
-
         except Exception as e:
             _LOGGER.error("Failed to process HubPlus device: %s", e)
 
-    # Create SunVault aggregation device only if we have battery data
-    if sunvault_amperages:  # Only create if we have battery data
-        # Generate a usable serial number for this virtual device, use PVS serial as base
-        # since we must be talking through one and it has a serial
-        pvs_serial = next(iter(data[PVS_DEVICE_TYPE]))  # only one PVS
+    # Create SunVault aggregation device if we have battery data
+    if sunvault_amperages:
+        pvs_serial = next(iter(data[PVS_DEVICE_TYPE]))
         sunvault_serial = f"sunvault_{pvs_serial}"
 
         if SUNVAULT_DEVICE_TYPE not in data:
@@ -643,15 +531,11 @@ def convert_ess_data(ess_data, data):
             "MODEL": "Virtual SunVault",
             "DEVICE_TYPE": SUNVAULT_DEVICE_TYPE
         }
-        _LOGGER.debug("Created SunVault aggregation device: %s with %d batteries", sunvault_serial, len(sunvault_amperages))
-    else:
-        _LOGGER.debug("No battery data found, skipping SunVault aggregation device creation")
     return data
 
 
 def get_battery_configuration(entry, cache):
     """Auto-detect battery configuration from PVS data"""
-    # Auto-detection from cache if available
     has_battery_from_data = False
     if hasattr(cache, 'previous_pvs_sample') and cache.previous_pvs_sample and "devices" in cache.previous_pvs_sample:
         has_battery_from_data = any(
@@ -659,36 +543,30 @@ def get_battery_configuration(entry, cache):
             for device in cache.previous_pvs_sample.get("devices", [])
         )
 
-    _LOGGER.debug("Battery auto-detection: detected=%s", has_battery_from_data)
-
-    return has_battery_from_data, False  # Return (detected, legacy_user_setting)
+    return has_battery_from_data, False
 
 
 def reset_battery_failure_tracking(cache):
     """Reset battery failure tracking on HA restart"""
     if not hasattr(cache, '_restart_handled'):
-        _LOGGER.debug("Fresh HA start detected, resetting battery failure tracking")
         cache.battery_detection_failures = 0
         cache.battery_warning_sent = False
         cache._restart_handled = True
 
 
 def handle_battery_detection_and_warnings(hass, entry, data, cache, safe_notify, user_has_battery):
-    """Handle battery detection and send warnings if needed - SIMPLIFIED"""
+    """Handle battery detection and send warnings if needed"""
     if not user_has_battery:
-        return  # User doesn't expect batteries, skip checking
-    
-    # Check if we successfully got battery data when user expects it
+        return
+
     current_battery_detected = any(
         device.get("DEVICE_TYPE") in ("ESS", "Battery", "ESS BMS", "Energy Storage System")
         for device in data.get("devices", [])
     )
-    
+
     if not current_battery_detected:
         cache.battery_detection_failures += 1
-        _LOGGER.debug("Battery detection failure #%d", cache.battery_detection_failures)
-        
-        # After 3 failed attempts, send warning (bypasses notification toggle)
+
         if cache.battery_detection_failures >= 3 and not cache.battery_warning_sent:
             warning_msg = (
                 "⚠️ SunVault Battery Detection Issue\n\n"
@@ -702,14 +580,9 @@ def handle_battery_detection_and_warnings(hass, entry, data, cache, safe_notify,
             )
             safe_notify(hass, warning_msg, "SunPower Battery Warning", entry, force_notify=True, cache=cache)
             cache.battery_warning_sent = True
-            _LOGGER.warning("Battery detection failed %d times, sent user warning", cache.battery_detection_failures)
     else:
-        # Reset failure tracking if we successfully detect batteries
         if cache.battery_detection_failures > 0:
-            _LOGGER.info("Battery detection successful after %d previous failures", cache.battery_detection_failures)
             cache.battery_detection_failures = 0
             cache.battery_warning_sent = False
 
 
-# SIMPLIFIED MAIN FUNCTIONS ONLY - REMOVED DUPLICATE FALLBACKS
-# All functions now handle both battery and non-battery systems gracefully
