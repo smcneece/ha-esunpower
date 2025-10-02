@@ -1,8 +1,9 @@
 # Enhanced SunPower Home Assistant Integration
 
+
  **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
-> ## 🔒 **NEW FIRMWARE AUTHENTICATION READY**
+> ## 🔒 **NEW FIRMWARE AUTHENTICATION is having some problems, sorry I am trying to fix this now. Even today SunStrong patched some stuff with authentication in their pypvs library.
 > **This integration is prepared for SunPower's upcoming firmware authentication requirements but remains UNTESTED with the new firmware.** If you are selected for the firmware update, please contact me immediately if you encounter any issues please open an issue here:  [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 
  **Also if you have battery system hold off installing this until some bugs are worked out unless you would be interested in helping beta test (Sept 24 2025, I'll remove this warning when it is fixed)**
