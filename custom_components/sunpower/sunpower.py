@@ -29,9 +29,9 @@ class SunPowerMonitor:
             # Generate Basic Auth header for ssm_owner:password
             import base64
             auth_string = f"ssm_owner:{auth_password}"
-            auth_bytes = auth_string.encode('ascii')
-            auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
-            self._auth_header = f"Basic {auth_b64}"
+            auth_bytes = auth_string.encode('utf-8')
+            auth_b64 = base64.b64encode(auth_bytes).decode('utf-8')
+            self._auth_header = f"basic {auth_b64}"
 
     async def generic_command_async(self, command):
         """All 'commands' to the PVS module use this url pattern and return json
@@ -56,14 +56,20 @@ class SunPowerMonitor:
                             async with session.get(url, headers=headers) as auth_response:
                                 if auth_response.status in [401, 403]:
                                     raise ConnectionException("Authentication failed - check PVS serial number")
-                                text = await auth_response.text()
-                                return simplejson.loads(text)
+                                elif auth_response.status == 200:
+                                    text = await auth_response.text()
+                                    return simplejson.loads(text)
+                                else:
+                                    raise ConnectionException(f"PVS returned HTTP {auth_response.status}")
                         else:
                             raise ConnectionException("Authentication required but no PVS serial provided")
-                    else:
+                    elif response.status == 200:
                         # Success without authentication
                         text = await response.text()
                         return simplejson.loads(text)
+                    else:
+                        # Other HTTP error
+                        raise ConnectionException(f"PVS returned HTTP {response.status}")
         except aiohttp.ClientError as error:
             raise ConnectionException from error
         except simplejson.errors.JSONDecodeError as error:
@@ -146,14 +152,20 @@ class SunPowerMonitor:
                             async with session.get(url, headers=headers) as auth_response:
                                 if auth_response.status in [401, 403]:
                                     raise ConnectionException("Authentication failed for ESS endpoint - check PVS serial number")
-                                text = await auth_response.text()
-                                return simplejson.loads(text)
+                                elif auth_response.status == 200:
+                                    text = await auth_response.text()
+                                    return simplejson.loads(text)
+                                else:
+                                    raise ConnectionException(f"PVS ESS endpoint returned HTTP {auth_response.status}")
                         else:
                             raise ConnectionException("Authentication required for ESS endpoint but no PVS serial provided")
-                    else:
+                    elif response.status == 200:
                         # Success without authentication
                         text = await response.text()
                         return simplejson.loads(text)
+                    else:
+                        # Other HTTP error
+                        raise ConnectionException(f"PVS ESS endpoint returned HTTP {response.status}")
         except aiohttp.ClientError as error:
             raise ConnectionException from error
         except simplejson.errors.JSONDecodeError as error:

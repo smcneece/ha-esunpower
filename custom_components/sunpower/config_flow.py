@@ -163,7 +163,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             ),
             vol.Optional("route_gateway_ip", default=""): str,
-            vol.Optional("pvs_serial_last5", default=""): str,
+            vol.Required("pvs_serial_last5"): str,
         })
 
         return self.async_show_form(
@@ -381,7 +381,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             ),
             vol.Optional("route_gateway_ip", default=current_route_gateway_ip): str,
-            vol.Optional("pvs_serial_last5", default=current_pvs_serial): str,
+            vol.Required("pvs_serial_last5", default=current_pvs_serial): str,
         })
 
         return self.async_show_form(
