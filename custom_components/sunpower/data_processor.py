@@ -1,7 +1,7 @@
 """SunPower Data Processing Module - FINAL (No Coordinator References)
 
 This module handles all data conversion and validation logic:
-- Raw PVS JSON → Structured device data  
+- Raw PVS JSON → Structured device data
 - Virtual meter creation from inverter data (IP-safe)
 - Comprehensive data validation and error handling
 - Complete IP address detection across all ranges

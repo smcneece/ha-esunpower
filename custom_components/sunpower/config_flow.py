@@ -5,6 +5,10 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from pypvs.pvs import PVS
+from pypvs.exceptions import PVSError
 
 from .const import DOMAIN, DEFAULT_SUNPOWER_UPDATE_INTERVAL, MIN_SUNPOWER_UPDATE_INTERVAL
 from .sunpower import SunPowerMonitor, ConnectionException, ParseException
@@ -62,81 +66,152 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Don't fail setup if battery detection fails
             _LOGGER.debug("Battery detection failed during setup: %s", e)
 
-    async def _test_pvs_connection(self, host, pvs_serial_last5=None):
-        """Test PVS connection and validate real device data during setup"""
-        try:
-            _LOGGER.info("Setup validation: Testing PVS connection to %s", host)
+    async def _get_supervisor_info(self, host):
+        """Auto-detect PVS serial and firmware build from supervisor/info endpoint
 
-            # Create monitor with authentication if serial provided
-            monitor = SunPowerMonitor(host, auth_password=pvs_serial_last5)
-            
-            # Test with reasonable timeout for setup
-            try:
-                device_data = await asyncio.wait_for(
-                    monitor.device_list_async(),
-                    timeout=30.0  # 30 second timeout for setup
-                )
-            except asyncio.TimeoutError:
-                _LOGGER.warning("Setup validation: PVS connection timeout after 30 seconds")
-                return False, "Connection timeout - PVS did not respond within 30 seconds"
-            
-            # Validate response structure
-            if not device_data:
-                _LOGGER.warning("Setup validation: PVS returned empty data")
-                return False, "PVS returned empty response"
-            
-            if not isinstance(device_data, dict):
-                _LOGGER.warning("Setup validation: PVS returned invalid data type: %s", type(device_data))
-                return False, f"PVS returned invalid data type: {type(device_data)}"
-            
-            if "devices" not in device_data:
-                _LOGGER.warning("Setup validation: PVS response missing 'devices' key")
-                return False, "PVS response missing device data"
-            
-            devices = device_data.get("devices", [])
-            if not devices:
-                _LOGGER.warning("Setup validation: PVS returned no devices")
-                return False, "PVS returned no devices"
-            
-            device_count = len(devices)
-            _LOGGER.info("Setup validation: PVS returned %d devices", device_count)
-            
-            # Validate we have minimum device count (at least 3: PVS + 1 inverter + optional meter)
-            if device_count < 3:
-                _LOGGER.warning("Setup validation: Too few devices: %d", device_count)
-                return False, f"Only {device_count} devices found - need at least PVS + 1 inverter (minimum 3 devices)"
-            
-            # Validate we have required device types
-            device_types = [device.get("DEVICE_TYPE") for device in devices]
-            has_pvs = any(dt == "PVS" for dt in device_types)
-            has_inverters = any(dt == "Inverter" for dt in device_types)
-            
-            if not has_pvs:
-                _LOGGER.warning("Setup validation: No PVS device found in response")
-                return False, "No PVS supervisor device found"
-            
-            if not has_inverters:
-                _LOGGER.warning("Setup validation: No inverter devices found in response")
-                return False, "No solar inverters found"
-            
-            # Count device types for user feedback
-            inverter_count = sum(1 for dt in device_types if dt == "Inverter")
-            meter_count = sum(1 for dt in device_types if dt == "Power Meter")
-            
-            _LOGGER.info("Setup validation: SUCCESS - Found %d inverters, %d meters, 1 PVS", 
-                        inverter_count, meter_count)
-            
-            return True, f"Connection successful! Found {inverter_count} inverters, {meter_count} meters, and PVS supervisor"
-            
-        except (ConnectionException, ParseException) as e:
-            _LOGGER.warning("Setup validation: PVS connection failed: %s", e)
-            return False, f"Cannot connect to PVS: {str(e)}"
+        Returns:
+            Tuple of (serial, build, last5, error_message)
+        """
+        import aiohttp
+
+        try:
+            url = f"http://{host}/cgi-bin/dl_cgi/supervisor/info"
+            timeout = aiohttp.ClientTimeout(total=30)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        supervisor = data.get("supervisor", {})
+
+                        serial = supervisor.get("SERIAL")
+                        build = supervisor.get("BUILD")
+
+                        if serial and build:
+                            last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
+                            _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s, Last5=%s", serial, build, last5)
+                            return serial, build, last5, None
+                        else:
+                            return None, None, None, "supervisor/info missing SERIAL or BUILD"
+                    else:
+                        return None, None, None, f"supervisor/info HTTP {response.status}"
+
         except Exception as e:
-            _LOGGER.error("Setup validation: Unexpected error: %s", e)
-            return False, f"Setup validation failed: {str(e)}"
+            _LOGGER.warning("supervisor/info request failed: %s", e)
+            return None, None, None, str(e)
+
+    async def _validate_pvs(self, host):
+        """Validate PVS connection using supervisor/info for auto-detection
+
+        Uses supervisor/info to:
+        1. Auto-detect full serial number
+        2. Extract firmware BUILD number
+        3. Determine if new firmware (BUILD >= 61840) or old firmware
+        4. Auto-extract last 5 chars of serial for password
+
+        Returns:
+            Tuple of (serial, uses_pypvs, last5, build, error_message)
+        """
+        # Step 1: Get supervisor info for auto-detection
+        serial, build, last5, error = await self._get_supervisor_info(host)
+
+        if error:
+            _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error)
+            # Fallback to legacy detection without BUILD number
+            return await self._validate_pvs_legacy(host)
+
+        # Step 2: Determine firmware type based on BUILD number (PR #127 approach)
+        MIN_LOCALAPI_BUILD = 61840
+        uses_pypvs = build >= MIN_LOCALAPI_BUILD
+
+        _LOGGER.info("🔍 PVS Firmware Detected: BUILD=%s, Method=%s, Serial=%s, Password=%s",
+                    build, "pypvs (LocalAPI)" if uses_pypvs else "dl_cgi (legacy)", serial, last5)
+
+        # Step 3: Validate the chosen method works
+        if uses_pypvs:
+            # New firmware (BUILD >= 61840) - needs pypvs + password
+            try:
+                _LOGGER.info("Validating new firmware (pypvs) with password...")
+                pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, password=last5)
+                await pvs.validate()
+                _LOGGER.info("✅ New firmware (pypvs) validated successfully")
+                return serial, True, last5, build, None
+            except Exception as e:
+                _LOGGER.warning("❌ New firmware (pypvs) failed: %s - trying legacy fallback", e)
+                # SAFETY FALLBACK: Try legacy dl_cgi even for new firmware
+                # (Some firmware versions may have buggy LocalAPI implementation)
+                try:
+                    _LOGGER.info("⚠️ Attempting legacy dl_cgi fallback for BUILD %s", build)
+                    monitor = SunPowerMonitor(host, auth_password=None)
+                    device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
+
+                    if device_data and isinstance(device_data, dict) and "devices" in device_data:
+                        _LOGGER.warning("✅ Legacy fallback succeeded for BUILD %s - firmware LocalAPI may be buggy", build)
+                        return serial, False, None, build, None  # Use legacy mode instead
+                    else:
+                        return None, None, None, None, f"pypvs failed and legacy fallback returned invalid data"
+                except Exception as fallback_e:
+                    _LOGGER.error("❌ Both pypvs and legacy fallback failed: pypvs=%s, legacy=%s", e, fallback_e)
+                    return None, None, None, None, f"New firmware failed: {str(e)} (fallback also failed: {str(fallback_e)})"
+        else:
+            # Old firmware (BUILD < 61840) - uses dl_cgi WITHOUT password
+            try:
+                _LOGGER.info("Validating old firmware (dl_cgi) WITHOUT password...")
+                monitor = SunPowerMonitor(host, auth_password=None)
+                device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
+
+                if device_data and isinstance(device_data, dict) and "devices" in device_data:
+                    _LOGGER.info("✅ Old firmware (dl_cgi) validated successfully")
+                    # Return last5 for pre-filling, even though it won't be used for auth
+                    return serial, False, last5, build, None
+                else:
+                    return None, None, None, None, "Old firmware returned invalid response"
+
+            except Exception as e:
+                _LOGGER.error("❌ Old firmware validation failed: %s", e)
+                return None, None, None, None, f"Old firmware (dl_cgi) failed: {str(e)}"
+
+    async def _validate_pvs_legacy(self, host):
+        """Legacy validation when supervisor/info unavailable - tries both methods
+
+        Returns:
+            Tuple of (serial, uses_pypvs, last5, build, error_message)
+        """
+        # Try pypvs first (new firmware)
+        try:
+            pvs = PVS(session=async_get_clientsession(self.hass, False), host=host)
+            await pvs.validate()
+            serial = pvs._firmware.serial
+            last5 = (serial[-5:] if serial and len(serial) >= 5 else "").upper()
+            _LOGGER.info("Legacy detection: New firmware (pypvs), serial=%s", serial)
+            return serial, True, last5, None, None
+        except Exception as e:
+            _LOGGER.debug("pypvs failed: %s", e)
+
+        # Try legacy dl_cgi (old firmware)
+        try:
+            monitor = SunPowerMonitor(host, auth_password=None)
+            device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
+
+            if device_data and isinstance(device_data, dict) and "devices" in device_data:
+                for device in device_data.get("devices", []):
+                    if device.get("DEVICE_TYPE") == "PVS":
+                        serial = device.get("SERIAL")
+                        last5 = (serial[-5:] if serial and len(serial) >= 5 else "").upper()
+                        _LOGGER.info("Legacy detection: Old firmware (dl_cgi), serial=%s, last5=%s", serial, last5)
+                        return serial, False, last5, None, None  # Return last5 for pre-filling
+
+        except Exception as e:
+            _LOGGER.error("Both validation methods failed: %s", e, exc_info=True)
+
+        return None, None, None, None, "Cannot connect - all methods failed"
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial connection and hardware setup."""
+        """Handle initial connection setup - matches SunStrong pattern
+
+        Step 1: Just IP and polling interval, validate PVS responds and get serial.
+        Password collected in step 2 (async_step_need_password).
+        """
         errors = {}
         description_placeholders = {}
 
@@ -147,39 +222,43 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if polling_interval < 300:
                 errors["polling_interval"] = "MIN_INTERVAL"
 
-            # Validate PVS serial last 5 chars if provided
-            pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()
-            if pvs_serial_last5:
-                if len(pvs_serial_last5) != 5:
-                    errors["pvs_serial_last5"] = "Must be exactly 5 characters"
-                elif not pvs_serial_last5.isalnum():
-                    errors["pvs_serial_last5"] = "Must contain only letters and numbers"
-
             if not errors:
-                # Update user_input with stripped serial (or None if empty)
-                user_input["pvs_serial_last5"] = pvs_serial_last5 if pvs_serial_last5 else ""
+                # Validate PVS connection with auto-detection
+                serial, uses_pypvs, last5, build, error_message = await self._validate_pvs(user_input["host"])
 
-                # Test PVS connection before proceeding
-                _LOGGER.info("Setup: Validating PVS connection")
-
-                success, message = await self._test_pvs_connection(
-                    user_input["host"],
-                    pvs_serial_last5 if pvs_serial_last5 else None
-                )
-                
-                if success:
-                    # Store basic config and check for battery system adjustment
+                if serial:
+                    # Store IP, polling interval, firmware method, and auto-detected values
+                    self.ip_address = user_input["host"]
                     self._basic_config = user_input.copy()
-                    await self._adjust_polling_for_battery_system()
-                    _LOGGER.info("Setup: Connection validated, proceeding to notifications")
-                    return await self.async_step_notifications()
+                    self._basic_config["uses_pypvs"] = uses_pypvs
+                    self._basic_config["auto_detected_last5"] = last5  # Pre-fill password
+                    self._basic_config["firmware_build"] = build
+
+                    # Set unique_id from serial
+                    await self.async_set_unique_id(serial)
+                    self._abort_if_unique_id_configured({})
+                    _LOGGER.info("Setup: Serial=%s, Method=%s, Build=%s, Last5=%s",
+                                serial, "pypvs" if uses_pypvs else "dl_cgi", build, last5)
+
+                    # Decide if password step is needed:
+                    # - Old firmware + auto-detected: Skip password (not needed)
+                    # - New firmware OR failed detection: Ask for password
+                    if not uses_pypvs and last5:
+                        # Old firmware with auto-detected serial - skip password
+                        _LOGGER.info("Old firmware detected with auto-password - skipping password step")
+                        self._basic_config["pvs_serial_last5"] = last5  # Store for future use
+                        await self._adjust_polling_for_battery_system()
+                        return await self.async_step_notifications()
+                    else:
+                        # New firmware OR failed detection - ask for password
+                        return await self.async_step_need_password()
                 else:
                     # Connection failed - show error
-                    _LOGGER.warning("Setup: PVS validation failed: %s", message)
+                    _LOGGER.warning("Setup: PVS validation failed: %s", error_message)
                     errors["host"] = "connection_failed"
-                    description_placeholders["error_details"] = message
+                    description_placeholders["error_details"] = error_message
 
-        # Page 1: Connection & Hardware schema
+        # Page 1: Just IP and polling interval (like SunStrong)
         schema = vol.Schema({
             vol.Required("host", default="172.27.153.1"): str,
             vol.Required("polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
@@ -190,11 +269,63 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("pvs_serial_last5"): str,
         })
 
         return self.async_show_form(
             step_id="user",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders=description_placeholders
+        )
+
+    async def async_step_need_password(self, user_input=None):
+        """Ask for PVS password - step 2 after validation
+
+        Password is last 5 characters of PVS serial number.
+        - New firmware (BUILD >= 61840): Password required for authentication
+        - Old firmware (BUILD < 61840): Password collected but not used
+        """
+        errors = {}
+        description_placeholders = {}
+
+        # Get auto-detected values and firmware info
+        auto_detected_last5 = self._basic_config.get("auto_detected_last5", "")
+        uses_pypvs = self._basic_config.get("uses_pypvs", False)
+        firmware_build = self._basic_config.get("firmware_build")
+
+        # Show firmware info to user
+        description_placeholders["serial_number"] = self.unique_id or "Unknown"
+        description_placeholders["firmware_build"] = str(firmware_build) if firmware_build else "Unknown"
+        description_placeholders["auth_required"] = "Yes - Password will be used" if uses_pypvs else "No - Password for future use only"
+
+        if user_input is not None:
+            # Validate password (last 5 of serial) - force uppercase to match serial format
+            pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip().upper()
+
+            if not pvs_serial_last5:
+                errors["pvs_serial_last5"] = "Password required (last 5 chars of serial)"
+            elif len(pvs_serial_last5) != 5:
+                errors["pvs_serial_last5"] = "Must be exactly 5 characters"
+            elif not pvs_serial_last5.isalnum():
+                errors["pvs_serial_last5"] = "Must contain only letters and numbers"
+
+            if not errors:
+                # Store uppercase password in basic config
+                self._basic_config["pvs_serial_last5"] = pvs_serial_last5
+
+                # Check for battery system and proceed to notifications
+                await self._adjust_polling_for_battery_system()
+                _LOGGER.info("Setup: Password=%s, Will be used=%s",
+                            pvs_serial_last5, uses_pypvs)
+                return await self.async_step_notifications()
+
+        # Step 2 schema: Pre-fill password with auto-detected last5
+        schema = vol.Schema({
+            vol.Required("pvs_serial_last5", default=auto_detected_last5 or ""): str,
+        })
+
+        return self.async_show_form(
+            step_id="need_password",
             data_schema=schema,
             errors=errors,
             description_placeholders=description_placeholders
@@ -235,10 +366,9 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "use_descriptive_names": complete_config["use_descriptive_names"],
                     "use_product_names": complete_config["use_product_names"],
                     "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
+                    "uses_pypvs": complete_config.get("uses_pypvs", False),
                 },
                 options={
-                    "sunrise_elevation": 5,  # Default preserved for future use
-                    "sunset_elevation": 5,  # Default preserved for future use
                     "general_notifications": complete_config["general_notifications"],
                     "deep_debug_notifications": complete_config["deep_debug_notifications"],
                     "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
@@ -354,7 +484,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("pvs_serial_last5", default=current_pvs_serial): str,
+            vol.Optional("pvs_serial_last5", default=current_pvs_serial): str,
         })
 
         return self.async_show_form(
@@ -440,8 +570,6 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             
             # Create options
             options = {
-                "sunrise_elevation": 5,  # Default preserved for future use
-                "sunset_elevation": 5,  # Default preserved for future use
                 "general_notifications": complete_config["general_notifications"],
                 "deep_debug_notifications": complete_config["deep_debug_notifications"],
                 "overwrite_general_notifications": complete_config["overwrite_general_notifications"],

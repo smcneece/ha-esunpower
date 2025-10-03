@@ -357,7 +357,8 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
     from .notifications import notify_flash_memory_critical
 
     # Get flash memory threshold (default 1000 MB)
-    flash_threshold = entry.options.get("flash_memory_threshold", 1000)
+    flash_threshold = entry.options.get("flash_memory_threshold_mb", 1000)
+
     if flash_threshold <= 0:
         return  # Monitoring disabled
 
@@ -366,7 +367,8 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
 
         if flash_avail is not None:
             try:
-                flash_mb = int(flash_avail)
+                flash_kb = int(flash_avail)
+                flash_mb = flash_kb / 1024  # Convert KB to MB
 
                 # Initialize flash memory tracking
                 if not hasattr(cache, 'flash_memory_alerts'):

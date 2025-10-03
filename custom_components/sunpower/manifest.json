@@ -12,9 +12,14 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/smcneece/ha-esunpower/issues",
   "requirements": [
-    "requests"
+    "requests",
+    "bcrypt",
+    "pypvs"
+  ],
+  "loggers": [
+    "pypvs"
   ],
   "ssdp": [],
-  "version": "2025.10.5",
+  "version": "2025.10.6",
   "zeroconf": []
 }

@@ -12,16 +12,25 @@
         },
         "step": {
             "user": {
-                "title": "Enhanced SunPower - Basic Setup",
-                "description": "Configure essential Enhanced SunPower settings.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "title": "Enhanced SunPower - Connection Setup",
+                "description": "Step 1: Enter your PVS IP address.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 300-second minimum polling interval. More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
-                    "polling_interval": "Polling Interval (seconds)",
-                    "pvs_serial_last5": "PVS Serial (last 5 characters)"
+                    "polling_interval": "Polling Interval (seconds)"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval": "How often to check for new data (10-3600 seconds)."
+                    "polling_interval": "How often to check for new data (300-3600 seconds)."
+                }
+            },
+            "need_password": {
+                "title": "Enhanced SunPower - Authentication",
+                "description": "Step 2: Enter password for PVS authentication.\n\n🔐 Password is the last 5 characters of your PVS serial number.\n\n📍 Find serial number:\n• Physical device: Remove PVS cover - serial on device label\n• SunPower/SunStrong App: Profile → System Info → Serial Number\n\n{serial_number}",
+                "data": {
+                    "pvs_serial_last5": "PVS Password (last 5 chars of serial)"
+                },
+                "data_description": {
+                    "pvs_serial_last5": "Last 5 characters of PVS serial number (e.g., if serial is ABC123XYZ78901, enter 78901)"
                 }
             },
             "notifications": {

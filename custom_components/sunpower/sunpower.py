@@ -1,4 +1,4 @@
-""" Basic Sunpower PVS Tool - ASYNC VERSION - Enhanced with Varserver Support """
+""" Basic Sunpower PVS Tool - ASYNC VERSION - Legacy dl_cgi Support Only """
 
 import aiohttp
 import asyncio
@@ -7,12 +7,8 @@ import logging
 
 from .const import PVS_AUTH_USERNAME
 
-from .varserver import VarserverClient, VarserverError
-
-# Future: Switch to bundled pypvs when ready
-# from .pypvs_bundle.pvs import PVS
-# from .pypvs_bundle.updaters.ess import PVSESSUpdater
-# from .pypvs_bundle.models.pvs import PVSData
+# Note: New firmware (61840+) uses pypvs library directly in __init__.py
+# This file only handles legacy dl_cgi for old firmware
 # from .pypvs_bundle.exceptions import ENDPOINT_PROBE_EXCEPTIONS
 USE_FULL_PYPVS = False  # Set to True when pypvs bundle is ready
 
@@ -33,21 +29,24 @@ class SunPowerMonitor:
     if you find this useful please complain to sunpower and your sunpower dealer that they
     do not have a public API"""
 
-    def __init__(self, host, auth_password=None):
-        """Initialize SunPower PVS monitor.
+    def __init__(self, host, auth_password=None, pvs_serial=None):
+        """Initialize SunPower PVS monitor - Legacy dl_cgi only.
+
+        Note: New firmware (61840+) uses pypvs library directly.
+        This class is only for old firmware with dl_cgi endpoints.
 
         Args:
             host: PVS IP address (e.g., '172.27.153.1')
-            auth_password: Optional PVS serial last 5 characters for firmware 61840+ authentication
+            auth_password: Not used for old firmware (kept for compatibility)
+            pvs_serial: Not used for old firmware (kept for compatibility)
         """
         self.host = host
         self.auth_password = auth_password
+        self.pvs_serial = pvs_serial
         self.command_url = "http://{0}/cgi-bin/dl_cgi?Command=".format(host)
         self._session = None
         self._authenticated = False
         self._auth_header = None
-        self._varserver_available = None
-        self._varserver_client = None
 
         if auth_password:
             # Generate Basic Auth header for username:password
@@ -118,81 +117,6 @@ class SunPowerMonitor:
         if self._session and not self._session.closed:
             await self._session.close()
             self._session = None
-        if self._varserver_client:
-            await self._varserver_client.close()
-            self._varserver_client = None
-
-    def get_varserver_status(self):
-        """Get status of varserver capability
-
-        Returns dict with capability info for diagnostics
-        """
-        return {
-            "varserver_detected": self._varserver_available,
-            "auth_configured": bool(self.auth_password),
-            "recommendation": self._get_varserver_recommendation()
-        }
-
-    def _get_varserver_recommendation(self):
-        """Get recommendation for user based on current state"""
-        if not self.auth_password:
-            return "For firmware 61840+ support, configure PVS serial in integration settings"
-        elif self._varserver_available is False:
-            return "PVS firmware does not support varserver (older than 61840)"
-        elif self._varserver_available is True:
-            return "Varserver capability active - using modern endpoints"
-        else:
-            return "Varserver capability not yet tested"
-
-    async def detect_varserver_capability(self):
-        """Detect if the PVS supports varserver (FCGI) endpoints
-
-        Returns True if varserver is available, False for legacy dl_cgi only
-        """
-
-        if self._varserver_available is not None:
-            return self._varserver_available
-
-        if not self.auth_password:
-            _LOGGER.debug("No auth password provided, assuming legacy firmware")
-            self._varserver_available = False
-            return False
-
-        try:
-            # Create varserver client and test capability
-            self._varserver_client = VarserverClient(
-                host=self.host,
-                username=PVS_AUTH_USERNAME,
-                password=self.auth_password
-            )
-
-            # Test varserver availability
-            varserver_responsive = await self._varserver_client.probe_capability()
-
-            if varserver_responsive:
-                self._varserver_available = True
-                _LOGGER.info("Varserver capability detected on PVS %s", self.host)
-                return True
-            else:
-                self._varserver_available = False
-                await self._varserver_client.close()
-                self._varserver_client = None
-                return False
-
-        except VarserverError as e:
-            _LOGGER.debug("Varserver probe failed: %s, falling back to dl_cgi", e)
-            self._varserver_available = False
-            if self._varserver_client:
-                await self._varserver_client.close()
-                self._varserver_client = None
-            return False
-        except Exception as e:
-            _LOGGER.warning("Unexpected error during varserver detection: %s, using dl_cgi", e)
-            self._varserver_available = False
-            if self._varserver_client:
-                await self._varserver_client.close()
-                self._varserver_client = None
-            return False
 
     async def generic_command_async(self, command):
         """All 'commands' to the PVS module use this url pattern and return json
@@ -290,33 +214,11 @@ class SunPowerMonitor:
             )
 
     async def device_list_async(self):
-        """Get a list of all devices connected to the PVS - ASYNC
+        """Get a list of all devices connected to the PVS - Legacy dl_cgi
 
-        Enhanced to try varserver first (required for firmware 61840+), fallback to dl_cgi
+        Note: This is only used for old firmware. New firmware (61840+) uses pypvs library.
         """
-        # Try varserver if available (new firmware requires this)
-        if await self.detect_varserver_capability():
-            try:
-                return await self._get_device_list_varserver()
-            except Exception as e:
-                _LOGGER.warning("Varserver DeviceList failed, falling back to dl_cgi: %s", e)
-
-        # Fallback to legacy dl_cgi endpoint (old firmware)
         return await self.generic_command_async("DeviceList")
-
-    async def _get_device_list_varserver(self):
-        """Get DeviceList using varserver (required for firmware 61840+)"""
-        if not self._varserver_client:
-            raise ConnectionException("Varserver not properly initialized")
-
-        try:
-            device_list = await self._varserver_client.fetch_device_list()
-            _LOGGER.info("Successfully fetched DeviceList via varserver (%d devices)", len(device_list.get("devices", [])))
-            return device_list
-
-        except VarserverError as e:
-            _LOGGER.error("Failed to get DeviceList from varserver: %s", e)
-            raise ConnectionException(f"Varserver DeviceList failed: {e}")
 
     def device_list(self):
         """DEPRECATED: Get a list of all devices connected to the PVS - SYNC WRAPPER
@@ -344,38 +246,11 @@ class SunPowerMonitor:
             )
 
     async def energy_storage_system_status_async(self):
-        """Get the status of the energy storage system - ASYNC
+        """Get the status of the energy storage system - Legacy dl_cgi
 
-        Enhanced to try varserver first, fallback to legacy dl_cgi endpoint
+        Note: This is only used for old firmware. New firmware (61840+) uses pypvs library.
         """
-        # Try varserver if available
-        if await self.detect_varserver_capability():
-            try:
-                return await self._get_ess_data_varserver()
-            except Exception as e:
-                _LOGGER.warning("Varserver ESS data failed, falling back to dl_cgi: %s", e)
-
-        # Fallback to legacy dl_cgi endpoint
         return await self._get_ess_data_legacy()
-
-    async def _get_ess_data_varserver(self):
-        """Get ESS data using varserver (modern, efficient approach)"""
-        if not self._varserver_client:
-            raise ConnectionException("Varserver not properly initialized")
-
-        try:
-            # Fetch ESS data efficiently (all variables in one request)
-            ess_grouped = await self._varserver_client.fetch_ess_data()
-
-            # Convert to legacy format for backward compatibility
-            legacy_format = self._varserver_client.convert_ess_to_legacy_format(ess_grouped)
-
-            _LOGGER.debug("Successfully fetched ESS data via varserver")
-            return legacy_format
-
-        except VarserverError as e:
-            _LOGGER.error("Failed to get ESS data from varserver: %s", e)
-            raise ConnectionException(f"Varserver ESS data failed: {e}")
 
     async def _get_ess_data_legacy(self):
         """Get ESS data using legacy dl_cgi endpoint"""

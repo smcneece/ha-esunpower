@@ -381,11 +381,11 @@ def notify_batched_inverter_issues(hass, entry, cache, persistent_errors, recove
         safe_notify(hass, combined_message, title, entry, force_notify=True,
                    notification_category="inverter", cache=cache)
 
-def notify_flash_memory_critical(hass, entry, cache, available_mb, threshold_mb):
+def notify_flash_memory_critical(hass, entry, cache, serial, available_mb, threshold_mb):
     """ESSENTIAL: Flash memory critical alert - UI + mobile"""
-    msg = f"⚠️ PVS FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb}MB)"
+    msg = f"⚠️ PVS {serial} FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb:.0f}MB)"
     # This is critical hardware protection - always notify + mobile
-    safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True, 
+    safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True,
                notification_category="flash_memory", cache=cache)
 
 def notify_polling_failed(hass, entry, cache, polling_url, error):

@@ -1,25 +1,32 @@
 # Enhanced SunPower/SunStrong Home Assistant Integration
 
-## 🔒 **FIRMWARE COMPATIBILITY**
+## **FIRMWARE COMPATIBILITY**
 
-**✅ Works (I hope) with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
-- **Firmware 61840+**: Uses modern varserver (FCGI) endpoints with cookie-based authentication
-- **Older firmware**: Falls back to legacy dl_cgi endpoints (no authentication required)
+**Works (I hope) with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
+- **Firmware BUILD 61840+**: Uses official `pypvs` library with LocalAPI authentication
+- **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints (tested and working)
+- **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
+- **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
+
 
 **⚠️ TESTING STATUS**:
-- **Old firmware (< 61840)**: ✅ **Tested and working** on developer's production system
-- **New firmware (61840+)**: ⚠️ **COMPLETELY UNTESTED** - Authentication and varserver support built from SunStrong's code.
+- **Old firmware (BUILD < 61840)**: Tested and working on my production system (Firmware 61839)
+- **New firmware (BUILD 61840+)**: **Mostly untested** - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware, Even the official SunStrong integration is having issues as of Oct-02-2025: https://github.com/SunStrong-Management/pvs-hass/issues/7 - this could be firmware or the new pypvs code, and of course me not having the firmware myself makes this really hard to troubleshoot. 
 
-- **Help wanted**: If you have firmware 61840+, please test and report back!  I'm waiting for firmware update to validate. When reporting please report with logs and current version of the integration you are running, in an attempt to fix this sadly I have pushed more versions than I should have. 
+**⚠️ Help wanted**: If you have firmware BUILD 61840+ and experience setup issues, please report with full logs and version number of firmware and integration. This is still experimental for new firmware. Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 
-
-**⚠️ IMPORTANT**: PVS serial number (last 5 characters) now **required** during setup for firmware 61840+ authentication, existing users please be pro-active and enter your serial number now.
+**NEW: Password Auto-Detection** - The integration attempts to:
+- Detect your full PVS serial number from the device
+- Extract the last 5 characters for authentication
+- Pre-fill the password field (uppercase format)
+- Skip password step entirely for old firmware
+- **Note**: Untested on new firmware - may require manual entry if auto-detection fails
 
 ---
 
- **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
+ **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) So BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**  
 
- **🔄 After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
+ ** After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -47,8 +54,7 @@
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI. 
 - **Diagnostic Dashboard**: 8 sensors tracking integration reliability and performance
-- **Authentication Ready**: Supports SunPower's new firmware authentication requirements
-- **PVS Hardware Protection**: Built-in throttling (300s minimum), health checking, and intelligent backoff
+- **PVS Hardware Protection**: Built-in throttling (10 second minimum), health checking, and intelligent backoff
 
 **Technical Enhancements:**
 - **Multi-Channel Notifications**: 6 separate notification streams
@@ -82,7 +88,7 @@
 
 ### Requirements
 
-**STRONGLY RECOMMENDED: Install during daylight hours**
+**Install during daylight hours!**
 - Inverters are powered by the sun and offline at night
 - Integration validates real PVS connection during setup process
 
@@ -142,8 +148,16 @@
 ![Notifications Configuration](images/config_pg3.png)
 
 ### Setup Process
-1. **Page 1**: Enter PVS IP address, polling interval, and PVS serial number for authentication
-2. **Page 2**: Set flash memory threshold, notification preferences, and mobile device
+1. **Page 1**: Enter PVS IP address and polling interval
+   - Integration automatically detects firmware BUILD and serial number
+   - Validates connection and selects optimal communication method
+2. **Page 2**: Confirm password (auto-detected and pre-filled for new firmware)
+   - Old firmware (BUILD < 61840): Password step skipped automatically
+   - New firmware (BUILD ≥61840): Password pre-filled, just confirm
+3. **Page 3**: Configure notifications and advanced settings
+   - Set flash memory threshold
+   - Select mobile device for critical alerts
+   - Configure email notifications
 
 *Note: Descriptive names are automatically enabled for better energy dashboard integration.*
 
@@ -152,8 +166,8 @@
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
 | **Host** | PVS IP Address | N/A | `172.27.153.1` |
-| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (20s min for battery systems, per SunStrong guidance) |
-| **PVS Serial (last 5)** | Authentication for PVS6 firmware 61840+ | `` | See guide below |
+| **Polling Interval** | Update frequency (seconds) | 300 | 300-3600 seconds (5 min minimum for PVS protection) |
+| **PVS Password (last 5)** | Auto-detected from serial number | Auto-filled | Confirm auto-detected value (new firmware only) |
 | **Descriptive Names** | Show detailed inverter names | `true` | Automatically enabled for energy dashboard |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
 | **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
@@ -163,20 +177,28 @@
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
 
-### 🔒 PVS Authentication (Future-Ready)
+### 🔒 PVS Authentication (Automatic!)
 
-**Upcoming Change**: Future SunStrong PVS firmware will require authentication . This integration is ready!
+**✨ Fully Automated** - No manual serial number entry required!
 
-**Where to Find Your PVS Serial Number:**
-- **Physical Device**: Remove PVS cover - serial number is on the device label
-- **SunPower/SunStrong App**: Profile tab → System Info → Serial Number
-- **Config Field**: Enter only the **last 5 characters** (e.g., if serial is "ABC123XYZ78901", enter "78901")
+**How Auto-Detection Works:**
+1. Integration queries PVS for firmware BUILD number and full serial number
+2. Automatically extracts last 5 characters for authentication password
+3. Pre-fills password field in UPPERCASE format (matches serial format)
+4. For old firmware (BUILD < 61840): Skips password step entirely
+5. For new firmware (BUILD ≥61840): Shows pre-filled password for confirmation
 
-**How It Works:**
-- **Current Firmware**: Integration works exactly as before (no authentication needed)
-- **Future Firmware 61840+**: Integration automatically uses HTTP Basic Authentication when PVS requires it
-- **Smart Fallback**: Always tries without authentication first, then adds auth if needed
-- **Zero Impact**: Adding your serial number now prepares for the future without affecting current operation
+**Firmware-Specific Behavior:**
+- **BUILD < 61840**: No authentication required, password step skipped automatically
+- **BUILD ≥61840**: LocalAPI authentication with auto-detected password
+- **Buggy Firmware**: Automatic fallback to legacy mode if LocalAPI fails
+- **Failed Detection**: Manual password entry available as fallback
+
+**Manual Override (if needed):**
+If auto-detection fails, you can manually enter the last 5 characters of your PVS serial:
+- **Physical Device**: Remove PVS cover - serial on device label
+- **SunPower/SunStrong App**: Profile → System Info → Serial Number
+- **Format**: UPPERCASE letters/numbers only (e.g., "W3193" not "w3193")
 
 **Authentication Details:**
 - **Username**: `ssm_owner` (configured by SunStrong Management)

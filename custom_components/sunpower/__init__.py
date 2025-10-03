@@ -18,7 +18,11 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 from homeassistant.helpers.debounce import Debouncer
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
+
+from pypvs.pvs import PVS
+from pypvs.exceptions import PVSError
 
 from .const import (
     BATTERY_DEVICE_TYPE,
@@ -77,9 +81,23 @@ from .notifications import (
     safe_notify,
 )
 
+from .pypvs_converter import convert_pypvs_to_legacy
+
 _LOGGER = logging.getLogger(__name__)
 
-
+# Dependency diagnostic logging - check installations (one-time on load)
+try:
+    import pypvs
+    import aiohttp
+    import simplejson
+    _LOGGER.info("Dependencies loaded: pypvs=%s, aiohttp=%s, simplejson=%s",
+                 getattr(pypvs, '__version__', 'unknown'),
+                 aiohttp.__version__,
+                 simplejson.__version__)
+except ImportError as e:
+    _LOGGER.error("❌ Dependency import failed: %s", e)
+except Exception as e:
+    _LOGGER.error("❌ Dependency check error: %s", e)
 
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
@@ -469,18 +487,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
 
-    # Get PVS serial last 5 characters for authentication (if provided)
+    # Check if we should use pypvs (new firmware) or legacy dl_cgi (old firmware)
+    uses_pypvs = entry.data.get("uses_pypvs", False)
+    firmware_build = entry.data.get("firmware_build")
+
+    # Get authentication details - ONLY use password for new firmware (BUILD >= 61840)
     pvs_serial_last5 = entry.data.get("pvs_serial_last5", "").strip()
-    auth_password = pvs_serial_last5 if pvs_serial_last5 else None
+    auth_password = pvs_serial_last5 if (pvs_serial_last5 and uses_pypvs) else None
 
-    if auth_password:
-        _LOGGER.info("Authentication configured - PVS serial last 5 characters provided")
+    if uses_pypvs:
+        _LOGGER.info("🔒 Using pypvs library for new firmware (BUILD %s) WITH authentication", firmware_build)
+        # Create PVS object with password for new firmware
+        try:
+            pvs_object = PVS(
+                session=async_get_clientsession(hass, False),
+                host=entry.data['host'],
+                user="ssm_owner",
+                password=auth_password
+            )
+            _LOGGER.info("✅ pypvs object created successfully (version %s)", getattr(pypvs, '__version__', 'unknown'))
+        except Exception as e:
+            _LOGGER.error("❌ Failed to create pypvs object - library may be corrupted or incompatible: %s", e, exc_info=True)
+            raise
+        sunpower_monitor = None  # Not used when using pypvs
     else:
-        _LOGGER.info("No authentication configured - will use unauthenticated requests")
+        _LOGGER.info("🔓 Using legacy dl_cgi for old firmware (BUILD %s) WITHOUT authentication", firmware_build)
+        pvs_object = None  # Not used when using legacy method
+        sunpower_monitor = SunPowerMonitor(
+            entry.data['host'],
+            auth_password=None,  # Old firmware does NOT use authentication
+            pvs_serial=entry.unique_id
+        )
 
-    sunpower_monitor = SunPowerMonitor(entry.data['host'], auth_password=auth_password)
-
-    
     # Simple polling interval - adjustments happen in config flow after battery detection
     polling_interval = entry.options.get("polling_interval", entry.data.get("polling_interval", DEFAULT_POLLING_INTERVAL))
 
@@ -523,7 +561,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             data = convert_sunpower_data(cached_data)
             is_valid, device_count, error_message = validate_converted_data(data)
             if is_valid:
-                inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+                # Run health checks on cached data too
+                try:
+                    pvs_data = data.get(PVS_DEVICE_TYPE, {})
+                    inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+                    if pvs_data and inverter_data:
+                        check_firmware_upgrade(hass, entry, cache, pvs_data)
+                        check_flash_memory_level(hass, entry, cache, pvs_data)
+                        check_inverter_health(hass, entry, cache, inverter_data)
+                except Exception as e:
+                    _LOGGER.warning("Health checks failed: %s", e)
+
                 meter_data = data.get('Power Meter', {})
                 diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
@@ -536,12 +584,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Step 1: Poll PVS for fresh data
         try:
-            fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_polling_interval, cache, hass, entry)
+            if pvs_object:
+                # New firmware: Use pypvs library
+                _LOGGER.debug("Polling PVS using pypvs (new firmware)")
+                pvs_data = await pvs_object.update()
+                # Convert pypvs PVSData object to legacy dl_cgi format
+                fresh_data = convert_pypvs_to_legacy(pvs_data)
+            else:
+                # Old firmware: Use legacy dl_cgi
+                _LOGGER.debug("Polling PVS using dl_cgi (old firmware)")
+                fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_polling_interval, cache, hass, entry)
             # Note: fresh_data can be None if PVS is unhealthy/backoff - this is normal, use cache
+        except PVSError as e:
+            _LOGGER.error("pypvs polling error: %s", e)
+            fresh_data = None
         except Exception as e:
             _LOGGER.error("PVS polling exception: %s", e)
             # Handle authentication vs general polling failures
-            await _handle_polling_error(hass, entry, cache, host_ip, e)
+            if not pvs_object:  # Only call for legacy method
+                await _handle_polling_error(hass, entry, cache, host_ip, e)
             fresh_data = None
             # Continue to cache fallback below
 

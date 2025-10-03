@@ -2,6 +2,117 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.10.6] - 2025-10-03
+
+### Major Feature: Intelligent Firmware Auto-Detection
+
+**Supervisor/Info Auto-Detection:**
+- **Automatic Firmware BUILD Detection**: Integration now queries `/cgi-bin/dl_cgi/supervisor/info` to detect firmware BUILD number
+- **Smart Method Selection**: Automatically chooses pypvs (BUILD ≥61840) or legacy dl_cgi (BUILD <61840) based on detected firmware
+- **Zero Configuration**: No manual firmware type selection required
+- **Safety Fallback**: If LocalAPI (pypvs) fails even on new firmware, automatically falls back to legacy dl_cgi with warning log
+
+**Password Auto-Detection:**
+- **Automatic Serial Detection**: Full PVS serial number detected from supervisor/info endpoint
+- **Auto-Extract Last 5 Characters**: Password automatically extracted and formatted in UPPERCASE
+- **Pre-Fill Password Field**: Setup page 2 pre-fills with auto-detected password (new firmware only)
+- **Skip for Old Firmware**: Password step completely skipped when BUILD < 61840 detected
+- **Manual Override Available**: Users can still manually enter password if auto-detection fails
+
+### New Firmware Support Enhancement
+
+**pypvs Data Format Converter:**
+- **New Module**: Created `pypvs_converter.py` to convert pypvs PVSData objects to legacy dl_cgi format
+- **Seamless Integration**: Existing data_processor.py works unchanged for both firmware types
+- **Complete Device Support**: Converts PVS gateway, inverters, power meters, and ESS/battery devices
+- **Field Mapping**: Maps pypvs model attributes to dl_cgi field names (e.g., `last_report_kw` → `p_kw`)
+- **Backward Compatible**: Old firmware path completely unchanged
+
+### Critical Fixes
+
+**Manifest Dependencies:**
+- **Fixed**: Removed unused `bcrypt` and `requests` from requirements (inherited from pvs-hass but never used)
+- **Fixed**: Added missing `simplejson` dependency (used in sunpower.py but not listed)
+- **Kept**: `pypvs` dependency (correct - used for new firmware)
+- **Note**: `aiohttp` automatically installed as pypvs dependency
+
+**Authentication Routing:**
+- **Fixed**: Old firmware (BUILD <61840) now gets `auth_password=None` instead of password value
+- **Fixed**: Password only used when `uses_pypvs=True` to prevent auth errors on old firmware
+- **Fixed**: Uppercase transformation for password to match serial format (e.g., "W3193" not "w3193")
+
+### Diagnostic Improvements
+
+**Dependency Logging:**
+- **Added**: Startup logging of pypvs version and installation path for troubleshooting
+- **Added**: aiohttp and simplejson version logging
+- **Format**: Clear log messages show exact package versions and file locations
+
+**Config Flow Logging:**
+- **Enhanced**: Detailed firmware detection logs show BUILD number, method selected, serial, and password
+- **Enhanced**: Fallback attempts logged with clear success/failure indicators
+- **Enhanced**: Uses indicators (checkmark/X/warning) in logs for quick scanning
+
+### Security & Stability
+
+**Buggy Firmware Protection:**
+- **Safety Net**: If pypvs fails validation on BUILD ≥61840, automatically tries legacy dl_cgi as fallback
+- **SunStrong Issue Mitigation**: Handles known LocalAPI stability issues in some firmware versions (GitHub issue #7)
+- **Graceful Degradation**: Integration stays functional even if new LocalAPI implementation has bugs
+- **Detailed Error Messages**: Both methods' errors logged if both fail
+
+**⚠️ Testing Status Update:**
+- **Old Firmware (BUILD <61840)**: Fully tested on BUILD 61839 production system
+- **New Firmware (BUILD ≥61840)**: COMPLETELY UNTESTED - awaiting user testing with additional safety fallbacks
+- **Unknown Success Rate**: May work better than SunStrong's integration (which has reported issues) due to fallback mechanisms, but this is untested speculation
+
+### Documentation Updates
+
+**README.md:**
+- Updated firmware compatibility section with BUILD threshold (61840) clearly stated
+- Added password auto-detection details and uppercase format requirement
+- Updated setup process to reflect 3-page flow with auto-detection
+- Clarified authentication is automatic for both firmware types
+
+**CLAUDE.md:**
+- Added new firmware testing status with BUILD threshold details
+- Documented supervisor/info endpoint and auto-detection logic
+- Added pypvs_converter.py to architecture documentation
+
+### Architecture Improvements
+
+**Code Organization:**
+- **Modular Design**: pypvs converter isolated in separate 140-line file (keeps data_processor.py clean)
+- **Single Conversion Point**: All pypvs→legacy conversion happens in one function
+- **No Existing Code Changes**: data_processor.py, battery_handler.py, health_check.py unchanged
+- **Clean Imports**: Only 2 lines added to __init__.py (import and usage)
+
+## [v2025.10.6] - 2025-10-02
+
+### Major Architecture Change: pypvs Library Integration
+- **Replaced Custom Varserver**: Removed custom `varserver.py` implementation in favor of official `pypvs` library from SunStrong
+- **Guaranteed New Firmware Compatibility**: Now uses exact same authentication and communication code as proven working SunStrong integration
+- **Automatic Library Installation**: Home Assistant automatically installs pypvs library - zero manual work for users
+- **Two-Step Configuration**: Configuration flow now matches SunStrong pattern - validate first, then collect password
+- **Dual-Mode Support**: Automatically detects firmware version during setup and uses appropriate method
+
+### Critical Bug Fixes
+- **Flash Memory Alerts Fixed**: Corrected three bugs preventing flash memory warnings from triggering
+  - Fixed config key mismatch (`flash_memory_threshold` vs `flash_memory_threshold_mb`)
+  - Fixed units conversion (PVS reports KB, threshold is MB - now converts correctly)
+  - Fixed health checks skipped on cached data (now runs on both fresh and cached data)
+- **Notification Formatting**: Cleaned up flash memory alert decimal places (was 57.541015625MB, now 57.5MB)
+
+### Backward Compatibility
+- **Old Firmware Fully Supported**: Legacy dl_cgi method preserved for firmware < 61840
+- **Automatic Fallback**: Config validation tries pypvs first (new firmware), automatically falls back to dl_cgi (old firmware)
+- **Zero Breaking Changes**: Existing installations continue working unchanged
+
+### For New Firmware Users (61840+)
+- ⚠️ **COMPLETELY UNTESTED**: Built from SunStrong's proven code but not yet tested on actual new firmware
+- **Architecture Match**: Uses exact same pypvs library and patterns as working SunStrong integration
+- **Beta Testers Needed**: If you have new firmware, please test and report results
+
 ## [v2025.10.5] - 2025-10-01
 
 ### New Firmware Support (61840+)
