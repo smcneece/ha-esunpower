@@ -2,6 +2,23 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.10.9] - 2025-10-04
+
+### Critical Bug Fix: Reconfigure Serial Not Saved
+
+**Problem:**
+- PVS serial number entered via Reconfigure was validated but never saved to configuration
+- User could see serial in UI but code couldn't find it during authentication
+- Caused "Authentication required but no PVS serial provided" errors
+
+**Fix:**
+- Added `pvs_serial_last5` to options dict in OptionsFlowHandler (config_flow.py line 613)
+- Serial now properly saved when user reconfigures integration
+- Works with existing serial lookup code that checks both entry.options and entry.data
+
+**Files Modified:**
+- `config_flow.py`: Added serial to options dict (line 613)
+
 ## [v2025.10.8] - 2025-10-04
 
 ### Diagnostic Fixes, Memory/Flash Percentage Support & Configuration Bug Fix

@@ -258,17 +258,17 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 serial, "pypvs" if uses_pypvs else "dl_cgi", build, last5)
 
                     # Decide if password step is needed:
-                    # - Old firmware + auto-detected: Skip password (not needed)
-                    # - New firmware OR failed detection: Ask for password
+                    # - Old firmware + auto-detected: Skip password (not needed for old firmware)
+                    # - New firmware OR failed detection: Ask for password (future-proof for auth changes)
                     if not uses_pypvs and last5:
                         # Old firmware with auto-detected serial - skip password
                         _LOGGER.info("Old firmware detected with auto-password - skipping password step")
-                        self._basic_config["pvs_serial_last5"] = last5  # Store for future use
+                        self._basic_config["pvs_serial_last5"] = last5
                         await self._adjust_polling_for_battery_system()
                         self._adjust_polling_for_old_firmware()
                         return await self.async_step_notifications()
                     else:
-                        # New firmware OR failed detection - ask for password
+                        # New firmware OR failed detection - ask for password (future-proof)
                         return await self.async_step_need_password()
                 else:
                     # Connection failed - show error
@@ -610,6 +610,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
                 "email_notification_service": complete_config.get("email_notification_service"),
                 "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
+                "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
             }
             
             return self.async_create_entry(title="", data=options)
