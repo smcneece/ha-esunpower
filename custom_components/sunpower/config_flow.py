@@ -487,6 +487,17 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     errors["pvs_serial_last5"] = "Must contain only letters and numbers"
 
             if not errors:
+                # Auto-detect firmware info (critical for existing integrations missing firmware_build)
+                host = user_input["host"]
+                serial, build, last5, error = await self._get_supervisor_info(host)
+
+                if build:
+                    MIN_LOCALAPI_BUILD = 61840
+                    uses_pypvs = build >= MIN_LOCALAPI_BUILD
+                    user_input["firmware_build"] = build
+                    user_input["uses_pypvs"] = uses_pypvs
+                    _LOGGER.info("Options: Auto-detected firmware BUILD %s, uses_pypvs=%s", build, uses_pypvs)
+
                 # Store basic config and proceed to notifications (skip solar page)
                 self._basic_config = user_input.copy()
                 return await self.async_step_notifications()
@@ -587,7 +598,12 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 data_updates["use_product_names"] = complete_config["use_product_names"]
             if complete_config.get("pvs_serial_last5", "") != self.config_entry.data.get("pvs_serial_last5", ""):
                 data_updates["pvs_serial_last5"] = complete_config.get("pvs_serial_last5", "")
-            
+            # Always update firmware info if detected (critical for existing integrations)
+            if "firmware_build" in complete_config:
+                data_updates["firmware_build"] = complete_config["firmware_build"]
+            if "uses_pypvs" in complete_config:
+                data_updates["uses_pypvs"] = complete_config["uses_pypvs"]
+
             # Apply data updates if needed
             if data_updates:
                 new_data = dict(self.config_entry.data)

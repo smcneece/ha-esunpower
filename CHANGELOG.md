@@ -2,6 +2,26 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.10.10] - 2025-10-04
+
+### Critical Fix: Firmware Auto-Detection in Options Flow
+
+**Problem:**
+- Integrations created before firmware detection was added were missing `firmware_build` and `uses_pypvs` fields
+- Without these fields, integration defaulted to old firmware mode (no authentication)
+- Serial number was saved but ignored because uses_pypvs=False
+- Caused "Authentication required but no PVS serial provided" errors
+
+**Fix:**
+- Options flow now auto-detects firmware from supervisor/info during reconfigure
+- Automatically saves firmware_build and uses_pypvs to entry.data
+- Upgrades existing integrations to have proper firmware detection
+
+**Files Modified:**
+- `config_flow.py`:
+  - Added firmware auto-detection in OptionsFlowHandler (lines 490-499)
+  - Save firmware_build and uses_pypvs to entry.data (lines 602-605)
+
 ## [v2025.10.9] - 2025-10-04
 
 ### Critical Bug Fix: Reconfigure Serial Not Saved
