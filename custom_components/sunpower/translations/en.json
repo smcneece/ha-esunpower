@@ -13,14 +13,14 @@
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Connection Setup",
-                "description": "Step 1: Enter your PVS IP address.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 300-second minimum polling interval. More aggressive polling = higher CPU usage & larger databases.",
+                "description": "Step 1: Enter your PVS IP address.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)"
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval": "How often to check for new data (300-3600 seconds)."
+                    "polling_interval": "How often to check for new data (10-3600 seconds, 20s minimum for battery systems)."
                 }
             },
             "need_password": {
@@ -35,7 +35,7 @@
             },
             "notifications": {
                 "title": "Enhanced SunPower - Notifications & Advanced",
-                "description": "Configure notification preferences and advanced features.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting",
+                "description": "Configure notification preferences and advanced features.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n\n⚠️ Debug Notifications Warning:\n• With fast polling (10-60s), debug notifications generate MANY messages\n• Recommended: Use debug only for troubleshooting, disable when done",
                 "data": {
                     "general_notifications": "Show status notifications",
                     "deep_debug_notifications": "Show debug diagnostics",
@@ -47,7 +47,7 @@
                 },
                 "data_description": {
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
-                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
                     "email_notification_recipient": "Recipient email address (required when email service selected)",
@@ -68,7 +68,7 @@
                 "data_description": {
                     "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
-                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) to your mobile device",
                     "mobile_device": "Mobile device for critical alerts"
@@ -94,7 +94,7 @@
             },
             "notifications": {
                 "title": "Enhanced SunPower - Notifications",
-                "description": "Configure notification preferences.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting",
+                "description": "Configure notification preferences.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n\n⚠️ Debug Notifications Warning:\n• With fast polling (10-60s), debug notifications generate MANY messages\n• Recommended: Use debug only for troubleshooting, disable when done",
                 "data": {
                     "general_notifications": "Show status notifications",
                     "deep_debug_notifications": "Show debug diagnostics",
@@ -106,7 +106,7 @@
                 },
                 "data_description": {
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
-                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
                     "email_notification_recipient": "Recipient email address (required when email service selected)",
@@ -127,7 +127,7 @@
                 "data_description": {
                     "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
-                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (for troubleshooting)",
+                    "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "mobile_notifications": "Send critical alerts (PVS offline, inverter failures) directly to your mobile device",
                     "mobile_device": "Mobile device for critical alerts"

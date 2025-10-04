@@ -11,12 +11,14 @@
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/smcneece/ha-esunpower/issues",
-  "loggers": ["pypvs"],
+  "loggers": [
+    "pypvs"
+  ],
   "requirements": [
     "pypvs",
     "simplejson"
   ],
   "ssdp": [],
-  "version": "2025.10.6",
+  "version": "2025.10.7",
   "zeroconf": []
 }

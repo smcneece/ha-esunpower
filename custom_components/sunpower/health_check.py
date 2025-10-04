@@ -356,46 +356,72 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
     """Check PVS flash memory levels and alert if low"""
     from .notifications import notify_flash_memory_critical
 
-    # Get flash memory threshold (default 1000 MB)
-    flash_threshold = entry.options.get("flash_memory_threshold_mb", 1000)
+    # Get flash memory threshold
+    # For old firmware (BUILD < 61840): value is MB (default 0 = disabled)
+    # For new firmware (BUILD >= 61840): value is percentage (default 85%)
+    firmware_build = entry.data.get("firmware_build", 0)
+    flash_threshold = entry.options.get("flash_memory_threshold_mb", 85 if firmware_build >= 61840 else 0)
 
     if flash_threshold <= 0:
         return  # Monitoring disabled
 
     for serial, data in pvs_data.items():
-        flash_avail = data.get('dl_flash_avail')
+        # Initialize flash memory tracking
+        if not hasattr(cache, 'flash_memory_alerts'):
+            cache.flash_memory_alerts = {}
 
-        if flash_avail is not None:
+        if serial not in cache.flash_memory_alerts:
+            cache.flash_memory_alerts[serial] = {
+                'last_alert_time': 0,
+                'alert_count': 0
+            }
+
+        alert_info = cache.flash_memory_alerts[serial]
+        current_time = time.time()
+
+        flash_avail_kb = data.get('dl_flash_avail')
+        flash_usage_pct = data.get('flash_usage_percent')
+
+        # Determine which metric to use (KB for old firmware, percentage for new)
+        if flash_avail_kb is not None:
             try:
-                flash_kb = int(flash_avail)
-                flash_mb = flash_kb / 1024  # Convert KB to MB
+                flash_kb = int(flash_avail_kb)
 
-                # Initialize flash memory tracking
-                if not hasattr(cache, 'flash_memory_alerts'):
-                    cache.flash_memory_alerts = {}
+                # New firmware: Use percentage-based check (alert if usage > threshold)
+                if flash_kb == 0 and flash_usage_pct is not None:
+                    flash_pct = int(flash_usage_pct)
 
-                if serial not in cache.flash_memory_alerts:
-                    cache.flash_memory_alerts[serial] = {
-                        'last_alert_time': 0,
-                        'alert_count': 0
-                    }
+                    # Alert if flash usage exceeds threshold percentage
+                    if flash_pct > flash_threshold:
+                        # Only alert once per 24 hours
+                        if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
+                            notify_flash_memory_critical(hass, entry, cache, serial, f"{100 - flash_pct}%", f"{100 - flash_threshold}%")
+                            alert_info['last_alert_time'] = current_time
+                            alert_info['alert_count'] += 1
 
-                alert_info = cache.flash_memory_alerts[serial]
-                current_time = time.time()
+                            _LOGGER.warning("PVS %s flash memory critical: %d%% available (threshold: %d%%)",
+                                          serial, 100 - flash_pct, 100 - flash_threshold)
+                    else:
+                        # Reset alert tracking when below threshold
+                        alert_info['last_alert_time'] = 0
 
-                # Check if below threshold
-                if flash_mb < flash_threshold:
-                    # Only alert once per 24 hours
-                    if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
-                        notify_flash_memory_critical(hass, entry, cache, serial, flash_mb, flash_threshold)
-                        alert_info['last_alert_time'] = current_time
-                        alert_info['alert_count'] += 1
+                # Old firmware: Use KB-based check
+                elif flash_kb > 0:
+                    flash_mb = flash_kb / 1024  # Convert KB to MB
 
-                        _LOGGER.warning("PVS %s flash memory critical: %d MB remaining (threshold: %d MB)",
-                                      serial, flash_mb, flash_threshold)
-                else:
-                    # Reset alert tracking when above threshold
-                    alert_info['last_alert_time'] = 0
+                    # Check if below threshold
+                    if flash_mb < flash_threshold:
+                        # Only alert once per 24 hours
+                        if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
+                            notify_flash_memory_critical(hass, entry, cache, serial, flash_mb, flash_threshold)
+                            alert_info['last_alert_time'] = current_time
+                            alert_info['alert_count'] += 1
+
+                            _LOGGER.warning("PVS %s flash memory critical: %d MB remaining (threshold: %d MB)",
+                                          serial, flash_mb, flash_threshold)
+                    else:
+                        # Reset alert tracking when above threshold
+                        alert_info['last_alert_time'] = 0
 
             except (ValueError, TypeError):
                 _LOGGER.debug("Invalid flash memory value for PVS %s: %s", serial, flash_avail)

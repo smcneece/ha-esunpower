@@ -1,19 +1,24 @@
-# Enhanced SunPower/SunStrong Home Assistant Integration
+# Enhanced SunPower/SunStrong PVS Home Assistant Integration
+
+### PLEASE TAKE A FEW MINUTES TO READ
 
 ## **FIRMWARE COMPATIBILITY**
 
-**Works (I hope) with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
-- **Firmware BUILD 61840+**: Uses official `pypvs` library with LocalAPI authentication
-- **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints (tested and working)
+**October 3, 2025 should work with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
+- **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
+- **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
 
 **⚠️ TESTING STATUS**:
-- **Old firmware (BUILD < 61840)**: Tested and working on my production system (Firmware 61839)
-- **New firmware (BUILD 61840+)**: **Mostly untested** - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware, Even the official SunStrong integration is having issues as of Oct-02-2025: https://github.com/SunStrong-Management/pvs-hass/issues/7 - this could be firmware or the new pypvs code, and of course me not having the firmware myself makes this really hard to troubleshoot. 
+- **Old firmware (BUILD < 61840)**: Tested and working on my "production" HA system (Firmware 61839)
+- **New firmware (BUILD 61840+)**: Working on my test HA VM - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware. Even the official SunStrong integration is having issues as of October 2, 2025: https://github.com/SunStrong-Management/pvs-hass/issues/7 - this could be firmware or the new pypvs code, and of course me not having the firmware myself makes this really hard to troubleshoot. 
 
-**⚠️ Help wanted**: If you have firmware BUILD 61840+ and experience setup issues, please report with full logs and version number of firmware and integration. This is still experimental for new firmware. Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
+**⚠️ Help wanted**: If you have firmware BUILD 61840+ and experience setup issues, please report with full logs and version number of firmware and version number of integration. 
+
+This is still experimental for new firmware. And totally untested for battery systems, sadly. 
+Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 
 **NEW: Password Auto-Detection** - The integration attempts to:
 - Detect your full PVS serial number from the device
@@ -24,9 +29,9 @@
 
 ---
 
- **⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) So BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**  
+**⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) So BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
- ** After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
+**After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -36,7 +41,7 @@
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
-> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) <-- Why not sponsor me, even a few bucks shows you appreciate the work and gives encouragement. You can sponser me monthly, or just a one time thing. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) while you're here. 
+> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) <-- Why not sponsor me, even a few bucks shows you appreciate the work and gives encouragement. You can sponsor me monthly, or just a one time thing. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) while you're here. 
 
 > **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with simplified 24/7 polling, comprehensive PVS protection, individual inverter health monitoring, and authentication support.
 
@@ -52,9 +57,9 @@
 - **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
-- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI. 
+- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI.
 - **Diagnostic Dashboard**: 8 sensors tracking integration reliability and performance
-- **PVS Hardware Protection**: Built-in throttling (10 second minimum), health checking, and intelligent backoff
+- **PVS Hardware Protection**: Firmware-aware throttling (10s new firmware, 60s old firmware, 20s battery), health checking, and intelligent backoff
 
 **Technical Enhancements:**
 - **Multi-Channel Notifications**: 6 separate notification streams
@@ -66,7 +71,7 @@
 
 **Breaking Changes:**
 - **Binary Sensors**: Now use proper boolean states (`on`/`off`) instead of text values like `"working"`. May break existing automations.
-- **Minimum Polling**: Increased from 60s to 300s (5 minutes) for PVS hardware protection.
+- **Minimum Polling**: Firmware-aware enforcement (10s new firmware, 60s old firmware, 20s battery systems). Default remains 300s for safety.
 
 **Migration Guide:**
 ```yaml
@@ -94,9 +99,9 @@
 
 ### Upgrading from Original Keith Baker (krbaker) SunPower Integration
 
-**⚠️ This upgrade is a one-way process** - backup recommended before proceeding.
+**⚠️ This upgrade is a one-way process** - backup recommended before proceeding. You may be able to roll back, but my test failed, and I won't be investing time in debugging why.
 
-**Step-by-Step Upgrade:**
+**Step-by-Step Upgrade: GO SLOW**
 
 1. **Remove Original Integration**
    - Go to "Settings" → "Devices & Services"
@@ -148,7 +153,7 @@
 ![Notifications Configuration](images/config_pg3.png)
 
 ### Setup Process
-1. **Page 1**: Enter PVS IP address and polling interval
+1. **Page 1**: Enter PVS IP (WAN or LAN) address and polling interval
    - Integration automatically detects firmware BUILD and serial number
    - Validates connection and selects optimal communication method
 2. **Page 2**: Confirm password (auto-detected and pre-filled for new firmware)
@@ -159,16 +164,13 @@
    - Select mobile device for critical alerts
    - Configure email notifications
 
-*Note: Descriptive names are automatically enabled for better energy dashboard integration.*
-
 ### Configuration Options
 
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
-| **Host** | PVS IP Address | N/A | `172.27.153.1` |
-| **Polling Interval** | Update frequency (seconds) | 300 | 300-3600 seconds (5 min minimum for PVS protection) |
+| **Host** | PVS IP Address | N/A | WAN: `192.168.1.x` (recommended)<br>LAN: `172.27.153.1` |
+| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (firmware-aware: 10s new, 60s old, 20s battery) |
 | **PVS Password (last 5)** | Auto-detected from serial number | Auto-filled | Confirm auto-detected value (new firmware only) |
-| **Descriptive Names** | Show detailed inverter names | `true` | Automatically enabled for energy dashboard |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
 | **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
 | **Email Recipient** | Override recipient address | `` | Leave empty for service default |
@@ -218,9 +220,10 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 
 **Configuration:**
 - **Standard setup**: 300 seconds (5 minutes) - recommended default balancing data freshness with hardware protection
-- **Faster updates**: 10-60 seconds for frequent data updates (preparing for varserver capabilities)
+- **Faster updates (new firmware)**: 10-60 seconds for frequent data updates
 - **Conservative setup**: 600-3600 seconds for minimal PVS load
 - **Battery systems**: 20-second minimum (per SunStrong guidance for less aggressive polling)
+- **Old firmware**: 60-second minimum enforced automatically for hardware protection
 
 **SunStrong Recommendations:**
 - **Battery systems**: Use less aggressive polling intervals to reduce system load
@@ -405,18 +408,33 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 
 **Together:** Complete solar installation monitoring from grid-level accuracy down to individual panel performance, network connectivity, and panel-specific scheduling.
 
-**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals (20s minimum for battery systems per SunStrong guidance), with a conservative 300-second default. Fast polling capabilities prepare for upcoming varserver migration while maintaining hardware protection.
+**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals with firmware-aware minimums (10s new firmware, 60s old firmware, 20s battery systems), with a conservative 300-second default. Fast polling capabilities prepare for upcoming varserver migration while maintaining hardware protection.
 
 ## Network Setup
 
-**Simple Setup:** With authentication support, the integration can connect directly to your PVS using its standard IP address (typically `172.27.153.1`). No special network isolation or proxy setup required.
+### PVS Port Selection
 
-**For legacy systems or troubleshooting**, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
+**New Firmware (BUILD 61840+):**
+- **WAN Port (Recommended)**: Use the PVS WAN port IP address (gets DHCP, typically `192.168.1.x`)
+  - Easier to discover via your router's DHCP client list
+  - No fixed IP to remember
+  - Authentication eliminates need for network isolation
+- **LAN Port (Alternative)**: Fixed IP `172.27.153.1` also works
+  - Requires knowing the fixed address
+  - Same authentication and features as WAN port
+
+**Old Firmware (BUILD < 61840):**
+- **LAN Port Required**: Must use `172.27.153.1`
+- **Network Isolation Required**: PVS LAN port must be isolated (VLAN or separate network)
+  - See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for VLAN setup
+  - Or use Raspberry Pi proxy ([@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup))
+
+**Quick Test:** Check if your WAN port responds: `curl http://YOUR_PVS_WAN_IP/cgi-bin/dl_cgi/supervisor/info`
 
 ## Troubleshooting
 
 **Quick Fixes:**
-- **PVS Not Responding**: Check network connectivity, verify IP address (`172.27.153.1`)
+- **PVS Not Responding**: Check network connectivity, verify IP address (WAN port recommended for new firmware)
 - **All Entities Unavailable**: Force browser refresh (Ctrl+F5 / Cmd+Shift+R) to clear cached files
 - **Diagnostic Sensors Not Working**: Wait for a few polling cycles, check "Enhanced SunPower Diagnostics" device
 - **Mobile Notifications Not Working**: Verify Home Assistant mobile app installed and mobile service configured

@@ -66,6 +66,21 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Don't fail setup if battery detection fails
             _LOGGER.debug("Battery detection failed during setup: %s", e)
 
+    def _adjust_polling_for_old_firmware(self):
+        """Enforce 60s minimum for old firmware (BUILD < 61840)"""
+        try:
+            firmware_build = self._basic_config.get("firmware_build")
+            polling_interval = self._basic_config["polling_interval"]
+
+            # Old firmware needs 60s minimum for hardware protection
+            if firmware_build and firmware_build < 61840 and polling_interval < 60:
+                old_interval = polling_interval
+                self._basic_config["polling_interval"] = 60
+                _LOGGER.info("Adjusted polling from %ds to 60s for old firmware BUILD %s (hardware protection)",
+                            old_interval, firmware_build)
+        except Exception as e:
+            _LOGGER.debug("Firmware polling adjustment failed: %s", e)
+
     async def _get_supervisor_info(self, host):
         """Auto-detect PVS serial and firmware build from supervisor/info endpoint
 
@@ -132,8 +147,9 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # New firmware (BUILD >= 61840) - needs pypvs + password
             try:
                 _LOGGER.info("Validating new firmware (pypvs) with password...")
-                pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, password=last5)
-                await pvs.validate()
+                pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, user="ssm_owner", password=last5)
+                await pvs.discover()  # Must discover serial before setup/validate
+                await pvs.setup(auth_password=last5)  # Authenticate with password
                 _LOGGER.info("✅ New firmware (pypvs) validated successfully")
                 return serial, True, last5, build, None
             except Exception as e:
@@ -147,7 +163,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                     if device_data and isinstance(device_data, dict) and "devices" in device_data:
                         _LOGGER.warning("✅ Legacy fallback succeeded for BUILD %s - firmware LocalAPI may be buggy", build)
-                        return serial, False, None, build, None  # Use legacy mode instead
+                        return serial, False, last5, build, None  # Use legacy mode but keep last5 for future use
                     else:
                         return None, None, None, None, f"pypvs failed and legacy fallback returned invalid data"
                 except Exception as fallback_e:
@@ -177,12 +193,13 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Returns:
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
-        # Try pypvs first (new firmware)
+        # Try pypvs first (new firmware) - without password since we don't have serial yet
         try:
-            pvs = PVS(session=async_get_clientsession(self.hass, False), host=host)
-            await pvs.validate()
-            serial = pvs._firmware.serial
+            pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, user="ssm_owner")
+            await pvs.discover()  # Discover serial
+            serial = pvs.serial_number
             last5 = (serial[-5:] if serial and len(serial) >= 5 else "").upper()
+            await pvs.setup(auth_password=last5)  # Now authenticate with discovered password
             _LOGGER.info("Legacy detection: New firmware (pypvs), serial=%s", serial)
             return serial, True, last5, None, None
         except Exception as e:
@@ -219,7 +236,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Validate polling interval
             polling_interval = user_input["polling_interval"]
 
-            if polling_interval < 300:
+            if polling_interval < MIN_SUNPOWER_UPDATE_INTERVAL:
                 errors["polling_interval"] = "MIN_INTERVAL"
 
             if not errors:
@@ -248,6 +265,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         _LOGGER.info("Old firmware detected with auto-password - skipping password step")
                         self._basic_config["pvs_serial_last5"] = last5  # Store for future use
                         await self._adjust_polling_for_battery_system()
+                        self._adjust_polling_for_old_firmware()
                         return await self.async_step_notifications()
                     else:
                         # New firmware OR failed detection - ask for password
@@ -260,7 +278,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Page 1: Just IP and polling interval (like SunStrong)
         schema = vol.Schema({
-            vol.Required("host", default="172.27.153.1"): str,
+            vol.Required("host", default="192.168.1.73"): str,
             vol.Required("polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_SUNPOWER_UPDATE_INTERVAL,
@@ -313,8 +331,9 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store uppercase password in basic config
                 self._basic_config["pvs_serial_last5"] = pvs_serial_last5
 
-                # Check for battery system and proceed to notifications
+                # Check for battery system and old firmware, adjust polling if needed
                 await self._adjust_polling_for_battery_system()
+                self._adjust_polling_for_old_firmware()
                 _LOGGER.info("Setup: Password=%s, Will be used=%s",
                             pvs_serial_last5, uses_pypvs)
                 return await self.async_step_notifications()
@@ -367,6 +386,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "use_product_names": complete_config["use_product_names"],
                     "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
                     "uses_pypvs": complete_config.get("uses_pypvs", False),
+                    "firmware_build": complete_config.get("firmware_build"),
                 },
                 options={
                     "general_notifications": complete_config["general_notifications"],
@@ -389,13 +409,26 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         email_options = {"none": "Disabled"}
         email_options.update(email_services)
 
+        # Firmware-aware flash memory threshold
+        firmware_build = self._basic_config.get("firmware_build", 0)
+        if firmware_build >= 61840:
+            # New firmware: Use percentage (0-100%)
+            flash_default = 85
+            flash_max = 100
+            flash_unit = "%"
+        else:
+            # Old firmware: Use MB (0-200 MB)
+            flash_default = 0
+            flash_max = 200
+            flash_unit = "MB"
+
         # Page 3: Notifications schema
         schema = vol.Schema({
-            vol.Required("flash_memory_threshold_mb", default=0): selector.NumberSelector(
+            vol.Required("flash_memory_threshold_mb", default=flash_default): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
-                    max=200,
-                    unit_of_measurement="MB",
+                    max=flash_max,
+                    unit_of_measurement=flash_unit,
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
@@ -604,13 +637,27 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         if current_email_service == "none":
             current_email_recipient = ""
 
+        # Firmware-aware flash memory threshold
+        firmware_build = self.config_entry.data.get("firmware_build", 0)
+        if firmware_build >= 61840:
+            # New firmware: Use percentage (0-100%)
+            flash_max = 100
+            flash_unit = "%"
+            # Convert old MB values to percentage or use default
+            if current_flash_threshold == 0 or current_flash_threshold > 100:
+                current_flash_threshold = 85
+        else:
+            # Old firmware: Use MB (0-200 MB)
+            flash_max = 200
+            flash_unit = "MB"
+
         # Page 3: Notifications schema
         schema = vol.Schema({
             vol.Required("flash_memory_threshold_mb", default=current_flash_threshold): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
-                    max=200,
-                    unit_of_measurement="MB",
+                    max=flash_max,
+                    unit_of_measurement=flash_unit,
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),

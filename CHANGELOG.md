@@ -2,6 +2,116 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+## [v2025.10.8] - 2025-10-04
+
+### Diagnostic Fixes & Memory/Flash Percentage Support
+
+**Diagnostic Tracking Fixes:**
+- **Poll Success Rate Now Accurate**: Fixed order-of-operations bug where diagnostic device was created BEFORE updating success stats
+- **Cached Data Counted as Success**: Coordinator now tracks cached data returns as successful polls (coordinator provided data successfully)
+- **Field Name Mismatch Fixed**: Changed `last_successful_poll` to `last_success_time` to match display code
+- **Result**: Diagnostic entities now show accurate real-time polling statistics (Poll Success Rate, Total Polls, Last Successful Poll, etc.)
+
+**Old Firmware Protection:**
+- **60-Second Minimum Enforced**: Old firmware (BUILD < 61840) now automatically enforces 60s minimum polling
+- **Hardware Protection**: Prevents dangerous fast polling on legacy firmware that could stress PVS hardware
+- **Config Flow Detection**: `_adjust_polling_for_old_firmware()` called after firmware detection in both setup paths
+- **User Transparent**: Silently adjusts user input to safe values
+
+**Memory/Flash Monitoring Improvements:**
+- **New Sensors for New Firmware**: Added RAM Usage % and Flash Usage % sensors (pypvs only provides percentages, not KB)
+- **Percentage-Based Flash Alerts**: New firmware users get flash alerts when usage > 85% (< 15% available) - configurable 0-100%
+- **Firmware-Aware Config UI**: Setup shows "MB" for old firmware, "%" for new firmware with appropriate defaults
+- **Old Firmware Unchanged**: KB-based monitoring continues working for BUILD < 61840 users
+- **Smart Detection**: Integration automatically uses correct metric based on available data
+
+**Data Availability Changes:**
+- **New Firmware (BUILD ≥ 61840)**:
+  - Memory Used KB: Shows 0 (data unavailable from varserver)
+  - Flash Available KB: Shows 0 (data unavailable from varserver)
+  - RAM Usage %: Shows actual percentage (0-100%)
+  - Flash Usage %: Shows actual percentage (0-100%)
+- **Old Firmware (BUILD < 61840)**:
+  - Memory Used KB: Shows actual KB values
+  - Flash Available KB: Shows actual KB values
+  - Percentage sensors: Not created (data unavailable)
+
+### Technical Details
+
+**Files Modified:**
+- `__init__.py`:
+  - Fixed diagnostic stat tracking (lines 588-589, 635-636, 730-748)
+  - Changed field name from `last_successful_poll` to `last_success_time` (lines 162, 743)
+  - Moved stat tracking before diagnostic device creation (order-of-operations fix)
+- `config_flow.py`:
+  - Added `_adjust_polling_for_old_firmware()` function (lines 69-82)
+  - Called in both setup paths (lines 268, 336)
+  - Firmware-aware flash threshold UI: Shows MB/% units based on firmware (lines 412-423, 640-652)
+  - Auto-converts old MB values to 85% default for new firmware users
+- `pypvs_converter.py`:
+  - Added `ram_usage_percent` and `flash_usage_percent` fields (lines 66-67)
+  - Set KB values to "0" for new firmware (data unavailable from varserver)
+- `health_check.py`:
+  - Added percentage-based flash monitoring (lines 390-406)
+  - Kept KB-based monitoring for old firmware (lines 408-421)
+  - Uses firmware-aware threshold (85% for new, MB for old)
+- `sensor.py`:
+  - Skip KB sensors when value is "0" (lines 127-130)
+  - Prevents creating ghost entities for new firmware users
+- `const.py`:
+  - Added `PVS_RAM_USAGE_PERCENT` sensor definition (lines 184-192)
+  - Added `PVS_FLASH_USAGE_PERCENT` sensor definition (lines 193-201)
+
+### Future Plans
+
+**Old Firmware Support Removal (~2 weeks):**
+- Will remove all BUILD < 61840 legacy code (dl_cgi, route checking, VLAN setup)
+- Simplifies codebase significantly
+- New firmware (varserver/pypvs) will be only supported method
+- Users on old firmware should upgrade or freeze on final legacy-supporting version
+
+## [v2025.10.7] - 2025-10-03
+
+### New Firmware Polish & Refinements
+
+**Authentication Experience:**
+- **Suppressed pypvs Auth Warnings**: Hidden harmless "Unauthorized access. Retrying login..." messages from logs
+- **Reason**: pypvs library retries authentication internally - warnings don't indicate errors
+- **Result**: Clean logs, no GitHub issues from confused users seeing retry messages
+
+**Polling Flexibility:**
+- **10-Second Minimum Polling**: Reduced from 300 seconds to 10 seconds for new firmware (LocalAPI/varserver)
+- **Battery System Protection**: Auto-adjusts to 20-second minimum when battery system detected
+- **Configuration UI Updated**: Setup and options flows now show correct "10-3600 seconds" range
+- **SunStrong Guidance**: Faster polling safe on new firmware due to improved varserver performance
+
+**Entity Parity Restored:**
+- **PVS Diagnostic Entities**: Added missing `dl_skipped_scans`, `dl_scan_time`, `dl_untransmitted` fields
+- **Production Meter Amps**: Fixed meter type detection (p/c suffix) - production meters now always include Amps entity
+- **Zero-Value Filtering**: Meters only create entities for non-zero fields (matches old dl_cgi behavior exactly)
+- **Result**: Entity counts match legacy integration exactly
+
+**Network Flexibility:**
+- **Both Ports Supported**: WAN (192.168.1.73) and LAN (172.27.153.1) ports work with new firmware
+- **No VLAN Required**: New firmware authentication eliminates need for network isolation
+- **WAN Port Recommended**: Gets DHCP address, easier to discover than fixed LAN IP
+- **Backward Compatible**: Old firmware still requires LAN port isolation (legacy behavior)
+
+### Technical Details
+
+**pypvs_converter.py Enhancements:**
+- **PVS Model Extraction**: Correctly extracts "PVS6" from `hardware_version` field (gateway.model returns "PV-only")
+- **Device Naming**: Prepends "PV Supervisor" to match legacy format exactly
+- **Meter Type Detection**: Uses model suffix ('p'=production, 'c'=consumption) for field inclusion logic
+- **Production Meters**: Always include `i_a` (Amps) if available
+- **Consumption Meters**: Include per-leg data (i1_a, i2_a, p1_kw, p2_kw, v1n_v, v2n_v) only if non-zero
+
+**Files Modified:**
+- `__init__.py`: Added pypvs.pvs_fcgi logger suppression (line 28)
+- `config_flow.py`: Changed hardcoded 300 to MIN_SUNPOWER_UPDATE_INTERVAL (line 224)
+- `translations/en.json`: Updated polling interval descriptions to "10-3600 seconds"
+- `pypvs_converter.py`: Added PVS diagnostic fields, fixed meter type detection
+
 ## [v2025.10.6] - 2025-10-03
 
 ### Major Feature: Intelligent Firmware Auto-Detection
@@ -134,7 +244,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 - **Startup Polling**: Fixed health check failure on first poll after restart causing 1-minute delay
 - **Varserver Timeout**: Prevented long varserver probe from blocking integration startup on old firmware
 
-## [Unreleased] - 2025-09-29
+## [v2025.10.7] - 2025-10-04
 
 ### Code Quality Improvements
 - **Enhanced Error Logging**: Added HTTP status codes and response bodies to all PVS communication errors for better troubleshooting

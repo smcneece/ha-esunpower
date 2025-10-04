@@ -123,12 +123,18 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                     
                     # HYBRID: Field exists + has value (original compatibility + our clean interface)
                     if sunpower_sensor.native_value is not None:
-                        _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s", 
-                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name, 
+                        # Skip KB-based memory/flash sensors if value is "0" (new firmware - data unavailable)
+                        if sensor_name in ["PVS_MEMORY_USED", "PVS_FLASH_AVAILABLE"] and sunpower_sensor.native_value == "0":
+                            _LOGGER.debug("Skipping sensor %s for %s - new firmware uses percentage sensors instead",
+                                        sensor_name, sensor_data.get('SERIAL', 'Unknown'))
+                            continue
+
+                        _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s",
+                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name,
                                     sunpower_sensor.native_value)
                         entities.append(sunpower_sensor)
                     else:
-                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value", 
+                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value",
                                     sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
 
         # Create entities for each device type

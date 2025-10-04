@@ -24,6 +24,9 @@ from homeassistant.util import dt as dt_util
 from pypvs.pvs import PVS
 from pypvs.exceptions import PVSError
 
+# Suppress pypvs library auth retry warnings (harmless - pypvs handles retries internally)
+logging.getLogger("pypvs.pvs_fcgi").setLevel(logging.ERROR)
+
 from .const import (
     BATTERY_DEVICE_TYPE,
     DIAGNOSTIC_DEVICE_TYPE,
@@ -156,7 +159,7 @@ class SunPowerDataCache:
             'successful_polls': 0,
             'failed_polls': 0,
             'consecutive_failures': 0,
-            'last_successful_poll': None,
+            'last_success_time': 0,
             'response_times': [],
             'integration_start_time': time.time(),
         }
@@ -484,12 +487,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Migrate from krbaker format if needed
     await migrate_from_krbaker_if_needed(hass, entry)
 
-
-    polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
-
     # Check if we should use pypvs (new firmware) or legacy dl_cgi (old firmware)
     uses_pypvs = entry.data.get("uses_pypvs", False)
     firmware_build = entry.data.get("firmware_build")
+
+    # FIRMWARE UPGRADE MIGRATION: Detect if PVS firmware was upgraded to 61840+
+    if not uses_pypvs:
+        _LOGGER.info("Checking if PVS firmware was upgraded...")
+        try:
+            # Query supervisor/info for current BUILD
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"http://{entry.data['host']}/cgi-bin/dl_cgi/supervisor/info", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        supervisor = await resp.json()
+                        current_build = supervisor.get("BUILD")
+                        current_serial = supervisor.get("SERIAL")
+
+                        MIN_LOCALAPI_BUILD = 61840
+                        if current_build and current_build >= MIN_LOCALAPI_BUILD:
+                            _LOGGER.warning("⚠️ FIRMWARE UPGRADE DETECTED: BUILD %s requires pypvs but config has uses_pypvs=False", current_build)
+                            _LOGGER.info("Migrating to new firmware mode...")
+
+                            # Extract last5 from serial for authentication
+                            last5 = (current_serial[-5:] if current_serial and len(current_serial) >= 5 else "").upper()
+
+                            # Update config entry
+                            new_data = dict(entry.data)
+                            new_data["uses_pypvs"] = True
+                            new_data["firmware_build"] = current_build
+                            if not new_data.get("pvs_serial_last5"):
+                                new_data["pvs_serial_last5"] = last5
+                                _LOGGER.info("Auto-detected serial last5: %s", last5)
+
+                            hass.config_entries.async_update_entry(entry, data=new_data)
+
+                            # Update local variables
+                            uses_pypvs = True
+                            firmware_build = current_build
+
+                            _LOGGER.info("✅ Migration complete: Now using pypvs with BUILD %s", current_build)
+        except Exception as e:
+            _LOGGER.debug("Firmware upgrade check failed (not critical): %s", e)
+
+    # Set polling URL based on firmware method
+    if uses_pypvs:
+        polling_url = f"http://{entry.data['host']}/vars (pypvs LocalAPI)"
+    else:
+        polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
 
     # Get authentication details - ONLY use password for new firmware (BUILD >= 61840)
     pvs_serial_last5 = entry.data.get("pvs_serial_last5", "").strip()
@@ -497,6 +542,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     if uses_pypvs:
         _LOGGER.info("🔒 Using pypvs library for new firmware (BUILD %s) WITH authentication", firmware_build)
+        _LOGGER.info("Auth details: host=%s, user=ssm_owner, password=%s*** (length=%d)",
+                     entry.data['host'], auth_password[:2] if auth_password else "NONE",
+                     len(auth_password) if auth_password else 0)
+
         # Create PVS object with password for new firmware
         try:
             pvs_object = PVS(
@@ -506,8 +555,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 password=auth_password
             )
             _LOGGER.info("✅ pypvs object created successfully (version %s)", getattr(pypvs, '__version__', 'unknown'))
+
+            # Initialize pypvs - discover serial and authenticate
+            _LOGGER.info("Initializing pypvs: discovering serial and authenticating...")
+            await pvs_object.discover()
+            await pvs_object.setup(auth_password=auth_password)
+            _LOGGER.info("✅ pypvs initialized and authenticated successfully (serial: %s)", pvs_object.serial_number)
         except Exception as e:
-            _LOGGER.error("❌ Failed to create pypvs object - library may be corrupted or incompatible: %s", e, exc_info=True)
+            _LOGGER.error("❌ Failed to initialize pypvs object: %s", e, exc_info=True)
             raise
         sunpower_monitor = None  # Not used when using pypvs
     else:
@@ -528,6 +583,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         """Simplified data fetching - single polling interval, always active"""
 
         notify_diagnostic_coordinator_started(hass, entry, cache)
+
+        # Track poll start time for diagnostic stats
+        poll_start_time = time.time()
+        cache.diagnostic_stats['total_polls'] += 1
 
         # Get host IP for cache operations
         host_ip = entry.data['host']
@@ -572,6 +631,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 except Exception as e:
                     _LOGGER.warning("Health checks failed: %s", e)
 
+                # Track cached data return as success (coordinator returned data successfully)
+                cache.diagnostic_stats['successful_polls'] += 1
+                cache.diagnostic_stats['consecutive_failures'] = 0
+
                 meter_data = data.get('Power Meter', {})
                 diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
@@ -589,7 +652,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
                 pvs_data = await pvs_object.update()
                 # Convert pypvs PVSData object to legacy dl_cgi format
-                fresh_data = convert_pypvs_to_legacy(pvs_data)
+                # Pass PVS serial from pvs_object for virtual device creation
+                fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number)
             else:
                 # Old firmware: Use legacy dl_cgi
                 _LOGGER.debug("Polling PVS using dl_cgi (old firmware)")
@@ -597,9 +661,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             # Note: fresh_data can be None if PVS is unhealthy/backoff - this is normal, use cache
         except PVSError as e:
             _LOGGER.error("pypvs polling error: %s", e)
+            cache.diagnostic_stats['failed_polls'] += 1
+            cache.diagnostic_stats['consecutive_failures'] += 1
             fresh_data = None
         except Exception as e:
             _LOGGER.error("PVS polling exception: %s", e)
+            cache.diagnostic_stats['failed_polls'] += 1
+            cache.diagnostic_stats['consecutive_failures'] += 1
             # Handle authentication vs general polling failures
             if not pvs_object:  # Only call for legacy method
                 await _handle_polling_error(hass, entry, cache, host_ip, e)
@@ -662,7 +730,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 _LOGGER.warning("Health checks failed: %s", e)
                 # Continue - health check failures shouldn't stop data processing
 
-            # Step 6: Create diagnostic device
+            # Step 6: Track successful poll with response time (BEFORE creating diagnostic device)
+            response_time = time.time() - poll_start_time
+            cache.diagnostic_stats['successful_polls'] += 1
+            cache.diagnostic_stats['consecutive_failures'] = 0
+            cache.diagnostic_stats['last_success_time'] = time.time()
+            cache.diagnostic_stats['response_times'].append(response_time)
+
+            # Keep only last 100 response times for average calculation
+            if len(cache.diagnostic_stats['response_times']) > 100:
+                cache.diagnostic_stats['response_times'] = cache.diagnostic_stats['response_times'][-100:]
+
+            # Calculate average response time
+            if cache.diagnostic_stats['response_times']:
+                cache.diagnostic_stats['average_response_time'] = sum(cache.diagnostic_stats['response_times']) / len(cache.diagnostic_stats['response_times'])
+
+            # Step 7: Create diagnostic device (AFTER updating stats so it shows current poll)
             try:
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 meter_data = data.get('Power Meter', {})
