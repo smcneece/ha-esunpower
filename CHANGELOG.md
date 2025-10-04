@@ -4,7 +4,12 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 ## [v2025.10.8] - 2025-10-04
 
-### Diagnostic Fixes & Memory/Flash Percentage Support
+### Diagnostic Fixes, Memory/Flash Percentage Support & Configuration Bug Fix
+
+**Configuration Bug Fix:**
+- **Reconfigure Serial Number**: Fixed authentication failing when PVS serial entered via Reconfigure instead of initial setup
+- **Smart Lookup**: Code now checks both `entry.options` (reconfigure) and `entry.data` (initial setup) for serial number
+- **Impact**: New firmware users can now update serial number via reconfigure without "Authentication required" errors
 
 **Diagnostic Tracking Fixes:**
 - **Poll Success Rate Now Accurate**: Fixed order-of-operations bug where diagnostic device was created BEFORE updating success stats
@@ -40,6 +45,7 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 
 **Files Modified:**
 - `__init__.py`:
+  - Fixed serial number lookup to check both entry.options and entry.data (line 541-543)
   - Fixed diagnostic stat tracking (lines 588-589, 635-636, 730-748)
   - Changed field name from `last_successful_poll` to `last_success_time` (lines 162, 743)
   - Moved stat tracking before diagnostic device creation (order-of-operations fix)

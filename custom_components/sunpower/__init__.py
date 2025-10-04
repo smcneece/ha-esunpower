@@ -537,7 +537,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
 
     # Get authentication details - ONLY use password for new firmware (BUILD >= 61840)
-    pvs_serial_last5 = entry.data.get("pvs_serial_last5", "").strip()
+    # Check both entry.data (initial setup) and entry.options (reconfigure) for serial
+    pvs_serial_last5 = entry.options.get("pvs_serial_last5") or entry.data.get("pvs_serial_last5", "")
+    pvs_serial_last5 = pvs_serial_last5.strip() if pvs_serial_last5 else ""
     auth_password = pvs_serial_last5 if (pvs_serial_last5 and uses_pypvs) else None
 
     if uses_pypvs:
