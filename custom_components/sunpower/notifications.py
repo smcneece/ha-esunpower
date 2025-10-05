@@ -247,7 +247,7 @@ def safe_notify(hass, message, title="Enhanced SunPower", config_entry=None,
                     _LOGGER.debug("Skipping duplicate startup notification: %s", startup_key)
                     return
                 else:
-                    cache.startup_notifications_sent.add(startup_key)
+                    cache.startup_notifications_sent[startup_key] = True  # Dict, not set
         
         # FIXED: Only add timestamp if requested and not already in message
         final_message = message
@@ -387,6 +387,13 @@ def notify_flash_memory_critical(hass, entry, cache, serial, available_mb, thres
     # This is critical hardware protection - always notify + mobile
     safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True,
                notification_category="flash_memory", cache=cache)
+
+def notify_flash_wear_critical(hass, entry, cache, serial, wear_pct, threshold_pct, remaining_pct):
+    """ESSENTIAL: Flash wear critical alert - UI + mobile"""
+    msg = f"⚠️ PVS {serial} FLASH WEAR CRITICAL: {wear_pct}% used / {remaining_pct}% remaining (threshold: {threshold_pct}%)"
+    # This is critical hardware protection - always notify + mobile
+    safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True,
+               notification_category="flash_wear", cache=cache)
 
 def notify_polling_failed(hass, entry, cache, polling_url, error):
     """ESSENTIAL: Polling failure notifications"""

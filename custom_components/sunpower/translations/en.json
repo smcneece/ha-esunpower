@@ -13,7 +13,7 @@
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Connection Setup",
-                "description": "Step 1: Enter your PVS IP address.\n\n🌞 IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n⚠️ PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "Step 1: Enter your PVS IP address.\n\n\ud83c\udf1e IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)"
@@ -25,7 +25,7 @@
             },
             "need_password": {
                 "title": "Enhanced SunPower - Authentication",
-                "description": "Step 2: Enter password for PVS authentication.\n\n🔐 Password is the last 5 characters of your PVS serial number.\n\n📍 Find serial number:\n• Physical device: Remove PVS cover - serial on device label\n• SunPower/SunStrong App: Profile → System Info → Serial Number\n\n{serial_number}",
+                "description": "Step 2: Enter password for PVS authentication.\n\n\ud83d\udd10 Password is the last 5 characters of your PVS serial number.\n\n\ud83d\udccd Find serial number:\n\u2022 Physical device: Remove PVS cover - serial on device label\n\u2022 SunPower/SunStrong App: Profile \u2192 System Info \u2192 Serial Number\n\n{serial_number}",
                 "data": {
                     "pvs_serial_last5": "PVS Password (last 5 chars of serial)"
                 },
@@ -35,7 +35,7 @@
             },
             "notifications": {
                 "title": "Enhanced SunPower - Notifications & Advanced",
-                "description": "Configure notification preferences and advanced features.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n\n⚠️ Debug Notifications Warning:\n• With fast polling (10-60s), debug notifications generate MANY messages\n• Recommended: Use debug only for troubleshooting, disable when done",
+                "description": "Configure notification preferences and advanced features.\n\n\ud83d\udd14 Notification Levels:\n\u2022 General notifications give you 'integration is working' feedback\n\u2022 Debug notifications help with troubleshooting\n\n\u26a0\ufe0f Debug Notifications Warning:\n\u2022 With fast polling (10-60s), debug notifications generate MANY messages\n\u2022 Recommended: Use debug only for troubleshooting, disable when done",
                 "data": {
                     "general_notifications": "Show status notifications",
                     "deep_debug_notifications": "Show debug diagnostics",
@@ -43,7 +43,8 @@
                     "mobile_device": "Mobile device for critical alerts",
                     "email_notification_service": "Email notification service",
                     "email_notification_recipient": "Email recipient",
-                    "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
+                    "flash_memory_threshold_mb": "Flash memory alert threshold",
+                    "flash_wear_threshold": "Flash wear alert threshold"
                 },
                 "data_description": {
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
@@ -51,12 +52,13 @@
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
                     "email_notification_recipient": "Recipient email address (required when email service selected)",
-                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
+                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount - % for new firmware, MB for old (set to 0 to disable)",
+                    "flash_wear_threshold": "Alert when PVS flash wear exceeds this percentage - shows EMMC lifetime consumed (set to 0 to disable)"
                 }
             },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
-                "description": "Configure advanced Enhanced SunPower features.\n\n🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n\n🔔 Notification Options:\n• General notifications provide 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n• Email notifications send critical alerts via email\n\n📱 Mobile Device: Select your phone/tablet for critical alerts\n📧 Email Notifications: Enable critical alerts via email service",
+                "description": "Configure advanced Enhanced SunPower features.\n\n\ud83c\udf1e Sun Elevation Guide:\n\u2022 5\u00b0 = Early start (east-facing panels)\n\u2022 10\u00b0 = Standard (most residential systems)\n\u2022 15\u00b0 = Late start (west-facing/shaded panels)\n\n\ud83d\udd14 Notification Options:\n\u2022 General notifications provide 'integration is working' feedback\n\u2022 Debug notifications help with troubleshooting\n\u2022 Mobile notifications send critical alerts to your phone\n\u2022 Email notifications send critical alerts via email\n\n\ud83d\udcf1 Mobile Device: Select your phone/tablet for critical alerts\n\ud83d\udce7 Email Notifications: Enable critical alerts via email service",
                 "data": {
                     "minimum_sun_elevation": "Minimum sun elevation (degrees)",
                     "general_notifications": "Show status notifications",
@@ -66,7 +68,7 @@
                     "mobile_device": "Mobile device for alerts"
                 },
                 "data_description": {
-                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
+                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5\u00b0 = early start, 10\u00b0 = standard, 15\u00b0 = late start)",
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
@@ -80,7 +82,7 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "⚠️ Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n🌞 IMPORTANT: Configuration changes during daylight hours recommended.\n\n⚠️ PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\ud83c\udf1e IMPORTANT: Configuration changes during daylight hours recommended.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)",
@@ -94,7 +96,7 @@
             },
             "notifications": {
                 "title": "Enhanced SunPower - Notifications",
-                "description": "Configure notification preferences.\n\n🔔 Notification Levels:\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n\n⚠️ Debug Notifications Warning:\n• With fast polling (10-60s), debug notifications generate MANY messages\n• Recommended: Use debug only for troubleshooting, disable when done",
+                "description": "Configure notification preferences.\n\n\ud83d\udd14 Notification Levels:\n\u2022 General notifications give you 'integration is working' feedback\n\u2022 Debug notifications help with troubleshooting\n\n\u26a0\ufe0f Debug Notifications Warning:\n\u2022 With fast polling (10-60s), debug notifications generate MANY messages\n\u2022 Recommended: Use debug only for troubleshooting, disable when done",
                 "data": {
                     "general_notifications": "Show status notifications",
                     "deep_debug_notifications": "Show debug diagnostics",
@@ -102,7 +104,8 @@
                     "mobile_device": "Mobile device for critical alerts",
                     "email_notification_service": "Email notification service",
                     "email_notification_recipient": "Email recipient",
-                    "flash_memory_threshold_mb": "Flash memory alert threshold (MB)"
+                    "flash_memory_threshold_mb": "Flash memory alert threshold",
+                    "flash_wear_threshold": "Flash wear alert threshold"
                 },
                 "data_description": {
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
@@ -110,12 +113,13 @@
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",
                     "email_notification_service": "Select email notification service from your Home Assistant notify services (select service to enable emails)",
                     "email_notification_recipient": "Recipient email address (required when email service selected)",
-                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount (set to 0 to disable)"
+                    "flash_memory_threshold_mb": "Alert when PVS flash memory drops below this amount - % for new firmware, MB for old (set to 0 to disable)",
+                    "flash_wear_threshold": "Alert when PVS flash wear exceeds this percentage - shows EMMC lifetime consumed (set to 0 to disable)"
                 }
             },
             "advanced": {
                 "title": "Enhanced SunPower - Advanced Settings",
-                "description": "🌞 Sun Elevation Guide:\n• 5° = Early start (east-facing panels)\n• 10° = Standard (most residential systems)\n• 15° = Late start (west-facing/shaded panels)\n• 0° = Horizon level\n\n🔔 Notification Levels:\n• Critical notifications (PVS offline, inverter failures) always show\n• General notifications give you 'integration is working' feedback\n• Debug notifications help with troubleshooting\n• Mobile notifications send critical alerts to your phone\n• Email notifications send critical alerts via email\n\n📱 Mobile Device: Choose which device receives critical alerts (PVS offline, inverter failures, flash memory critical)\n📧 Email Notifications: Enable critical alerts via email service",
+                "description": "\ud83c\udf1e Sun Elevation Guide:\n\u2022 5\u00b0 = Early start (east-facing panels)\n\u2022 10\u00b0 = Standard (most residential systems)\n\u2022 15\u00b0 = Late start (west-facing/shaded panels)\n\u2022 0\u00b0 = Horizon level\n\n\ud83d\udd14 Notification Levels:\n\u2022 Critical notifications (PVS offline, inverter failures) always show\n\u2022 General notifications give you 'integration is working' feedback\n\u2022 Debug notifications help with troubleshooting\n\u2022 Mobile notifications send critical alerts to your phone\n\u2022 Email notifications send critical alerts via email\n\n\ud83d\udcf1 Mobile Device: Choose which device receives critical alerts (PVS offline, inverter failures, flash memory critical)\n\ud83d\udce7 Email Notifications: Enable critical alerts via email service",
                 "data": {
                     "minimum_sun_elevation": "Minimum sun elevation (degrees)",
                     "general_notifications": "Show status notifications",
@@ -125,7 +129,7 @@
                     "mobile_device": "Mobile device for alerts"
                 },
                 "data_description": {
-                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5° = early start, 10° = standard, 15° = late start)",
+                    "minimum_sun_elevation": "Minimum degrees above horizon for solar polling (5\u00b0 = early start, 10\u00b0 = standard, 15\u00b0 = late start)",
                     "general_notifications": "Polling success, system status, 'integration is working' feedback",
                     "deep_debug_notifications": "Coordinator cycles, timing details, data conversion (WARNING: generates many notifications with fast polling)",
                     "overwrite_general_notifications": "Prevents notification accumulation by reusing the same notification",

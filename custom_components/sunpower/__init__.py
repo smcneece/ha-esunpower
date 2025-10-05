@@ -58,6 +58,7 @@ from .data_processor import (
 from .health_check import (
     check_firmware_upgrade,
     check_flash_memory_level,
+    check_flash_wear_level,
     check_inverter_health,
     reset_inverter_health_tracking,
     smart_pvs_health_check,
@@ -137,7 +138,7 @@ class SunPowerDataCache:
         
         # Startup notification throttling
         self.startup_time = time.time()
-        self.startup_notifications_sent = set()
+        self.startup_notifications_sent = {}  # Dict to track alert times, not a set
         
         # PVS health check tracking
         self.pvs_health_failures = 0
@@ -148,6 +149,9 @@ class SunPowerDataCache:
         self.inverter_health_initialized = False
         self.expected_inverters = set()
         self.inverter_failure_counts = {}
+
+        # Battery detection (persistent once detected)
+        self.battery_detected_once = False
         
         # Firmware tracking
         self.last_known_firmware = None
@@ -622,16 +626,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             data = convert_sunpower_data(cached_data)
             is_valid, device_count, error_message = validate_converted_data(data)
             if is_valid:
+                # Get device data for diagnostic creation
+                inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+
                 # Run health checks on cached data too
                 try:
                     pvs_data = data.get(PVS_DEVICE_TYPE, {})
-                    inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                     if pvs_data and inverter_data:
                         check_firmware_upgrade(hass, entry, cache, pvs_data)
                         check_flash_memory_level(hass, entry, cache, pvs_data)
+                        check_flash_wear_level(hass, entry, cache, pvs_data)
                         check_inverter_health(hass, entry, cache, inverter_data)
                 except Exception as e:
-                    _LOGGER.warning("Health checks failed: %s", e)
+                    _LOGGER.error("Health checks failed on cached data: %s", e, exc_info=True)
 
                 # Track cached data return as success (coordinator returned data successfully)
                 cache.diagnostic_stats['successful_polls'] += 1
@@ -653,9 +660,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 # New firmware: Use pypvs library
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
                 pvs_data = await pvs_object.update()
+                # Query flash wear percentage (not in pypvs PVSGateway model yet)
+                flashwear_pct = 0
+                try:
+                    flashwear_hex = await pvs_object.getVarserverVar('/sys/pvs/flashwear_type_b')
+                    # Convert hex to percentage: 0x01 = 10%, 0x09 = 90%
+                    if flashwear_hex:
+                        if isinstance(flashwear_hex, str) and flashwear_hex.startswith('0x'):
+                            flashwear_pct = int(flashwear_hex, 16) * 10
+                        else:
+                            flashwear_pct = int(flashwear_hex) * 10
+                        _LOGGER.debug('Flash wear: %d%%', flashwear_pct)
+                except Exception as e:
+                    _LOGGER.debug('Could not fetch flashwear_type_b: %s', e)
                 # Convert pypvs PVSData object to legacy dl_cgi format
                 # Pass PVS serial from pvs_object for virtual device creation
-                fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number)
+                fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number, flashwear_percent=flashwear_pct)
             else:
                 # Old firmware: Use legacy dl_cgi
                 _LOGGER.debug("Polling PVS using dl_cgi (old firmware)")
@@ -676,12 +696,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             fresh_data = None
             # Continue to cache fallback below
 
-        # Step 2: Save cache if we got fresh data
+        # Step 2: Save cache if we got fresh data - preserve missing devices
         if fresh_data:
             try:
-                cache_success = await save_cache_file(hass, host_ip, fresh_data)
+                # Merge cached inverters/meters before saving to preserve night-time data
+                data_to_save = dict(fresh_data)  # Copy fresh data
+                if cached_data:
+                    fresh_device_types = {dev.get('DEVICE_TYPE') for dev in fresh_data.get('devices', [])}
+                    fresh_serials = {dev.get('SERIAL') for dev in fresh_data.get('devices', [])}
+                    cached_devices = cached_data.get('devices', [])
+                    
+                    # Preserve inverters if missing (night-time)
+                    if 'Inverter' not in fresh_device_types:
+                        cached_inverters = [dev for dev in cached_devices 
+                                           if dev.get('DEVICE_TYPE') == 'Inverter']
+                        if cached_inverters:
+                            data_to_save['devices'] = fresh_data['devices'] + cached_inverters
+                            _LOGGER.debug("Preserving %d inverters in cache (offline)", len(cached_inverters))
+                
+                cache_success = await save_cache_file(hass, host_ip, data_to_save)
                 if cache_success:
-                    cache.previous_pvs_sample = fresh_data
+                    cache.previous_pvs_sample = data_to_save
                     cache.previous_pvs_sample_time = time.time()
             except Exception as e:
                 _LOGGER.warning("Cache save failed: %s", e)
@@ -690,6 +725,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Step 3: Convert and validate data
         if fresh_data:
             try:
+                # Merge cached device data at RAW JSON level BEFORE conversion
+                # This ensures virtual meter creation has all device data available
+                if cached_data:
+                    try:
+                        # Get existing serials to avoid duplicates
+                        fresh_serials = {dev.get('SERIAL') for dev in fresh_data.get('devices', [])}
+                        fresh_device_types = {dev.get('DEVICE_TYPE') for dev in fresh_data.get('devices', [])}
+                        cached_devices = cached_data.get('devices', [])
+                        
+                        # Preserve inverters if missing from fresh data (night-time)
+                        if 'Inverter' not in fresh_device_types:
+                            cached_inverters = [dev for dev in cached_devices 
+                                               if dev.get('DEVICE_TYPE') == 'Inverter' 
+                                               and dev.get('SERIAL') not in fresh_serials]
+                            if cached_inverters:
+                                fresh_data['devices'].extend(cached_inverters)
+                                _LOGGER.debug("Restored %d inverters from cache (offline at night)", len(cached_inverters))
+                        
+                        # Preserve power meters if missing
+                        if 'Power Meter' not in fresh_device_types:
+                            cached_meters = [dev for dev in cached_devices 
+                                            if dev.get('DEVICE_TYPE') == 'Power Meter' 
+                                            and dev.get('SERIAL') not in fresh_serials]
+                            if cached_meters:
+                                fresh_data['devices'].extend(cached_meters)
+                                _LOGGER.debug("Restored %d power meters from cache", len(cached_meters))
+                    except Exception as merge_error:
+                        _LOGGER.debug("Cache merge failed: %s", merge_error)
+                        # Continue without cached data
+                
+                # NOW convert with complete device list (fresh + cached)
                 data = convert_sunpower_data(fresh_data)
                 is_valid, device_count, error_message = validate_converted_data(data)
 
@@ -705,32 +771,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             # Battery processing (if detected)
             if has_battery:
                 try:
+                    _LOGGER.debug("Battery system detected - polling ESS endpoint")
                     old_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
                     ess_data = await sunpower_monitor.energy_storage_system_status_async()
 
                     if ess_data:
+                        _LOGGER.debug("ESS endpoint returned data - converting to battery entities")
                         data = convert_ess_data(ess_data, data)
                         new_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
 
                         if old_battery_count == new_battery_count:
                             _LOGGER.warning("ESS data processed but no virtual devices created")
+                        else:
+                            _LOGGER.info("ESS polling successful: %d battery entities created", new_battery_count)
+                    else:
+                        _LOGGER.warning("ESS endpoint returned no data - battery entities may become unavailable")
 
                 except Exception as convert_error:
                     _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
                     # Don't re-raise - continue with PVS data
+            else:
+                _LOGGER.debug("No battery system detected - skipping ESS polling")
 
-            # Step 5: Health checks - only when we have valid PVS data
+            # Step 5: Health checks
             try:
                 pvs_data = data.get(PVS_DEVICE_TYPE, {})
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
-
                 if pvs_data and inverter_data:
                     check_firmware_upgrade(hass, entry, cache, pvs_data)
                     check_flash_memory_level(hass, entry, cache, pvs_data)
+                    check_flash_wear_level(hass, entry, cache, pvs_data)
                     check_inverter_health(hass, entry, cache, inverter_data)
             except Exception as e:
-                _LOGGER.warning("Health checks failed: %s", e)
-                # Continue - health check failures shouldn't stop data processing
+                _LOGGER.error("Health checks failed on fresh data: %s", e, exc_info=True)
 
             # Step 6: Track successful poll with response time (BEFORE creating diagnostic device)
             response_time = time.time() - poll_start_time

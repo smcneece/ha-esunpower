@@ -18,6 +18,42 @@ _LOGGER = logging.getLogger(__name__)
 
 # Removed duplicate - using const.py values
 
+
+async def get_supervisor_info(host):
+    """Auto-detect PVS serial and firmware build from supervisor/info endpoint
+
+    Returns:
+        Tuple of (serial, build, last5, error_message)
+    """
+    import aiohttp
+
+    try:
+        url = f"http://{host}/cgi-bin/dl_cgi/supervisor/info"
+        timeout = aiohttp.ClientTimeout(total=30)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    supervisor = data.get("supervisor", {})
+
+                    serial = supervisor.get("SERIAL")
+                    build = supervisor.get("BUILD")
+
+                    if serial and build:
+                        last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
+                        _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s, Last5=%s", serial, build, last5)
+                        return serial, build, last5, None
+                    else:
+                        return None, None, None, "supervisor/info missing SERIAL or BUILD"
+                else:
+                    return None, None, None, f"supervisor/info HTTP {response.status}"
+
+    except Exception as e:
+        _LOGGER.warning("supervisor/info request failed: %s", e)
+        return None, None, None, str(e)
+
+
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Enhanced SunPower integration.
 
@@ -81,40 +117,6 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception as e:
             _LOGGER.debug("Firmware polling adjustment failed: %s", e)
 
-    async def _get_supervisor_info(self, host):
-        """Auto-detect PVS serial and firmware build from supervisor/info endpoint
-
-        Returns:
-            Tuple of (serial, build, last5, error_message)
-        """
-        import aiohttp
-
-        try:
-            url = f"http://{host}/cgi-bin/dl_cgi/supervisor/info"
-            timeout = aiohttp.ClientTimeout(total=30)
-
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        supervisor = data.get("supervisor", {})
-
-                        serial = supervisor.get("SERIAL")
-                        build = supervisor.get("BUILD")
-
-                        if serial and build:
-                            last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
-                            _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s, Last5=%s", serial, build, last5)
-                            return serial, build, last5, None
-                        else:
-                            return None, None, None, "supervisor/info missing SERIAL or BUILD"
-                    else:
-                        return None, None, None, f"supervisor/info HTTP {response.status}"
-
-        except Exception as e:
-            _LOGGER.warning("supervisor/info request failed: %s", e)
-            return None, None, None, str(e)
-
     async def _validate_pvs(self, host):
         """Validate PVS connection using supervisor/info for auto-detection
 
@@ -128,7 +130,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
         # Step 1: Get supervisor info for auto-detection
-        serial, build, last5, error = await self._get_supervisor_info(host)
+        serial, build, last5, error = await get_supervisor_info(host)
 
         if error:
             _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error)
@@ -394,6 +396,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
                     "mobile_device": complete_config.get("mobile_device"),
                     "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
+                    "flash_wear_threshold": complete_config.get("flash_wear_threshold", 90),
                     "email_notification_service": complete_config.get("email_notification_service"),
                     "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
                 }
@@ -429,6 +432,14 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     min=0,
                     max=flash_max,
                     unit_of_measurement=flash_unit,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("flash_wear_threshold", default=90): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=100,
+                    unit_of_measurement="%",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
@@ -489,7 +500,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             if not errors:
                 # Auto-detect firmware info (critical for existing integrations missing firmware_build)
                 host = user_input["host"]
-                serial, build, last5, error = await self._get_supervisor_info(host)
+                serial, build, last5, error = await get_supervisor_info(host)
 
                 if build:
                     MIN_LOCALAPI_BUILD = 61840
@@ -498,6 +509,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     user_input["uses_pypvs"] = uses_pypvs
                     _LOGGER.info("Options: Auto-detected firmware BUILD %s, uses_pypvs=%s", build, uses_pypvs)
 
+                    # New firmware requires password - prevent blank serial from overwriting existing
+                    if uses_pypvs and not pvs_serial_last5:
+                        errors["pvs_serial_last5"] = "Password required for new firmware (last 5 chars of serial)"
+
+            if not errors:
                 # Store basic config and proceed to notifications (skip solar page)
                 self._basic_config = user_input.copy()
                 return await self.async_step_notifications()
@@ -515,7 +531,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             )
         )
 
-        current_pvs_serial = self.config_entry.data.get("pvs_serial_last5", "")
+        current_pvs_serial = self.config_entry.options.get("pvs_serial_last5") or self.config_entry.data.get("pvs_serial_last5", "")
 
         # Page 1: Connection & Hardware schema
         schema = vol.Schema({
@@ -624,6 +640,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
                 "mobile_device": complete_config.get("mobile_device"),
                 "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
+                "flash_wear_threshold": complete_config.get("flash_wear_threshold", 90),
                 "email_notification_service": complete_config.get("email_notification_service"),
                 "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
                 "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
@@ -675,6 +692,14 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     min=0,
                     max=flash_max,
                     unit_of_measurement=flash_unit,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("flash_wear_threshold", default=self.config_entry.options.get("flash_wear_threshold", 90)): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=100,
+                    unit_of_measurement="%",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),

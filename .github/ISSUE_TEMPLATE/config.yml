@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting Guide
+    url: https://github.com/smcneece/ha-esunpower/blob/main/TROUBLESHOOTING.md
+    about: Check the troubleshooting guide before opening an issue
+  - name: Energy Dashboard Help
+    url: https://www.home-assistant.io/docs/energy/
+    about: Home Assistant Energy Dashboard documentation

@@ -1,10 +1,10 @@
-# Enhanced SunPower/SunStrong PVS Home Assistant Integration
+# Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
 
-### PLEASE TAKE A FEW MINUTES TO READ
+## PLEASE TAKE A FEW MINUTES TO READ
 
-## **FIRMWARE COMPATIBILITY**
+## **FIRMWARE COMPATIBILITY** 
 
-**October 3, 2025 should work with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
+**October 3, 2025 the integration should work with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
 - **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
 - **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
@@ -13,25 +13,15 @@
 
 **⚠️ TESTING STATUS**:
 - **Old firmware (BUILD < 61840)**: Tested and working on my "production" HA system (Firmware 61839)
-- **New firmware (BUILD 61840+)**: Working on my test HA VM - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware. Even the official SunStrong integration is having issues as of October 2, 2025: https://github.com/SunStrong-Management/pvs-hass/issues/7 - this could be firmware or the new pypvs code, and of course me not having the firmware myself makes this really hard to troubleshoot. 
+- **New firmware (BUILD 61840+)**: Working on my test HA VM - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware. 
 
-**⚠️ Help wanted**: If you have firmware BUILD 61840+ and experience setup issues, please report with full logs and version number of firmware and version number of integration. 
+### Untested for battery systems - if you have a battery system please help us test support!
 
-This is still experimental for new firmware. And totally untested for battery systems, sadly. 
 Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
-
-**NEW: Password Auto-Detection** - The integration attempts to:
-- Detect your full PVS serial number from the device
-- Extract the last 5 characters for authentication
-- Pre-fill the password field (uppercase format)
-- Skip password step entirely for old firmware
-- **Note**: Untested on new firmware - may require manual entry if auto-detection fails
 
 ---
 
-**⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) So BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
-
-**After ANY upgrade: Force refresh your browser (Ctrl+F5 / Cmd+Shift+R) to clear cached UI files!**
+**⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -54,16 +44,16 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 ## What Makes This Enhanced?
 
 **Core Improvements:**
-- **Flash Memory Monitoring**: Critical alerts when PVS storage drops below configurable threshold
+- **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI.
-- **Diagnostic Dashboard**: 8 sensors tracking integration reliability and performance
+- **Diagnostic Dashboard**: 7 sensors tracking integration reliability and performance
 - **PVS Hardware Protection**: Firmware-aware throttling (10s new firmware, 60s old firmware, 20s battery), health checking, and intelligent backoff
 
 **Technical Enhancements:**
 - **Multi-Channel Notifications**: 6 separate notification streams
-- **Enhanced Battery Support**: Improved SunVault detection and monitoring with smart fallbacks
+- **Comprehensive Battery Monitoring**: 10 dedicated ESS/battery sensors (SOC, SOH, power, temps, voltages, charge/discharge limits) - more data than original or SunStrong forks
 - **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns
 - **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
 
@@ -141,6 +131,15 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
+### Automatic Discovery (Zeroconf)
+
+**New!** Enhanced SunPower now supports automatic discovery for PVS5 and PVS6 systems:
+- Home Assistant will automatically detect your PVS on the network
+- You'll see a notification: "New device discovered - Enhanced SunPower"
+- Click "Configure" to start setup with pre-filled IP address
+- Works for both new and old firmware
+- Manual setup still available if discovery doesn't work
+
 ## Configuration
 
 ### Basic Setup (Page 1)
@@ -168,12 +167,13 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
-| **Host** | PVS IP Address | N/A | WAN: `192.168.1.x` (recommended)<br>LAN: `172.27.153.1` |
+| **Host** | PVS IP Address | N/A | WAN: `192.168.1.x` <br>LAN: `172.27.153.1` |
 | **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (firmware-aware: 10s new, 60s old, 20s battery) |
 | **PVS Password (last 5)** | Auto-detected from serial number | Auto-filled | Confirm auto-detected value (new firmware only) |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
+| **Flash Wear Threshold** | PVS flash lifetime alert (%) | 90 (90% wear) | 0 to disable, 85-95% recommended |
 | **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
-| **Email Recipient** | Override recipient address | `` | Leave empty for service default |
+| **Email Recipient** | Override recipient address | `` | Enter send to Email address |
 | **General Notifications** | Show status updates | `true` | Enable for monitoring |
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
@@ -332,7 +332,7 @@ notify:
 
 ### Energy Dashboard Integration
 
-**Enhanced SunPower Integration** provides comprehensive data for Home Assistant's Energy Dashboard. After installation and configuration, you can then configure your Energy Dashboard. Allow the integration to run for a few hours to generate statistics. 
+**Enhanced SunPower Integration** provides comprehensive data for Home Assistant's Energy Dashboard. After installation and configuration, you can then configure your Energy Dashboard. Allow the integration to run for a few hours to generate statistics.
 
 **Entity Naming:** The integration shows proper inverter identification (e.g., "Inverter E001221370442207 Lifetime Power") for easy energy dashboard setup.
 
@@ -344,8 +344,13 @@ notify:
 ![Solar Production Setup](images/production.png)
 
 **Setting Up Grid Consumption:**
-- **Consumption from Grid**: `sensor.power_meter_*c_kwh_to_home`
-- **Return to Grid**: `sensor.power_meter_*c_kwh_to_grid`
+
+**⚠️ IMPORTANT: Use the 'c' meter sensors (CT clamps), NOT the 'p' meter or "Lifetime Power" sensors!**
+
+- **Grid consumption**: `sensor.power_meter_*c_kwh_to_home`
+- **Return to grid**: `sensor.power_meter_*c_kwh_to_grid`
+
+**Why the 'c' meter?** Only the 'c' consumption meter (CT clamps) provides the bidirectional energy sensors needed for proper Energy Dashboard calculations. The 'p' production meter and "Lifetime Power" sensors only show net totals and will cause incorrect calculations.
 
 ![Consumption Setup](images/consumption.png)
 
@@ -479,3 +484,22 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 ---
 
 **Enjoying reliable SunPower monitoring with simplified 24/7 polling, mobile alerts, individual inverter health tracking, authentication support, and diagnostic dashboard monitoring? Consider starring this repository to help others find these improvements!**
+
+---
+
+## Keywords
+
+**Hardware:** SunPower PVS, SunPower PVS5, SunPower PVS6, SunStrong, SunVault, ESS Battery, Solar Inverters  
+**Software:** Home Assistant, HACS, Python, pypvs, krbaker fork  
+**Features:** Solar Monitoring, Inverter Health, Battery Tracking, Flash Wear, Energy Dashboard, Mobile Notifications
+
+<!-- 
+SEO Keywords: sunpower, sunstrong, pvs, pvs6, pvs5, home assistant, hacs, solar monitoring, 
+solar panels, inverter monitoring, sunvault, battery storage, ess, energy storage system, 
+pv monitoring, renewable energy, home automation, solar integration, pypvs, solar power, 
+photovoltaic, firmware 61840, new firmware, old firmware, authentication, krbaker, krbaker fork,
+enhanced sunpower, sunpower integration, solar system monitoring, panel monitoring, inverter health,
+battery health, state of charge, state of health, flash memory, flash wear, diagnostic sensors,
+night-time caching, virtual production meter, mobile alerts, email notifications, VLAN routing,
+automatic route repair, health monitoring, performance tracking, energy dashboard integration
+-->

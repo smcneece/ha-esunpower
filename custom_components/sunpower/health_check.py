@@ -424,7 +424,7 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
                         alert_info['last_alert_time'] = 0
 
             except (ValueError, TypeError):
-                _LOGGER.debug("Invalid flash memory value for PVS %s: %s", serial, flash_avail)
+                _LOGGER.debug("Invalid flash memory value for PVS %s: %s", serial, flash_avail_kb)
 
 
 def update_diagnostic_stats(cache, success, response_time=None):
@@ -476,3 +476,63 @@ def update_diagnostic_stats(cache, success, response_time=None):
     else:
         stats['failed_polls'] += 1
         stats['last_failure_time'] = current_time
+
+def check_flash_wear_level(hass, entry, cache, pvs_data):
+    """Monitor PVS flash wear percentage and send daily alerts when threshold exceeded
+
+    Args:
+        hass: Home Assistant instance
+        entry: Config entry
+        cache: Integration cache
+        pvs_data: Dictionary of PVS devices from coordinator data
+    
+    Flash wear shows EMMC lifetime consumed (higher = more wear):
+    - 0% = brand new flash storage
+    - 50% = halfway through lifetime
+    - 90% = approaching end of life (default alert threshold)
+    - 100% = flash storage failed
+    """
+    # Get threshold from config (default 90%)
+    flash_wear_threshold = entry.options.get("flash_wear_threshold", 90)
+    
+    # Skip if threshold is 0 (disabled)
+    if flash_wear_threshold == 0:
+        return
+    
+    for serial, data in pvs_data.items():
+        # Initialize alert tracking for this PVS (keyed by serial + '_flash_wear')
+        alert_key = f"{serial}_flash_wear"
+        if alert_key not in cache.startup_notifications_sent:
+            cache.startup_notifications_sent[alert_key] = {'last_alert_time': 0, 'alert_count': 0}
+        
+        alert_info = cache.startup_notifications_sent[alert_key]
+        current_time = time.time()
+        
+        flashwear_pct = data.get('flashwear_percent')
+        
+        if flashwear_pct is not None:
+            try:
+                wear_pct = int(flashwear_pct)
+                
+                # Alert if flash wear exceeds threshold (higher wear = more consumed)
+                if wear_pct >= flash_wear_threshold:
+                    # Only alert once per 24 hours
+                    if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
+                        # Calculate remaining life
+                        remaining_pct = 100 - wear_pct
+                        
+                        # Send notification
+                        from .notifications import notify_flash_wear_critical
+                        notify_flash_wear_critical(hass, entry, cache, serial, wear_pct, flash_wear_threshold, remaining_pct)
+                        
+                        alert_info['last_alert_time'] = current_time
+                        alert_info['alert_count'] += 1
+                        
+                        _LOGGER.warning("PVS %s flash wear critical: %d%% used / %d%% remaining (threshold: %d%%)",
+                                      serial, wear_pct, remaining_pct, flash_wear_threshold)
+                else:
+                    # Reset alert tracking when below threshold
+                    alert_info['last_alert_time'] = 0
+            
+            except (ValueError, TypeError):
+                _LOGGER.debug("Invalid flash wear value for PVS %s: %s", serial, flashwear_pct)

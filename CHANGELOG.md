@@ -2,6 +2,72 @@
 
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
+
+## [v2025.10.11] - 2025-10-05
+
+### New Features: Battery & Storage Health Monitoring
+
+**ESS/Battery Sensors (New Firmware Only):**
+Added 10 comprehensive battery sensors for pypvs users (BUILD >= 61840):
+- State of Charge (SOC) - Current battery charge percentage
+- State of Health (SOH) - Battery degradation tracking for long-term monitoring
+- Power - Real-time battery charge/discharge rate (kW)
+- Operating Mode - Current ESS operational state
+- Battery Voltage - Total battery pack voltage
+- Inverter Temperature - Storage inverter thermal monitoring
+- Max Cell Temperature - Hottest battery cell temperature
+- Min Cell Temperature - Coldest battery cell temperature
+- Max Charge Power - System charge capability limit
+- Max Discharge Power - System discharge capability limit
+
+**PVS Flash Wear Monitoring:**
+- Flash Wear % sensor - EMMC lifetime estimation (0x01 = 10%, 0x09 = 90%)
+- Configurable daily alert threshold (default 90% wear = 10% remaining)
+- Provides early warning before PVS storage failure
+- Requires new firmware (BUILD >= 61840) with varserver query support
+
+**Night-time Inverter Caching:**
+- Inverters and virtual production meter now remain visible at night with last known daytime values
+- Cache automatically preserves inverter data when they go offline after sunset
+- Prevents entity unavailable/unknown states during night hours
+- Works for both old and new firmware
+
+**Automatic Discovery (Zeroconf):**
+- Added PVS5 and PVS6 automatic discovery support
+- Home Assistant now automatically detects PVS systems on network
+- Pre-fills IP address during configuration for easier setup
+- Works with both new and old firmware
+
+**Dependency Updates:**
+- Updated pypvs requirement to `>=0.2.4` (from unversioned)
+- Ensures users get pypvs v0.2.4 bug fix: "Fixed sporadic issue while enumerating a PVS"
+- Auto-updates on next HA restart/integration reload
+
+### Critical Bug Fixes
+
+**Battery Polling Stops After Hours (Issue #5):**
+- **Problem:** Battery entities work initially but become unavailable after a few hours with no errors
+- **Root Cause:** Battery detection re-checked every poll - when battery devices disappeared from PVS device list (STATE="error" is normal), ESS polling stopped entirely
+- **Fix:** Battery detection now persistent once detected - ESS endpoint polled continuously regardless of PVS device list
+- **Impact:** Both old and new firmware - all SunVault/ESS battery users
+- **Files Modified:** `battery_handler.py` (lines 537-560), `__init__.py` (lines 153-154, 769-791)
+
+**Health Check Startup Crash:**
+- **Problem:** Integration blocked HA startup with error: "'set' object does not support item assignment"
+- **Root Cause:** `cache.startup_notifications_sent` initialized as `set()` instead of `dict`
+- **Fix:** Changed to dict initialization and updated all references from `.add()` to dict assignment
+- **Impact:** Both old and new firmware - blocked flash wear/memory alerts and health checks
+- **Files Modified:** `__init__.py` (line 141), `notifications.py` (line 250)
+
+**Files Modified:**
+- `pypvs_converter.py`: Fixed ESS converter to map all PVSESS model fields (lines 163-191)
+- `const.py`: Added ESS_DEVICE_TYPE sensor definitions (lines 348-439), PVS_FLASH_WEAR sensor (lines 202-210)
+- `__init__.py`: Added flashwear_type_b varserver query after pypvs update (lines 656-673), night-time inverter cache preservation (lines 694-718, 723-751), battery persistence fix (lines 153-154, 769-791), health check dict fix (line 141)
+- `translations/en.json`: Added flash wear threshold labels and descriptions
+- `manifest.json`: Added zeroconf discovery for PVS5/PVS6 systems (lines 21-28), updated pypvs requirement to >=0.2.4 (line 16)
+- `battery_handler.py`: Persistent battery detection (lines 537-560)
+- `notifications.py`: Fixed startup notification dict usage (line 250)
+
 ## [v2025.10.10] - 2025-10-04
 
 ### Critical Fix: Firmware Auto-Detection in Options Flow

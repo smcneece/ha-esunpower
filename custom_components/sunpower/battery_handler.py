@@ -535,13 +535,27 @@ def convert_ess_data(ess_data, data):
 
 
 def get_battery_configuration(entry, cache):
-    """Auto-detect battery configuration from PVS data"""
+    """Auto-detect battery configuration from PVS data
+
+    Once battery is detected, remember it persistently - battery devices
+    may disappear from PVS device list (STATE=error is normal), but ESS
+    endpoint will continue to provide data.
+    """
+    # Check if we've already detected battery (persistent)
+    if hasattr(cache, 'battery_detected_once') and cache.battery_detected_once:
+        return True, False
+
+    # First-time detection
     has_battery_from_data = False
     if hasattr(cache, 'previous_pvs_sample') and cache.previous_pvs_sample and "devices" in cache.previous_pvs_sample:
         has_battery_from_data = any(
             device.get("DEVICE_TYPE") in ("ESS", "Battery", "ESS BMS", "Energy Storage System", "SunVault")
             for device in cache.previous_pvs_sample.get("devices", [])
         )
+
+    # Remember detection persistently
+    if has_battery_from_data:
+        cache.battery_detected_once = True
 
     return has_battery_from_data, False
 

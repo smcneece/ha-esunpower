@@ -69,7 +69,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
         for device_type in SENSORS:
             if device_type not in sunpower_data:
-                _LOGGER.error(f"Cannot find any {device_type}")
+                _LOGGER.debug(f"Device type {device_type} not present (expected if you don't have this equipment)")
                 continue
             unique_id = SENSORS[device_type]["unique_id"]
             sensors = SENSORS[device_type]["sensors"]

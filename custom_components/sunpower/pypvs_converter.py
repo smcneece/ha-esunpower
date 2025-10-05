@@ -11,7 +11,7 @@ from datetime import datetime
 _LOGGER = logging.getLogger(__name__)
 
 
-def convert_pypvs_to_legacy(pvs_data, pvs_serial=None):
+def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
     """Convert pypvs PVSData object to legacy dl_cgi format
 
     pypvs uses structured models (pvs_data.inverters, pvs_data.meters, etc.)
@@ -65,6 +65,7 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None):
                 "dl_flash_avail": "0",  # pypvs only provides flash_usage_percent, not actual KB
                 "ram_usage_percent": str(int(float(getattr(gateway, 'ram_usage_percent', 0)))),
                 "flash_usage_percent": str(int(float(getattr(gateway, 'flash_usage_percent', 0)))),
+                "flashwear_percent": str(int(flashwear_percent)),
                 "dl_err_count": "0",
                 "dl_comm_err": "0",
                 "dl_skipped_scans": "0",
@@ -162,11 +163,29 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None):
             for serial, ess in pvs_data.ess.items():
                 ess_device = {
                     "DEVICE_TYPE": "Energy Storage System",
-                    "SERIAL": serial,
-                    "MODEL": getattr(ess, 'model', 'SunVault'),
+                    "SERIAL": ess.serial_number,
+                    "MODEL": ess.model,
+                    "DESCR": f"Energy Storage System {ess.serial_number}",
                     "STATE": "working",
                     "STATEDESCR": "Working",
-                    "soc": str(float(getattr(ess, 'state_of_charge', 0))),
+                    # pypvs PVSESS fields mapped to dl_cgi-style field names
+                    "soc_val": str(ess.soc_val),
+                    "customer_soc_val": str(ess.customer_soc_val),
+                    "soh_val": str(ess.soh_val),
+                    "op_mode": ess.op_mode,
+                    "power_3ph_kw": str(ess.power_3ph_kw),
+                    "neg_lte_kwh": str(ess.neg_lte_kwh),
+                    "pos_lte_kwh": str(ess.pos_lte_kwh),
+                    "v1n_v": str(ess.v1n_v),
+                    "v2n_v": str(ess.v2n_v),
+                    "v_batt_v": str(ess.v_batt_v),
+                    "t_invtr_degc": str(ess.t_invtr_degc),
+                    "chrg_limit_pmax_kw": str(ess.chrg_limit_pmax_kw),
+                    "dischrg_lim_pmax_kw": str(ess.dischrg_lim_pmax_kw),
+                    "max_t_batt_cell_degc": str(ess.max_t_batt_cell_degc),
+                    "min_t_batt_cell_degc": str(ess.min_t_batt_cell_degc),
+                    "max_v_batt_cell_v": str(ess.max_v_batt_cell_v),
+                    "min_v_batt_cell_v": str(ess.min_v_batt_cell_v),
                     "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(ess_device)

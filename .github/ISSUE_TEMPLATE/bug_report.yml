@@ -1,0 +1,65 @@
+name: Bug Report
+description: Report a problem with Enhanced SunPower integration
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Just need a few quick details to help diagnose the issue.
+
+  - type: dropdown
+    id: integration-version
+    attributes:
+      label: Integration Version
+      description: What version are you running?
+      options:
+        - v2025.10.11 (latest)
+        - v2025.10.10
+        - v2025.10.9
+        - v2025.10.8
+        - v2025.10.7 or older
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: pvs-model
+    attributes:
+      label: PVS Model
+      description: Which PVS do you have?
+      options:
+        - PVS5
+        - PVS6
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: firmware-build
+    attributes:
+      label: PVS Firmware BUILD (optional)
+      description: "Found at: Settings → Devices & Services → Enhanced SunPower → (device) → Firmware"
+      placeholder: "e.g., 61845, 58000"
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Describe the issue
+      description: What's going wrong?
+      placeholder: Tell us what you're seeing...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Screenshots (optional)
+      description: |
+        Copy/paste logs or attach screenshots if helpful.
+        **Find logs:** Settings → System → Logs → Search for "sunpower"
+      render: shell
+    validations:
+      required: false
