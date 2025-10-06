@@ -44,6 +44,17 @@ body:
     validations:
       required: false
 
+  - type: dropdown
+    id: battery-system
+    attributes:
+      label: Do you have a battery system?
+      description: SunVault, ESS, or any battery storage connected to PVS
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+
   - type: textarea
     id: what-happened
     attributes:
