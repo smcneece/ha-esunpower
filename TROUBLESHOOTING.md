@@ -6,22 +6,7 @@
 
 **Issue**: "I changed polling to 30 seconds but meter/inverter power still only updates every few minutes"
 
-**This is normal PVS hardware behavior!** The integration polls at your configured interval, but the PVS controls when it updates different data:
-
-**What Updates Fast** (every poll):
-- PVS gateway sensors: uptime, RAM, CPU load, error counts
-- Flash memory usage and wear
-- Communication statistics
-
-**What Updates Slowly** (~5 minutes):
-- Meter power readings
-- Inverter power output
-- Energy production/consumption totals
-
-**What Updates Medium** (~1-2 minutes):
-- Battery state of charge (if present)
-- Inverter temperatures
-- Voltage/current readings
+**This is normal PVS hardware behavior!** The integration polls at your configured interval, but the PVS controls when it updates different data.
 
 **Why?** The PVS likely caches meter/inverter data to reduce polling stress on those devices (similar to old firmware protection).
 
