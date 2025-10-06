@@ -1,28 +1,41 @@
 # Troubleshooting Guide
 
-## Poll Success Rate Expectations
-
-**Normal Behavior**: Poll success rates of **90-95%** are typical and expected. The PVS hardware occasionally fails to respond, which is why the integration:
-
-- **Attempts up to 2 retries** per polling interval before marking as failed
-- **Tracks poll success rate** in diagnostic sensors for monitoring
-- **Uses intelligent backoff** after consecutive failures to protect PVS hardware
-- **Maintains cached data** to bridge temporary connectivity gaps
-
-**Example**: 93.7% success rate with 79 total polls indicates healthy operation with expected intermittent PVS timeouts.
-
-**When to Investigate**:
-- Success rate **below 80%** consistently
-- **Long streaks** of consecutive poll failures (>5)
-- **"PVS OFFLINE"** alerts with high consecutive failure counts
-
-**Normal Fluctuations**: Success rates will vary based on:
-- PVS system load and processing time
-- Network latency and stability  
-- PVS internal housekeeping operations
-- Solar generation transitions (sunrise/sunset)
-
 ## Common Issues
+
+### Polling Interval vs Data Update Rates
+
+**Issue**: "I changed polling to 30 seconds but meter/inverter power still only updates every few minutes"
+
+**This is normal PVS hardware behavior!** The integration polls at your configured interval, but the PVS controls when it updates different data:
+
+**What Updates Fast** (every poll):
+- PVS gateway sensors: uptime, RAM, CPU load, error counts
+- Flash memory usage and wear
+- Communication statistics
+
+**What Updates Slowly** (~5 minutes):
+- Meter power readings
+- Inverter power output
+- Energy production/consumption totals
+
+**What Updates Medium** (~1-2 minutes):
+- Battery state of charge (if present)
+- Inverter temperatures
+- Voltage/current readings
+
+**Why?** The PVS likely caches meter/inverter data to reduce polling stress on those devices (similar to old firmware protection).
+
+**How to Verify Polling Works:**
+1. Go to Settings → Devices & Services → Enhanced SunPower → PVS device
+2. Watch the **Uptime** sensor - should update at your configured interval
+3. Meter power will still only change every ~5 min (PVS hardware limitation)
+
+**Or enable Debug Notifications:**
+1. Settings → Devices & Services → Enhanced SunPower → Configure
+2. Enable "Debug Notifications"
+3. Watch for coordinator poll time notifications
+
+**Bottom Line:** Faster polling gets you fresher PVS system stats, but doesn't make power readings update faster.
 
 ### PVS Not Responding
 1. **Verify IP Address**: PVS typically uses `172.27.153.1`
