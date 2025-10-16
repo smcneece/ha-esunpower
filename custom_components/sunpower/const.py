@@ -45,6 +45,7 @@ INVERTER_DEVICE_TYPE = "Inverter"
 METER_DEVICE_TYPE = "Power Meter"
 BATTERY_DEVICE_TYPE = "ESS BMS"
 ESS_DEVICE_TYPE = "Energy Storage System"
+TRANSFER_SWITCH_DEVICE_TYPE = "Transfer Switch"
 HUBPLUS_DEVICE_TYPE = "HUB+"
 SUNVAULT_DEVICE_TYPE = "SunVault"
 DIAGNOSTIC_DEVICE_TYPE = "Enhanced SunPower Diagnostics"
@@ -446,6 +447,76 @@ SUNPOWER_SENSORS = {
             },
         },
     },
+    TRANSFER_SWITCH_DEVICE_TYPE: {
+        "unique_id": "transfer_switch",
+        "sensors": {
+            "TS_MAIN_BREAKER_STATE": {
+                "field": "mid_state",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Main Breaker State",
+                "unit": None,
+                "icon": "mdi:electric-switch",
+                "device": None,
+                "state": None,
+            },
+            "TS_PV_DISCONNECT_STATE": {
+                "field": "pvd1_state",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} PV Disconnect State",
+                "unit": None,
+                "icon": "mdi:solar-power",
+                "device": None,
+                "state": None,
+            },
+            "TS_TEMPERATURE": {
+                "field": "temperature_c",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Temperature",
+                "unit": UnitOfTemperature.CELSIUS,
+                "icon": "mdi:thermometer",
+                "device": SensorDeviceClass.TEMPERATURE,
+                "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+            "TS_GRID_VOLTAGE_L1": {
+                "field": "v1n_grid_v",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Grid Voltage L1",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:transmission-tower",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "TS_GRID_VOLTAGE_L2": {
+                "field": "v2n_grid_v",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Grid Voltage L2",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:transmission-tower",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "TS_LOAD_VOLTAGE_L1": {
+                "field": "v1n_v",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Load Voltage L1",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:home-lightning-bolt",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "TS_LOAD_VOLTAGE_L2": {
+                "field": "v2n_v",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Load Voltage L2",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:home-lightning-bolt",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+            "TS_SUPPLY_VOLTAGE": {
+                "field": "v_supply_v",
+                "title": "{SUN_POWER}Transfer Switch {SERIAL} Supply Voltage",
+                "unit": UnitOfElectricPotential.VOLT,
+                "icon": "mdi:lightning-bolt",
+                "device": SensorDeviceClass.VOLTAGE,
+                "state": SensorStateClass.MEASUREMENT,
+            },
+        },
+    },
     INVERTER_DEVICE_TYPE: {
         "unique_id": "inverter",
         "sensors": {
@@ -534,6 +605,15 @@ SUNPOWER_SENSORS = {
     DIAGNOSTIC_DEVICE_TYPE: {
         "unique_id": "diagnostics",
         "sensors": {
+            "POLLING_INTERVAL": {
+                "field": "polling_interval_seconds",
+                "title": "Polling Interval",
+                "unit": UnitOfTime.SECONDS,
+                "icon": "mdi:timer-outline",
+                "device": SensorDeviceClass.DURATION,
+                "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
             "POLL_SUCCESS_RATE": {
                 "field": "poll_success_rate",
                 "title": "Poll Success Rate",
@@ -541,6 +621,7 @@ SUNPOWER_SENSORS = {
                 "icon": "mdi:check-circle",
                 "device": None,
                 "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
             },
             "TOTAL_POLLS": {
                 "field": "total_polls",
@@ -585,14 +666,6 @@ SUNPOWER_SENSORS = {
                 "icon": "mdi:solar-panel",
                 "device": None,
                 "state": None,
-            },
-            "PVS_UPTIME_PERCENT": {
-                "field": "pvs_uptime_percent",
-                "title": "PVS Uptime",
-                "unit": PERCENTAGE,
-                "icon": "mdi:server-network",
-                "device": None,
-                "state": SensorStateClass.MEASUREMENT,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
         },

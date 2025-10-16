@@ -20,7 +20,7 @@
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval": "How often to check for new data (10-3600 seconds, 20s minimum for battery systems)."
+                    "polling_interval": "How often to poll PVS (10-3600 seconds, 20s minimum for battery). Note: PVS updates gateway sensors every poll, but meter/inverter data updates every ~5min regardless."
                 }
             },
             "need_password": {
@@ -90,7 +90,7 @@
                 },
                 "data_description": {
                     "host": "Hostname or IP of PVS (typically 172.27.153.1)",
-                    "polling_interval": "How often to check for new data (10-3600 seconds).",
+                    "polling_interval": "How often to poll PVS (10-3600 seconds). Note: PVS updates gateway sensors every poll, but meter/inverter data updates every ~5min regardless.",
                     "pvs_serial_last5": "Last 5 characters of PVS serial number (found on device label)"
                 }
             },

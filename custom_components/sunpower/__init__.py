@@ -169,7 +169,7 @@ class SunPowerDataCache:
         }
 
 
-def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
+def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None):
     """Create diagnostic device data for sensors"""
 
     # Initialize stats if not present
@@ -195,15 +195,6 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     # Use average response time from stats
     avg_response = stats.get('average_response_time', 0.0)
 
-    # Calculate uptime percentage
-    uptime_start = stats.get('uptime_start', time.time())
-    total_runtime = time.time() - uptime_start
-    if total_runtime > 0 and stats.get('last_success_time', 0) > 0:
-        uptime_seconds = total_runtime - (stats.get('failed_polls', 0) * 300)
-        uptime_percent = max(0, min(100, (uptime_seconds / total_runtime) * 100))
-    else:
-        uptime_percent = 0
-
     # Count active inverters
     active_inverters = len(inverter_data) if inverter_data else 0
 
@@ -216,8 +207,8 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
     else:
         last_poll_str = "Never"
         last_poll_seconds = None
-    
-    
+
+
     # Create diagnostic device
     diagnostic_serial = "sunpower_diagnostics"
     diagnostic_device = {
@@ -228,15 +219,15 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None):
         "STATE": "working",
         "SWVER": "2025.8.12",
         "HWVER": "Virtual",
+        "polling_interval_seconds": int(polling_interval) if polling_interval else 300,
         "poll_success_rate": round(success_rate, 1),
         "total_polls": stats.get('total_polls', 0),
-        "consecutive_failures": stats.get('failed_polls', 0),  # Use failed_polls as consecutive failures
+        "consecutive_failures": stats.get('consecutive_failures', 0),
         "last_successful_poll": last_poll_str,
         "average_response_time": round(avg_response, 2),
         "active_inverters": active_inverters,
-        "pvs_uptime_percent": round(uptime_percent, 1),
     }
-    
+
     return diagnostic_serial, diagnostic_device
 
 
@@ -491,6 +482,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Migrate from krbaker format if needed
     await migrate_from_krbaker_if_needed(hass, entry)
 
+    # Migrate from SunStrong (pvs-hass) format if needed - RUNS ONCE ONLY
+    if not entry.data.get("sunstrong_migration_done", False):
+        _LOGGER.info("Checking for orphaned SunStrong entities to migrate...")
+        try:
+            # Get PVS serial/model from supervisor/info (needed for migration)
+            import aiohttp
+            pvs_serial = None
+            pvs_model = "pvs6"  # Default
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://{entry.data['host']}/cgi-bin/dl_cgi/supervisor/info",
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    if resp.status == 200:
+                        supervisor = await resp.json()
+                        pvs_serial = supervisor.get("SERIAL", "").upper()
+                        pvs_model = supervisor.get("MODEL", "pvs6").lower()
+
+            if pvs_serial:
+                from .converter import migrate_sunstrong_entities
+
+                migration_results = await migrate_sunstrong_entities(hass, pvs_serial, pvs_model)
+
+                if migration_results["migrated"] > 0:
+                    _LOGGER.info(
+                        "✅ SunStrong migration complete: %d entities migrated, %d skipped, %d errors",
+                        migration_results["migrated"],
+                        migration_results["skipped"],
+                        migration_results["errors"]
+                    )
+                else:
+                    _LOGGER.info("No SunStrong entities found - migration not needed")
+
+            # Mark migration as done (success or not) - NEVER RUN AGAIN
+            new_data = dict(entry.data)
+            new_data["sunstrong_migration_done"] = True
+            hass.config_entries.async_update_entry(entry, data=new_data)
+
+        except Exception as err:
+            # Migration failed - log but don't block setup
+            _LOGGER.warning("SunStrong migration failed (not critical): %s", err)
+
+            # Still mark as done to prevent retry loops
+            new_data = dict(entry.data)
+            new_data["sunstrong_migration_done"] = True
+            hass.config_entries.async_update_entry(entry, data=new_data)
+
     # Check if we should use pypvs (new firmware) or legacy dl_cgi (old firmware)
     uses_pypvs = entry.data.get("uses_pypvs", False)
     firmware_build = entry.data.get("firmware_build")
@@ -600,8 +639,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         # Get battery configuration from auto-detection (simplified - no polling overrides)
         has_battery, user_has_battery = get_battery_configuration(entry, cache)
 
-        # Always poll with single interval
-        current_polling_interval = polling_interval
+        # Re-read polling interval from entry (might have changed via reconfigure)
+        current_polling_interval = entry.options.get("polling_interval", entry.data.get("polling_interval", DEFAULT_POLLING_INTERVAL))
 
         # Update coordinator interval if needed
         new_interval = timedelta(seconds=current_polling_interval)
@@ -645,7 +684,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.diagnostic_stats['consecutive_failures'] = 0
 
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
 
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age, current_polling_interval)
@@ -682,10 +721,58 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_polling_interval, cache, hass, entry)
             # Note: fresh_data can be None if PVS is unhealthy/backoff - this is normal, use cache
         except PVSError as e:
-            _LOGGER.error("pypvs polling error: %s", e)
-            cache.diagnostic_stats['failed_polls'] += 1
-            cache.diagnostic_stats['consecutive_failures'] += 1
-            fresh_data = None
+            # Check if this is an authentication error and attempt automatic re-auth
+            error_str = str(e).lower()
+            is_auth_error = any(keyword in error_str for keyword in ['401', '403', 'auth', 'unauthorized', 'forbidden'])
+
+            if is_auth_error and pvs_object and auth_password:
+                _LOGGER.warning("⚠️ Authentication error detected during polling: %s", e)
+                _LOGGER.info("Attempting automatic re-authentication...")
+                try:
+                    # Re-authenticate using the same password
+                    await pvs_object.setup(auth_password=auth_password)
+                    _LOGGER.info("✅ Re-authentication successful, retrying poll...")
+
+                    # Retry the poll after successful re-auth
+                    pvs_data = await pvs_object.update()
+
+                    # Re-fetch flash wear data
+                    flashwear_pct = 0
+                    try:
+                        flashwear_hex = await pvs_object.getVarserverVar('/sys/pvs/flashwear_type_b')
+                        if flashwear_hex:
+                            if isinstance(flashwear_hex, str) and flashwear_hex.startswith('0x'):
+                                flashwear_pct = int(flashwear_hex, 16) * 10
+                            else:
+                                flashwear_pct = int(flashwear_hex) * 10
+                    except Exception:
+                        pass  # Flash wear is optional
+
+                    fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number, flashwear_percent=flashwear_pct)
+                    _LOGGER.info("✅ Poll retry after re-auth successful")
+
+                except Exception as retry_error:
+                    _LOGGER.error("❌ Re-authentication or poll retry failed: %s", retry_error)
+                    cache.diagnostic_stats['failed_polls'] += 1
+                    cache.diagnostic_stats['consecutive_failures'] += 1
+                    fresh_data = None
+
+                    # Send critical notification for persistent auth failures
+                    await hass.services.async_call(
+                        "persistent_notification",
+                        "create",
+                        {
+                            "title": "🔐 PVS Authentication Failure",
+                            "message": f"Automatic re-authentication failed: {retry_error}<br><br>Check PVS password configuration (last 5 of serial).",
+                            "notification_id": f"sunpower_auth_failure_{entry.entry_id}"
+                        }
+                    )
+            else:
+                # Non-auth error or can't retry - just log and fail
+                _LOGGER.error("pypvs polling error: %s", e)
+                cache.diagnostic_stats['failed_polls'] += 1
+                cache.diagnostic_stats['consecutive_failures'] += 1
+                fresh_data = None
         except Exception as e:
             _LOGGER.error("PVS polling exception: %s", e)
             cache.diagnostic_stats['failed_polls'] += 1
@@ -768,10 +855,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Step 4: Process fresh data if we have it
         if fresh_data:
-            # Battery processing (if detected)
+            # Re-check battery detection from FRESH data (fixes first-poll detection)
+            # This ensures ESS polling happens on first poll if batteries are present
+            fresh_has_battery = any(
+                device.get("DEVICE_TYPE") in ("ESS", "Battery", "ESS BMS", "Energy Storage System", "SunVault")
+                for device in fresh_data.get("devices", [])
+            )
+            if fresh_has_battery and not has_battery:
+                _LOGGER.info("Battery system detected in fresh poll data - enabling ESS polling")
+                has_battery = True
+                # Persist the detection
+                cache.battery_detected_once = True
+
+            # Battery processing (if detected from cache OR fresh data)
             if has_battery:
                 try:
-                    _LOGGER.debug("Battery system detected - polling ESS endpoint")
+                    _LOGGER.debug("Polling ESS endpoint for battery data")
                     old_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
                     ess_data = await sunpower_monitor.energy_storage_system_status_async()
 
@@ -780,18 +879,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         data = convert_ess_data(ess_data, data)
                         new_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
 
-                        if old_battery_count == new_battery_count:
-                            _LOGGER.warning("ESS data processed but no virtual devices created")
+                        # Only log entity count at INFO when it changes
+                        if new_battery_count != old_battery_count:
+                            if new_battery_count == 0:
+                                _LOGGER.warning("ESS data processed but no battery entities created (was %d)", old_battery_count)
+                            else:
+                                _LOGGER.info("Battery entity count changed: %d → %d", old_battery_count, new_battery_count)
                         else:
-                            _LOGGER.info("ESS polling successful: %d battery entities created", new_battery_count)
+                            _LOGGER.debug("ESS polling successful - %d battery entities", new_battery_count)
                     else:
                         _LOGGER.warning("ESS endpoint returned no data - battery entities may become unavailable")
 
                 except Exception as convert_error:
                     _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
                     # Don't re-raise - continue with PVS data
-            else:
-                _LOGGER.debug("No battery system detected - skipping ESS polling")
 
             # Step 5: Health checks
             try:
@@ -824,7 +925,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             try:
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
             except Exception as e:
                 _LOGGER.warning("Diagnostic device creation failed: %s", e)
@@ -851,7 +952,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     try:
                         inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                         meter_data = data.get('Power Meter', {})
-                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data)
+                        pvs_data = data.get(PVS_DEVICE_TYPE, {})
+                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, pvs_data)
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     except Exception as e:
                         _LOGGER.warning("Diagnostic device creation failed for cached data: %s", e)
@@ -883,6 +985,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         SUNPOWER_OBJECT: sunpower_monitor,
         SUNPOWER_COORDINATOR: coordinator,
+        "_cache": cache,  # Make cache accessible for diagnostics
     }
 
     # Initial setup - COORDINATOR FIRST, THEN PLATFORMS

@@ -3,6 +3,162 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.12] - 2025-10-16
+
+### Bug Fix: New Firmware Battery Sensors (pypvs ESS Support)
+
+**New Firmware Battery Sensors Fixed:**
+- Fixed battery systems on new firmware (BUILD >= 61840) showing only "ESS State" binary sensor
+- Added 15 new ESS sensor definitions that match pypvs PVSESS model field names
+- pypvs ESS data now properly creates full battery sensor suite instead of just binary sensor
+
+**Root Cause:**
+- pypvs library DOES provide ESS data via PVSESS model with NEW field names (soc_val, customer_soc_val, power_3ph_kw, etc.)
+- pypvs_converter.py successfully converted ESS data with these NEW field names
+- BUT battery_handler.py ESS sensor definitions expected OLD field names (enclosure_humidity, agg_power, meter_a_current, etc.)
+- sensor.py skips sensors when field doesn't exist in device data (lines 84-86)
+- Result: All ESS sensors were skipped except binary sensor (which has no field validation)
+
+**New Sensors Added (pypvs/new firmware only):**
+- ESS State of Charge (soc_val) - Main battery charge percentage
+- ESS Customer State of Charge (customer_soc_val) - Customer-visible SOC
+- ESS State of Health (soh_val) - Battery degradation tracking
+- ESS Power (power_3ph_kw) - Real-time battery charge/discharge rate
+- ESS Battery Voltage (v_batt_v) - Total battery pack voltage
+- ESS Inverter Temperature (t_invtr_degc) - Storage inverter thermal monitoring
+- ESS Operating Mode (op_mode) - Current operational state
+- ESS Charge/Discharge Limits (chrg_limit_pmax_kw, dischrg_lim_pmax_kw)
+- ESS Cell Temperature Min/Max (min_t_batt_cell_degc, max_t_batt_cell_degc)
+- ESS Cell Voltage Min/Max (min_v_batt_cell_v, max_v_batt_cell_v)
+- ESS V1N/V2N Voltages (v1n_v, v2n_v)
+
+**Impact:** New firmware users (BUILD >= 61840) with battery systems - now see full battery sensor suite instead of just binary sensor
+
+**Files Modified:**
+- `battery_handler.py`: Added 15 new pypvs ESS sensor definitions (lines 342-474)
+
+---
+
+### Bug Fix: Battery Detection on First Poll
+
+**First-Poll Battery Detection Fixed:**
+- Fixed battery systems not creating sensors until second integration restart
+- Battery detection now checks fresh poll data immediately (was only checking cache)
+- ESS endpoint now polled on first poll if batteries present in device list
+- Fixes "only seeing ESS State binary sensor" issue for OLD firmware battery users
+
+**Root Cause:**
+- Battery detection relied on `cache.previous_pvs_sample` which is empty on first poll
+- ESS endpoint was never polled until cache populated (required restart)
+- Fresh data available but not checked for battery devices before ESS polling decision
+
+**Impact:** Old firmware users (BUILD < 61840) with battery systems - ESS sensors now appear immediately on first restart
+
+**Files Modified:**
+- `__init__.py`: Added fresh data battery detection check (lines 858-868)
+
+---
+
+### New Features: Diagnostics Download
+
+**Home Assistant Diagnostics Support:**
+- Added native HA diagnostics download feature accessible from integration device page
+- One-click download captures all troubleshooting data in single JSON file
+- No Python installation or command-line access required - works on all platforms (Windows/Mac/Linux)
+
+**Diagnostics Data Captured:**
+- Complete raw PVS polling data (device list with all inverters, meters, batteries)
+- Integration configuration (host, polling interval, thresholds, all settings)
+- Coordinator state (update success, polling intervals, last update time)
+- Device summary (counts by type: PVS, inverters, meters, batteries)
+- Diagnostic stats (total polls, success rate, response times, consecutive failures)
+- Battery detection status (if battery system was ever detected)
+- Firmware tracking (last known BUILD number)
+- Inverter health tracking (expected inverters, failure counts)
+
+**Usage:** Navigate to integration device page → Click "Download diagnostics" → Share JSON file for support
+
+**Files Added:**
+- `diagnostics.py`: Comprehensive diagnostics data collection module
+
+**Files Modified:**
+- `__init__.py`: Added cache object to hass.data for diagnostics access
+
+**Impact:** All users - simplifies troubleshooting and support requests
+
+---
+
+### Improvements: Automatic Re-Authentication (New Firmware)
+
+**Automatic Session Recovery:**
+- Added automatic re-authentication when PVS session cookies expire
+- Transparent retry on authentication errors (401, 403, unauthorized)
+- Prevents "authentication expired" repair notifications
+- No user action required when sessions expire
+
+**How It Works:**
+1. Integration detects authentication error during polling
+2. Automatically re-authenticates using stored password
+3. Retries the poll operation seamlessly
+4. Logs show: "⚠️ Authentication error detected" → "✅ Re-authentication successful"
+
+**Cookie Inspection (Temporary):**
+- Added debug logging to inspect PVS session cookie expiration times
+- Helps understand PVS session behavior
+- Will be removed once cookie behavior is documented
+
+**Files Modified:**
+- `__init__.py`: Added auth error detection and automatic retry logic (lines 749-790)
+- `__init__.py`: Added cookie inspection logging after authentication (lines 619-634)
+
+**Impact:** New firmware users (BUILD >= 61840) - prevents authentication interruptions from expired sessions
+
+**Related Issue:** Addresses authentication stability issues similar to SunStrong Management pvs-hass#11
+
+---
+
+### Bug Fixes: Diagnostic Device Sensors
+
+**PVS Uptime Sensor Fixed:**
+- Fixed PVS Uptime showing 0% after integration restarts
+- Changed calculation from broken time-based math to poll success rate
+- Previous logic: `total_runtime - (failed_polls * 300)` resulted in negative values → 0%
+- New logic: PVS Uptime now matches Poll Success Rate (both show same percentage)
+
+**Consecutive Poll Failures Fixed:**
+- Fixed sensor showing total failed polls instead of consecutive failures
+- Now correctly resets to 0 on successful poll and increments only during consecutive failures
+
+**Files Modified:**
+- `__init__.py`: Lines 198-200 - Simplified uptime calculation to use success rate
+- `__init__.py`: Line 228 - Fixed consecutive failures to use correct stat counter
+
+**Impact:** All users - diagnostic sensors now report accurate values
+
+---
+
+### Improvements: Battery System Logging
+
+**Reduced Log Spam:**
+- Battery entity count now only logs at INFO when count changes (catches issues immediately)
+- Normal ESS polling success moved to DEBUG level (was INFO every 30-60 seconds)
+- First-time battery detection logs once at INFO: "Battery system detected - ESS polling will continue for all future polls"
+
+**Enhanced Problem Detection:**
+- Entity count changes logged at INFO: "Battery entity count changed: 3 → 0"
+- Zero entities after processing logged at WARNING: "ESS data processed but no battery entities created (was 3)"
+- Makes battery entity disappearance immediately visible without debug logging
+
+**Impact:** Both old and new firmware - all SunVault/ESS battery users
+
+**Files Modified:**
+- `battery_handler.py`: Added one-time INFO log on first battery detection (lines 557-559)
+- `__init__.py`: Changed ESS polling to only log INFO on entity count changes (lines 774-796)
+
+**Debugging:** Enable debug logging to see every ESS poll attempt and result
+
+---
+
 ## [v2025.10.11] - 2025-10-05
 
 ### New Features: Battery & Storage Health Monitoring

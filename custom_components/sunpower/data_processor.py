@@ -15,6 +15,7 @@ from .const import (
     INVERTER_DEVICE_TYPE,
     METER_DEVICE_TYPE,
     PVS_DEVICE_TYPE,
+    TRANSFER_SWITCH_DEVICE_TYPE,
 )
 
 _LOGGER = logging.getLogger(__name__)

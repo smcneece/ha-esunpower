@@ -10,11 +10,6 @@
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
-
-**⚠️ TESTING STATUS**:
-- **Old firmware (BUILD < 61840)**: Tested and working on my "production" HA system (Firmware 61839)
-- **New firmware (BUILD 61840+)**: Working on my test HA VM - Uses SunStrong's pypvs library with additional safety fallbacks, but not yet validated on real hardware. 
-
 ### Untested for battery systems - if you have a battery system please help us test support!
 
 Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
@@ -62,6 +57,15 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 **Breaking Changes:**
 - **Binary Sensors**: Now use proper boolean states (`on`/`off`) instead of text values like `"working"`. May break existing automations.
 - **Minimum Polling**: Firmware-aware enforcement (10s new firmware, 60s old firmware, 20s battery systems). Default remains 300s for safety.
+
+**Understanding Polling Intervals:**
+- **Integration polls PVS** at your configured interval (10-3600 seconds)
+- **PVS updates different data at different rates internally:**
+  - **PVS gateway sensors** (uptime, RAM, CPU, errors) → Update every PVS scan (~30-60s)
+  - **Meter/Inverter power sensors** → Update every ~5 minutes (PVS internal cache)
+  - **Battery sensors** → Update more frequently (if battery system present)
+- **Faster polling does NOT make meter/inverter data update faster** - this is controlled by PVS hardware, likely to reduce device polling stress
+- **Verify polling works**: Watch PVS **Uptime** sensor - should update at your configured interval
 
 **Migration Guide:**
 ```yaml
@@ -140,13 +144,22 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 - Works for both new and old firmware
 - Manual setup still available if discovery doesn't work
 
+### Network Best Practices
+
+**Recommended:** Set a static DHCP reservation for your PVS IP address in your router settings.
+
+- Prevents the PVS from receiving a new IP address after a DHCP lease renewal
+- Ensures the integration continues polling without interruption
+- Standard best practice for all IoT devices on your network
+- Router configuration is beyond the scope of this guide, but most routers allow reserving IPs by MAC address
+
 ## Configuration
 
 ### Basic Setup (Page 1)
 ![Basic Setup Configuration](images/config_pg1.png)
 
-### Solar Configuration (Page 2)
-![Solar Configuration](images/config_pg2.png)
+### Authentication (Page 2)
+![Authentication](images/config_pg2.png)
 
 ### Notifications & Advanced (Page 3)
 ![Notifications Configuration](images/config_pg3.png)
@@ -351,6 +364,12 @@ notify:
 - **Return to grid**: `sensor.power_meter_*c_kwh_to_grid`
 
 **Why the 'c' meter?** Only the 'c' consumption meter (CT clamps) provides the bidirectional energy sensors needed for proper Energy Dashboard calculations. The 'p' production meter and "Lifetime Power" sensors only show net totals and will cause incorrect calculations.
+
+**⚠️ TROUBLESHOOTING: Grid sensors not available?**
+- **Missing consumption meter entirely**: CT clamps may not be installed OR not provisioned in PVS settings - contact installer
+- **CT clamps present but not working**: Installer may need to provision/enable them in PVS configuration
+- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export - see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
+- **Alternative**: Use utility smart meter integration for most accurate grid tracking
 
 ![Consumption Setup](images/consumption.png)
 

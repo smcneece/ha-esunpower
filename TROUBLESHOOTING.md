@@ -88,6 +88,48 @@
 3. **Check Notifications**: Look for battery detection warnings
 4. **ESS Communication**: Battery data requires separate ESS API endpoint
 
+### Energy Dashboard - Missing Grid Import/Export Sensors
+
+**Issue**: "KWh To Grid" and "KWh To Home" sensors not available for Energy Dashboard configuration
+
+**Root Cause**: Grid import/export tracking requires consumption CT clamps with bidirectional metering support.
+
+**Three Common Scenarios:**
+
+**1️⃣ No Consumption CT Clamps Installed**
+- **Symptom**: No consumption meter device (only production meter exists)
+- **Why**: Some installers don't install consumption CT clamps in electrical panel
+- **Detection**: Check devices - you should see both `Power Meter *p` (production) AND `Power Meter *c` (consumption)
+- **Practical Solutions**:
+  - Use utility smart meter integration (recommended - most accurate)
+  - Install third-party CT clamp system (Emporia Vue, Sense, etc.)
+  - Note: SunPower installer service may be difficult/expensive to obtain post-bankruptcy
+
+**2️⃣ CT Clamps Installed But Not Provisioned**
+- **Symptom**: No consumption meter device, but CT clamps are physically installed in electrical panel
+- **Why**: Installer installed hardware but didn't enable/configure it in PVS settings
+- **Detection**: Physical inspection - CT clamps present on main panel wires but no consumption meter in HA
+- **Practical Solutions**:
+  - Use utility smart meter integration (easiest - no PVS changes needed)
+  - Contact installer to provision CT clamps in PVS (may be costly/difficult post-SunPower bankruptcy)
+  - Install third-party CT clamp system as alternative
+
+**3️⃣ PVS5 Firmware Limitation (CT Clamps Installed & Provisioned)**
+- **Symptom**: Consumption meter exists but only shows "Lifetime Power" - missing "KWh To Grid" and "KWh To Home" sensors
+- **Why**: Some PVS5 systems only report net consumption (`net_ltea_3phsum_kwh`) instead of separate import/export counters
+- **Detection**: Download diagnostics and check consumption meter data:
+  - ✅ **PVS6/newer**: Has `neg_ltea_3phsum_kwh` (to grid) AND `pos_ltea_3phsum_kwh` (from grid)
+  - ❌ **PVS5/limited**: Only has `net_ltea_3phsum_kwh` (net total)
+- **Workaround Options**:
+  - Use utility smart meter integration (most accurate for billing)
+  - Create template sensors to split net consumption into import/export
+
+**Reference**: [krbaker Issue #13 - KWH to Grid not working](https://github.com/krbaker/hass-sunpower/issues/13)
+
+**Alternative Energy Dashboard Setup (Without Grid Sensors)**:
+- **Solar Production**: Use Virtual Production Meter or individual inverter sensors
+- **Grid Consumption**: Use utility smart meter integration or third-party CT clamp system (Emporia Vue, Sense, etc.)
+
 ## Network Setup Issues
 
 ### **Hardware Power Requirements & Known Issues**
