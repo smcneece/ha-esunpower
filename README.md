@@ -91,6 +91,14 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 - Inverters are powered by the sun and offline at night
 - Integration validates real PVS connection during setup process
 
+### Upgrading from SunStrong (pvs-hass) Integration
+
+**Migration Tool Available:** See `tools/README_MIGRATION.md` for automated migration instructions.
+
+The repository includes a standalone migration script that converts your SunStrong entities to Enhanced SunPower while preserving all historical data. The tool is currently in testing - check the documentation before using.
+
+---
+
 ### Upgrading from Original Keith Baker (krbaker) SunPower Integration
 
 **⚠️ This upgrade is a one-way process** - backup recommended before proceeding. You may be able to roll back, but my test failed, and I won't be investing time in debugging why.
@@ -110,10 +118,22 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 
 4. **Install Enhanced Version** (follow steps below)
 
+5. **Clean Up Old Virtual Devices** (Battery Systems Only)
+   - krbaker integration created "Virtual Battery" and "Virtual SunVault" devices
+   - These will appear as orphaned/unavailable after upgrade
+   - **Safe to delete manually** - Enhanced SunPower uses real ESS devices from PVS instead of virtual aggregations
+   - Go to "Settings" → "Devices & Services" → "Entities" → Search for "virtual" → Delete orphaned entities
+
 **Why Remove First?**
 - Prevents entity conflicts between old and new versions
 - Enhanced version automatically migrates configuration
 - Entity history is preserved - no data loss
+
+**Battery System Changes:**
+- **Old krbaker approach**: Created virtual aggregation devices from ESS endpoint
+- **Enhanced SunPower approach**: Uses real ESS devices from PVS with comprehensive sensor suite
+- **Result**: More accurate data, better device organization, eliminates virtual device complexity
+- **Note**: Some calculated sensors (power input/output based on amperage) may be unavailable due to pypvs library limitations
 
 ### Install via HACS
 
@@ -379,6 +399,20 @@ For individual panel monitoring, add each inverter's lifetime power sensor:
 ![Solar Panel Setup](images/solar_panel_setup.png)
 
 ![Energy Dashboard Solar Production](images/energy_dash_solar_production.png)
+
+**Setting Up Home Battery Storage (Battery Systems Only):**
+
+If you have a SunVault or ESS battery system, configure battery monitoring in the Energy Dashboard:
+
+**Energy going in to the battery (charging):**
+- `sensor.sunpower_ess_{serial}_pos_lte_kwh`
+- Displayed as: "ESS {serial} Positive Lifetime Energy"
+
+**Energy coming out of the battery (discharging):**
+- `sensor.sunpower_ess_{serial}_neg_lte_kwh`
+- Displayed as: "ESS {serial} Negative Lifetime Energy"
+
+These sensors track the total energy flow through your battery system over its lifetime, providing accurate charging/discharging history for the Energy Dashboard.
 
 ### Monitoring Approach Recommendations
 

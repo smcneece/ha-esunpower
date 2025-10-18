@@ -482,54 +482,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Migrate from krbaker format if needed
     await migrate_from_krbaker_if_needed(hass, entry)
 
-    # Migrate from SunStrong (pvs-hass) format if needed - RUNS ONCE ONLY
-    if not entry.data.get("sunstrong_migration_done", False):
-        _LOGGER.info("Checking for orphaned SunStrong entities to migrate...")
-        try:
-            # Get PVS serial/model from supervisor/info (needed for migration)
-            import aiohttp
-            pvs_serial = None
-            pvs_model = "pvs6"  # Default
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"http://{entry.data['host']}/cgi-bin/dl_cgi/supervisor/info",
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
-                    if resp.status == 200:
-                        supervisor = await resp.json()
-                        pvs_serial = supervisor.get("SERIAL", "").upper()
-                        pvs_model = supervisor.get("MODEL", "pvs6").lower()
-
-            if pvs_serial:
-                from .converter import migrate_sunstrong_entities
-
-                migration_results = await migrate_sunstrong_entities(hass, pvs_serial, pvs_model)
-
-                if migration_results["migrated"] > 0:
-                    _LOGGER.info(
-                        "✅ SunStrong migration complete: %d entities migrated, %d skipped, %d errors",
-                        migration_results["migrated"],
-                        migration_results["skipped"],
-                        migration_results["errors"]
-                    )
-                else:
-                    _LOGGER.info("No SunStrong entities found - migration not needed")
-
-            # Mark migration as done (success or not) - NEVER RUN AGAIN
-            new_data = dict(entry.data)
-            new_data["sunstrong_migration_done"] = True
-            hass.config_entries.async_update_entry(entry, data=new_data)
-
-        except Exception as err:
-            # Migration failed - log but don't block setup
-            _LOGGER.warning("SunStrong migration failed (not critical): %s", err)
-
-            # Still mark as done to prevent retry loops
-            new_data = dict(entry.data)
-            new_data["sunstrong_migration_done"] = True
-            hass.config_entries.async_update_entry(entry, data=new_data)
-
     # Check if we should use pypvs (new firmware) or legacy dl_cgi (old firmware)
     uses_pypvs = entry.data.get("uses_pypvs", False)
     firmware_build = entry.data.get("firmware_build")

@@ -3,6 +3,80 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.13] - 2025-10-18
+
+### Code Quality Improvements
+
+**SunStrong Migration Moved to Standalone Tool (Experimental - Not Yet Released)**
+- Removed in-integration migration code (converter.py deleted, __init__.py simplified)
+- Created standalone Python script: `tools/migrate_from_sunstrong.py` (testing in progress)
+- Cleaner integration code - no permanent migration logic in main codebase
+- Migration tool will be announced after testing is complete
+
+### New Features
+
+**Transfer Switch Support (New Firmware)**
+- Added transfer switch (PV Disconnect) device support for new firmware battery backup systems
+- **Sensors**: Main breaker state, PV disconnect state, temperature, grid voltages (L1/L2), load voltages (L1/L2), supply voltage
+- **Impact**: Battery backup users can now monitor transfer switch status in Home Assistant
+- **File Modified**: pypvs_converter.py (lines 201-226) - Convert pypvs transfer_switches to legacy format
+- **Note**: Sensor definitions already existed in const.py, just needed converter implementation
+
+---
+
+### CRITICAL Bug Fix: Battery SOC Showing Wrong Values (New Firmware)
+
+**Battery State of Charge Fixed:**
+- Fixed battery SOC showing 0.876% when it should show 87.6% (100x too small!)
+- Fixed battery SOH (State of Health) showing wrong percentage
+- Fixed customer SOC showing wrong percentage
+- pypvs provides SOC as decimal (0-1), we weren't multiplying by 100 for percentage display
+
+**Root Cause:**
+- pypvs PVSESS model provides SOC/SOH as decimals: `0.876` = 87.6% charge
+- pypvs_converter.py passed through raw decimal without conversion
+- Result: "0.876%" displayed instead of "87.6%"
+- Made batteries look nearly dead when they were actually healthy
+
+**The Fix:**
+- Multiply pypvs SOC/SOH values by 100 before conversion
+- `soc_val * 100`, `customer_soc_val * 100`, `soh_val * 100`
+- Now displays correct percentage values
+
+**Impact:** **ALL new firmware users (BUILD >= 61840) with battery systems** - battery percentages now show correctly
+
+**Files Modified:**
+- `pypvs_converter.py`: Added percentage conversion for SOC/SOH fields (lines 178-181)
+
+---
+
+### Bug Fix: Missing Firmware/Hardware Versions (New Firmware)
+
+**Firmware/Hardware Display Fixed:**
+- Fixed "Firmware: Unknown Hardware: Unknown" showing for all inverters, meters, and ESS devices on new firmware
+- Added placeholder values for pypvs devices until library provides actual firmware/hardware data
+- pypvs library regression - old firmware dl_cgi provided these fields, new firmware pypvs doesn't
+
+**Root Cause:**
+- pypvs library models (PVSInverter, PVSESS, PVSMeter) don't include firmware/hardware version fields
+- Only PVS Gateway provides software_version and hardware_version
+- Old firmware dl_cgi provided: inverters (SWVER: "4.21.4", hw_version: "4403"), batteries (SWVER: "2.8", hw_version: "4.51")
+- New firmware LocalAPI/varserver likely has this data but pypvs models don't extract it
+
+**Temporary Fix (until pypvs updated):**
+- Inverters: `SWVER: "pypvs"`, `HWVER: <model name>` (e.g., "AC_Module_Type_H")
+- ESS devices: `SWVER: "pypvs"`, `HWVER: <model name>` (e.g., "SPWR-Equinox-model")
+- Shows actual model instead of "Unknown" which looks broken to users
+
+**Impact:** New firmware users (BUILD >= 61840) - devices now show placeholder firmware/hardware instead of "Unknown"
+
+**GitHub Issue:** Opened issue with SunStrong/pypvs to add firmware/hardware fields to device models
+
+**Files Modified:**
+- `pypvs_converter.py`: Added SWVER/HWVER placeholders for inverters and ESS devices (lines 90-91, 175-176)
+
+---
+
 ## [v2025.10.12] - 2025-10-16
 
 ### Bug Fix: New Firmware Battery Sensors (pypvs ESS Support)

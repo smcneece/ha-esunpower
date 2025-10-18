@@ -86,6 +86,9 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "DESCR": f"Inverter {inverter.serial_number}",
                     "STATE": "working",
                     "STATEDESCR": "Working",
+                    # pypvs doesn't provide firmware/hardware - use placeholders until fixed
+                    "SWVER": "pypvs",
+                    "HWVER": inverter.model or 'AC_Module_Type_E',
                     # pypvs inverter fields mapped to dl_cgi field names for entity compatibility
                     "ltea_3phsum_kwh": str(inverter.lte_kwh),
                     "p_3phsum_kw": str(inverter.last_report_kw),
@@ -168,10 +171,14 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "DESCR": f"Energy Storage System {ess.serial_number}",
                     "STATE": "working",
                     "STATEDESCR": "Working",
+                    # pypvs doesn't provide firmware/hardware - use placeholders until fixed
+                    "SWVER": "pypvs",
+                    "HWVER": ess.model,
                     # pypvs PVSESS fields mapped to dl_cgi-style field names
-                    "soc_val": str(ess.soc_val),
-                    "customer_soc_val": str(ess.customer_soc_val),
-                    "soh_val": str(ess.soh_val),
+                    # pypvs provides SOC/SOH as decimals (0-1), convert to percentages (0-100)
+                    "soc_val": str(ess.soc_val * 100),
+                    "customer_soc_val": str(ess.customer_soc_val * 100),
+                    "soh_val": str(ess.soh_val * 100),
                     "op_mode": ess.op_mode,
                     "power_3ph_kw": str(ess.power_3ph_kw),
                     "neg_lte_kwh": str(ess.neg_lte_kwh),
@@ -190,6 +197,33 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                 }
                 devices.append(ess_device)
             _LOGGER.debug("Converted %d pypvs ESS devices", len(pvs_data.ess))
+
+        # Convert Transfer Switches (if present)
+        if hasattr(pvs_data, 'transfer_switches') and pvs_data.transfer_switches:
+            for serial, ts in pvs_data.transfer_switches.items():
+                ts_device = {
+                    "DEVICE_TYPE": "Transfer Switch",
+                    "SERIAL": ts.serial_number,
+                    "MODEL": ts.model,
+                    "DESCR": f"Transfer Switch {ts.serial_number}",
+                    "STATE": "working",
+                    "STATEDESCR": "Working",
+                    # pypvs doesn't provide firmware/hardware - use placeholders until fixed
+                    "SWVER": "pypvs",
+                    "HWVER": ts.model,
+                    # pypvs PVSTransferSwitch fields mapped to dl_cgi field names
+                    "mid_state": ts.mid_state,
+                    "pvd1_state": ts.pvd1_state,
+                    "temperature_c": str(ts.temperature_c),
+                    "v1n_grid_v": str(ts.v1n_grid_v),
+                    "v2n_grid_v": str(ts.v2n_grid_v),
+                    "v1n_v": str(ts.v1n_v),
+                    "v2n_v": str(ts.v2n_v),
+                    "v_supply_v": str(ts.v_supply_v),
+                    "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+                }
+                devices.append(ts_device)
+            _LOGGER.debug("Converted %d pypvs transfer switches", len(pvs_data.transfer_switches))
 
         _LOGGER.debug("✅ pypvs → dl_cgi conversion: %d devices total", len(devices))
         return {"devices": devices}
