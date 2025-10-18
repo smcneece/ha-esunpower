@@ -10,7 +10,7 @@
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
-### Untested for battery systems - if you have a battery system please help us test support!
+### Battery systems are working! (Tested on new firmware)- If you're on new firmware and have a battery system you should be able to use this integraiton now.
 
 Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 
