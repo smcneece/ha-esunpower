@@ -21,7 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up the Enhanced SunPower binary sensors - UPDATED IMPORTS VERSION."""
+    """Set up the Enhanced SunPower binary sensors with dynamic entity discovery.
+    
+    Entities are created when devices are first detected, allowing setup to succeed
+    even if inverters are offline (e.g., at night).
+    """
     sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
     _LOGGER.debug("Enhanced SunPower state: %s", sunpower_state)
 
@@ -36,72 +40,121 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     coordinator = sunpower_state[SUNPOWER_COORDINATOR]
     sunpower_data = coordinator.data
 
+    # Track created entities to avoid duplicates on coordinator updates
+    if "_binary_sensor_entities_created" not in sunpower_state:
+        sunpower_state["_binary_sensor_entities_created"] = set()
+    created_entities = sunpower_state["_binary_sensor_entities_created"]
+
     do_ess = False
     if sunpower_data and ESS_DEVICE_TYPE in sunpower_data:
         do_ess = True
     else:
         _LOGGER.debug("Found No ESS Data")
 
+    # IMPROVED: Allow setup even without PVS data initially
     if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
-        _LOGGER.warning("Cannot find PVS Entry - coordinator may not have data yet, will retry on next update")
-        # FIXED: Don't create entities now, but don't fail either - they'll be created on next coordinator update
+        _LOGGER.info("PVS data not available yet - binary sensor entities will be created when data arrives")
+        # Set up coordinator listener to create entities when data becomes available
+        async def _async_add_entities_when_ready():
+            """Add entities when coordinator data becomes available."""
+            if coordinator.data and PVS_DEVICE_TYPE in coordinator.data:
+                await _create_binary_entities(hass, config_entry, async_add_entities, coordinator,
+                                             do_descriptive_names, do_product_names, created_entities)
+        
+        # Listen for coordinator updates
+        config_entry.async_on_unload(
+            coordinator.async_add_listener(_async_add_entities_when_ready)
+        )
+        
+        # Return empty list for now - entities will be added when data arrives
         async_add_entities([], True)
         return
-    else:
-        entities = []
+    
+    # Data is available - create entities now
+    await _create_binary_entities(hass, config_entry, async_add_entities, coordinator,
+                                 do_descriptive_names, do_product_names, created_entities)
 
-        pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
 
-        # UPDATED: Combine core binary sensors with battery binary sensors when needed
-        BINARY_SENSORS = SUNPOWER_BINARY_SENSORS
-        if do_ess:
-            BINARY_SENSORS.update(SUNVAULT_BINARY_SENSORS)
+async def _create_binary_entities(hass, config_entry, async_add_entities, coordinator,
+                                 do_descriptive_names, do_product_names, created_entities):
+    """Create binary sensor entities from coordinator data."""
+    sunpower_data = coordinator.data
+    
+    if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
+        return
+    
+    entities = []
 
-        for device_type in BINARY_SENSORS:
-            if device_type not in sunpower_data:
-                _LOGGER.error(f"Cannot find any {device_type}")
-                continue
-            unique_id = BINARY_SENSORS[device_type]["unique_id"]
-            sensors = BINARY_SENSORS[device_type]["sensors"]
-            for index, sensor_data in enumerate(sunpower_data[device_type].values()):
-                for sensor_name in sensors:
-                    sensor = sensors[sensor_name]
-                    sensor_type = (
-                        "" if not do_descriptive_names else f"{sensor_data.get('TYPE', '')} "
-                    )
-                    sensor_description = (
-                        "" if not do_descriptive_names else f"{sensor_data.get('DESCR', '')} "
-                    )
-                    text_sunpower = "" if not do_product_names else "SunPower "
-                    text_sunvault = "" if not do_product_names else "SunVault "
-                    text_pvs = "" if not do_product_names else "PVS "
-                    sensor_index = "" if not do_descriptive_names else f"{index + 1} "
-                    sunpower_sensor = SunPowerState(
-                        coordinator=coordinator,
-                        my_info=sensor_data,
-                        parent_info=pvs if device_type != PVS_DEVICE_TYPE else None,
-                        id_code=unique_id,
-                        device_type=device_type,
-                        field=sensor["field"],
-                        title=sensor["title"].format(
-                            index=sensor_index,
-                            TYPE=sensor_type,
-                            DESCR=sensor_description,
-                            SUN_POWER=text_sunpower,
-                            SUN_VAULT=text_sunvault,
-                            PVS=text_pvs,
-                            SERIAL=sensor_data.get("SERIAL", "Unknown"),
-                            MODEL=sensor_data.get("MODEL", "Unknown"),
-                        ),
-                        device_class=sensor["device"],
-                        on_value=sensor["on_value"],
-                        entity_category=sensor.get("entity_category", None),
-                    )
-                    # FIXED: Remove the problematic entity filtering that was preventing entity creation
-                    # Original code had similar filtering that prevented entities when no data available
-                    entities.append(sunpower_sensor)
+    pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
 
-    async_add_entities(entities, True)
+    # Check for ESS data
+    do_ess = ESS_DEVICE_TYPE in sunpower_data
+    
+    # UPDATED: Combine core binary sensors with battery binary sensors when needed
+    BINARY_SENSORS = SUNPOWER_BINARY_SENSORS.copy()
+    if do_ess:
+        BINARY_SENSORS.update(SUNVAULT_BINARY_SENSORS)
+
+    for device_type in BINARY_SENSORS:
+        if device_type not in sunpower_data:
+            _LOGGER.debug(f"Device type {device_type} not present (expected if you don't have this equipment)")
+            continue
+        unique_id = BINARY_SENSORS[device_type]["unique_id"]
+        sensors = BINARY_SENSORS[device_type]["sensors"]
+        
+        for index, sensor_data in enumerate(sunpower_data[device_type].values()):
+            device_serial = sensor_data.get('SERIAL', 'Unknown')
+            
+            for sensor_name in sensors:
+                sensor = sensors[sensor_name]
+                
+                # Generate unique entity ID for tracking
+                entity_unique_id = f"{device_serial}_pvs_{sensor['field']}"
+                
+                # Skip if already created
+                if entity_unique_id in created_entities:
+                    continue
+                
+                sensor_type = (
+                    "" if not do_descriptive_names else f"{sensor_data.get('TYPE', '')} "
+                )
+                sensor_description = (
+                    "" if not do_descriptive_names else f"{sensor_data.get('DESCR', '')} "
+                )
+                text_sunpower = "" if not do_product_names else "SunPower "
+                text_sunvault = "" if not do_product_names else "SunVault "
+                text_pvs = "" if not do_product_names else "PVS "
+                sensor_index = "" if not do_descriptive_names else f"{index + 1} "
+                sunpower_sensor = SunPowerState(
+                    coordinator=coordinator,
+                    my_info=sensor_data,
+                    parent_info=pvs if device_type != PVS_DEVICE_TYPE else None,
+                    id_code=unique_id,
+                    device_type=device_type,
+                    field=sensor["field"],
+                    title=sensor["title"].format(
+                        index=sensor_index,
+                        TYPE=sensor_type,
+                        DESCR=sensor_description,
+                        SUN_POWER=text_sunpower,
+                        SUN_VAULT=text_sunvault,
+                        PVS=text_pvs,
+                        SERIAL=device_serial,
+                        MODEL=sensor_data.get("MODEL", "Unknown"),
+                    ),
+                    device_class=sensor["device"],
+                    on_value=sensor["on_value"],
+                    entity_category=sensor.get("entity_category", None),
+                )
+                
+                _LOGGER.debug("Creating binary sensor %s for %s", sensor_name, device_serial)
+                entities.append(sunpower_sensor)
+                created_entities.add(entity_unique_id)
+
+    # Add new entities if any were created
+    if entities:
+        _LOGGER.info("Adding %d new binary sensor entities", len(entities))
+        async_add_entities(entities, True)
 
 
 class SunPowerState(SunPowerEntity, BinarySensorEntity):

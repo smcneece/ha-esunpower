@@ -22,12 +22,17 @@ from .const import (
 # UPDATED: Import battery constants from battery_handler.py
 from .battery_handler import SUNVAULT_SENSORS
 from .entity import SunPowerEntity
+from .notifications import notify_inverters_discovered
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up the Enhanced SunPower sensors - UPDATED IMPORTS VERSION."""
+    """Set up the Enhanced SunPower sensors with dynamic entity discovery.
+    
+    Entities are created when devices are first detected, allowing setup to succeed
+    even if inverters are offline (e.g., at night).
+    """
     sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
     _LOGGER.debug("Enhanced SunPower state: %s", sunpower_state)
 
@@ -46,100 +51,162 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     coordinator = sunpower_state[SUNPOWER_COORDINATOR]
     sunpower_data = coordinator.data
 
+    # Track created entities to avoid duplicates on coordinator updates
+    if "_sensor_entities_created" not in sunpower_state:
+        sunpower_state["_sensor_entities_created"] = set()
+    created_entities = sunpower_state["_sensor_entities_created"]
+
     do_ess = False
     if sunpower_data and ESS_DEVICE_TYPE in sunpower_data:
         do_ess = True
     else:
         _LOGGER.debug("Found No ESS Data")
 
+    # IMPROVED: Allow setup even without PVS data initially
     if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
-        _LOGGER.warning("Cannot find PVS Entry - coordinator may not have data yet, will retry on next update")
-        # FIXED: Don't create entities now, but don't fail either - they'll be created on next coordinator update
+        _LOGGER.info("PVS data not available yet - entities will be created when data arrives")
+        # Set up coordinator listener to create entities when data becomes available
+        async def _async_add_entities_when_ready():
+            """Add entities when coordinator data becomes available."""
+            if coordinator.data and PVS_DEVICE_TYPE in coordinator.data:
+                await _create_entities(hass, config_entry, async_add_entities, coordinator, 
+                                      do_descriptive_names, do_product_names, created_entities)
+        
+        # Listen for coordinator updates
+        config_entry.async_on_unload(
+            coordinator.async_add_listener(_async_add_entities_when_ready)
+        )
+        
+        # Return empty list for now - entities will be added when data arrives
         async_add_entities([], True)
         return
-    else:
-        entities = []
+    
+    # Data is available - create entities now
+    await _create_entities(hass, config_entry, async_add_entities, coordinator,
+                          do_descriptive_names, do_product_names, created_entities)
 
-        pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
 
-        # UPDATED: Combine core sensors with battery sensors when needed
-        SENSORS = SUNPOWER_SENSORS
-        if do_ess:
-            SENSORS.update(SUNVAULT_SENSORS)
+async def _create_entities(hass, config_entry, async_add_entities, coordinator,
+                          do_descriptive_names, do_product_names, created_entities):
+    """Create sensor entities from coordinator data."""
+    sunpower_data = coordinator.data
+    
+    if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
+        return
+    
+    entities = []
+    inverters_newly_discovered = False
 
-        for device_type in SENSORS:
-            if device_type not in sunpower_data:
-                _LOGGER.debug(f"Device type {device_type} not present (expected if you don't have this equipment)")
-                continue
-            unique_id = SENSORS[device_type]["unique_id"]
-            sensors = SENSORS[device_type]["sensors"]
+    pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
+
+    # Check for ESS data
+    do_ess = ESS_DEVICE_TYPE in sunpower_data
+    
+    # UPDATED: Combine core sensors with battery sensors when needed
+    SENSORS = SUNPOWER_SENSORS.copy()
+    if do_ess:
+        SENSORS.update(SUNVAULT_SENSORS)
+
+    for device_type in SENSORS:
+        if device_type not in sunpower_data:
+            _LOGGER.debug(f"Device type {device_type} not present (expected if you don't have this equipment)")
+            continue
+        unique_id = SENSORS[device_type]["unique_id"]
+        sensors = SENSORS[device_type]["sensors"]
+        
+        for index, sensor_data in enumerate(sunpower_data[device_type].values()):
+            device_serial = sensor_data.get('SERIAL', 'Unknown')
             
-            
-            for index, sensor_data in enumerate(sunpower_data[device_type].values()):
-                for sensor_name in sensors:
-                    sensor = sensors[sensor_name]
-                    
-                    # NEW: Hybrid approach - field exists AND has value (upgrade compatible + clean interface)
-                    field_name = sensor["field"]
-                    if field_name not in sensor_data:
-                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' not in device data", 
-                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
+            for sensor_name in sensors:
+                sensor = sensors[sensor_name]
+                
+                # Generate unique entity ID for tracking
+                entity_unique_id = f"{device_serial}_pvs_{sensor['field']}"
+                
+                # Skip if already created
+                if entity_unique_id in created_entities:
+                    continue
+                
+                # Track if this is the first inverter entity being created
+                from .const import INVERTER_DEVICE_TYPE
+                if device_type == INVERTER_DEVICE_TYPE and not inverters_newly_discovered:
+                    inverters_newly_discovered = True
+                
+                # NEW: Hybrid approach - field exists AND has value (upgrade compatible + clean interface)
+                field_name = sensor["field"]
+                if field_name not in sensor_data:
+                    _LOGGER.debug("Skipping sensor %s for %s - field '%s' not in device data", 
+                                sensor_name, device_serial, field_name)
+                    continue
+                
+                # Create the sensor object to check its value
+                sensor_type = (
+                    "" if not do_descriptive_names else f"{sensor_data.get('TYPE', '')} "
+                )
+                sensor_description = (
+                    "" if not do_descriptive_names else f"{sensor_data.get('DESCR', '')} "
+                )
+                text_sunpower = "" if not do_product_names else "SunPower "
+                text_sunvault = "" if not do_product_names else "SunVault "
+                text_pvs = "" if not do_product_names else "PVS "
+                sensor_index = "" if not do_descriptive_names else f"{index + 1} "
+                sunpower_sensor = SunPowerSensor(
+                    coordinator=coordinator,
+                    my_info=sensor_data,
+                    parent_info=pvs if device_type != PVS_DEVICE_TYPE else None,
+                    id_code=unique_id,
+                    device_type=device_type,
+                    field=sensor["field"],
+                    title=sensor["title"].format(
+                        index=sensor_index,
+                        TYPE=sensor_type,
+                        DESCR=sensor_description,
+                        SUN_POWER=text_sunpower,
+                        SUN_VAULT=text_sunvault,
+                        PVS=text_pvs,
+                        SERIAL=device_serial,
+                        MODEL=sensor_data.get("MODEL", "Unknown"),
+                    ),
+                    unit=sensor["unit"],
+                    icon=sensor["icon"],
+                    device_class=sensor["device"],
+                    state_class=sensor["state"],
+                    entity_category=sensor.get("entity_category", None),
+                )
+                
+                # HYBRID: Field exists + has value (original compatibility + our clean interface)
+                if sunpower_sensor.native_value is not None:
+                    # Skip KB-based memory/flash sensors if value is "0" (new firmware - data unavailable)
+                    if sensor_name in ["PVS_MEMORY_USED", "PVS_FLASH_AVAILABLE"] and sunpower_sensor.native_value == "0":
+                        _LOGGER.debug("Skipping sensor %s for %s - new firmware uses percentage sensors instead",
+                                    sensor_name, device_serial)
                         continue
-                    
-                    # Create the sensor object to check its value
-                    sensor_type = (
-                        "" if not do_descriptive_names else f"{sensor_data.get('TYPE', '')} "
-                    )
-                    sensor_description = (
-                        "" if not do_descriptive_names else f"{sensor_data.get('DESCR', '')} "
-                    )
-                    text_sunpower = "" if not do_product_names else "SunPower "
-                    text_sunvault = "" if not do_product_names else "SunVault "
-                    text_pvs = "" if not do_product_names else "PVS "
-                    sensor_index = "" if not do_descriptive_names else f"{index + 1} "
-                    sunpower_sensor = SunPowerSensor(
-                        coordinator=coordinator,
-                        my_info=sensor_data,
-                        parent_info=pvs if device_type != PVS_DEVICE_TYPE else None,
-                        id_code=unique_id,
-                        device_type=device_type,
-                        field=sensor["field"],
-                        title=sensor["title"].format(
-                            index=sensor_index,
-                            TYPE=sensor_type,
-                            DESCR=sensor_description,
-                            SUN_POWER=text_sunpower,
-                            SUN_VAULT=text_sunvault,
-                            PVS=text_pvs,
-                            SERIAL=sensor_data.get("SERIAL", "Unknown"),
-                            MODEL=sensor_data.get("MODEL", "Unknown"),
-                        ),
-                        unit=sensor["unit"],
-                        icon=sensor["icon"],
-                        device_class=sensor["device"],
-                        state_class=sensor["state"],
-                        entity_category=sensor.get("entity_category", None),
-                    )
-                    
-                    # HYBRID: Field exists + has value (original compatibility + our clean interface)
-                    if sunpower_sensor.native_value is not None:
-                        # Skip KB-based memory/flash sensors if value is "0" (new firmware - data unavailable)
-                        if sensor_name in ["PVS_MEMORY_USED", "PVS_FLASH_AVAILABLE"] and sunpower_sensor.native_value == "0":
-                            _LOGGER.debug("Skipping sensor %s for %s - new firmware uses percentage sensors instead",
-                                        sensor_name, sensor_data.get('SERIAL', 'Unknown'))
-                            continue
 
-                        _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s",
-                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name,
-                                    sunpower_sensor.native_value)
-                        entities.append(sunpower_sensor)
-                    else:
-                        _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value",
-                                    sensor_name, sensor_data.get('SERIAL', 'Unknown'), field_name)
+                    _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s",
+                                sensor_name, device_serial, field_name,
+                                sunpower_sensor.native_value)
+                    entities.append(sunpower_sensor)
+                    created_entities.add(entity_unique_id)
+                else:
+                    _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value",
+                                sensor_name, device_serial, field_name)
 
-        # Create entities for each device type
-
-    async_add_entities(entities, True)
+    # Add new entities if any were created
+    if entities:
+        _LOGGER.info("Adding %d new sensor entities", len(entities))
+        async_add_entities(entities, True)
+        
+        # Notify user if inverters were just discovered
+        if inverters_newly_discovered:
+            from .const import INVERTER_DEVICE_TYPE
+            inverter_count = len(sunpower_data.get(INVERTER_DEVICE_TYPE, {}))
+            if inverter_count > 0:
+                # Get cache from hass.data
+                sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
+                cache = sunpower_state.get("_cache")
+                if cache:
+                    notify_inverters_discovered(hass, config_entry, cache, inverter_count)
+                    _LOGGER.info("Notified user: %d inverters discovered and entities created", inverter_count)
 
 
 class SunPowerSensor(SunPowerEntity, SensorEntity):

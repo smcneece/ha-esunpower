@@ -78,6 +78,7 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
 
         # Convert Inverters - using EXACT pypvs field names from inverter.py model
         if hasattr(pvs_data, 'inverters') and pvs_data.inverters:
+            _LOGGER.info("pypvs reports %d inverters available", len(pvs_data.inverters))
             for serial, inverter in pvs_data.inverters.items():
                 inv_device = {
                     "DEVICE_TYPE": "Inverter",
@@ -103,7 +104,9 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(inv_device)
-            _LOGGER.debug("Converted %d pypvs inverters", len(pvs_data.inverters))
+            _LOGGER.info("✅ Converted %d pypvs inverters to legacy format", len(pvs_data.inverters))
+        else:
+            _LOGGER.warning("⚠️ No inverters found in pypvs data - inverters may be offline (nighttime?)")
 
         # Convert Meters - using EXACT pypvs field names from meter.py model
         if hasattr(pvs_data, 'meters') and pvs_data.meters:
