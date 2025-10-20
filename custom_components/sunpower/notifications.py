@@ -482,6 +482,16 @@ def notify_setup_success(hass, entry, cache):
     safe_notify(hass, msg, "Enhanced SunPower Debug", entry, is_debug=True, 
                notification_category="debug", cache=cache)
 
+def notify_inverters_discovered(hass, entry, cache, inverter_count):
+    """ESSENTIAL: Notify when inverters are discovered after initial setup"""
+    msg = (f"☀️ Inverters Detected!\n\n"
+           f"Enhanced SunPower has discovered {inverter_count} inverter{'s' if inverter_count != 1 else ''} "
+           f"and created all sensor entities.\n\n"
+           f"Your solar system is now fully monitored.")
+    
+    safe_notify(hass, msg, "Enhanced SunPower Setup", entry, force_notify=True,
+               notification_category="setup", cache=cache)
+
 # Removed day/night elevation notification functions - simplified polling only
 
 def notify_diagnostic_coordinator_started(hass, entry, cache):
