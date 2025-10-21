@@ -90,9 +90,10 @@
 
 **IMPORTANT - New Firmware Users (BUILD 61840+):**
 
-If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect directly to your PVS:
+If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect directly to your PVS WAN port:
 - New firmware requires HTTPS (port 443) for authentication - bridges don't support this
-- Use PVS WAN port IP (check your router's DHCP leases) or LAN port (172.27.153.1)
+- Use PVS WAN port IP (check your router's DHCP leases for "PVS" or "SunPower" device)
+- LAN port (172.27.153.1) still has DHCP server - requires VLAN isolation if used
 - Bridges were only needed for old firmware - new firmware has built-in authentication
 
 ---
