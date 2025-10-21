@@ -88,11 +88,6 @@
 - Entities are automatically created when inverters come online at sunrise
 - You'll receive a notification when your solar system is fully discovered and monitored
 
-### Upgrading from SunStrong (pvs-hass) Integration
-
-**Migration Tool Available:** See `tools/README_MIGRATION.md` for automated migration instructions.
-
-The repository includes a standalone migration script that converts your SunStrong entities to Enhanced SunPower while preserving all historical data. The tool is currently in testing - check the documentation before using.
 
 ---
 
