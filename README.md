@@ -88,6 +88,12 @@
 - Entities are automatically created when inverters come online at sunrise
 - You'll receive a notification when your solar system is fully discovered and monitored
 
+**IMPORTANT - New Firmware Users (BUILD 61840+):**
+
+If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect directly to your PVS:
+- New firmware requires HTTPS (port 443) for authentication - bridges don't support this
+- Use PVS WAN port IP (check your router's DHCP leases) or LAN port (172.27.153.1)
+- Bridges were only needed for old firmware - new firmware has built-in authentication
 
 ---
 
@@ -472,6 +478,10 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 - **LAN Port (Alternative)**: Fixed IP `172.27.153.1` also works
   - Requires knowing the fixed address
   - Same authentication and features as WAN port
+- **Raspberry Pi Bridges/Proxies**: Not supported with new firmware
+  - New firmware requires HTTPS (port 443) for authentication
+  - Most bridges only forward HTTP (port 80)
+  - Use direct PVS connection instead
 
 **Old Firmware (BUILD < 61840):**
 - **LAN Port Required**: Must use `172.27.153.1`
