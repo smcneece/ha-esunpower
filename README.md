@@ -1,8 +1,6 @@
-# Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
+# Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower - SunStrong PVS
 
-## PLEASE TAKE A FEW MINUTES TO READ
-
-## **FIRMWARE COMPATIBILITY** 
+## PLEASE TAKE A FEW MINUTES TO READ - FIRMWARE COMPATIBILITY 
 
 **October 3, 2025 the integration should work with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
 - **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
@@ -11,8 +9,6 @@
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
 ### Battery systems are working! (Tested on new firmware)- If you're on new firmware and have a battery system you should be able to use this integraiton now.
-
-Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 
 ---
 
@@ -63,7 +59,7 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 - **PVS updates different data at different rates internally:**
   - **PVS gateway sensors** (uptime, RAM, CPU, errors) → Update every PVS scan (~30-60s)
   - **Meter/Inverter power sensors** → Update every ~5 minutes (PVS internal cache)
-  - **Battery sensors** → Update more frequently (if battery system present)
+  - **Battery sensors** → May update more frequently (if battery system present)
 - **Faster polling does NOT make meter/inverter data update faster** - this is controlled by PVS hardware, likely to reduce device polling stress
 - **Verify polling works**: Watch PVS **Uptime** sensor - should update at your configured interval
 
@@ -87,9 +83,10 @@ Open issues here: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issue
 
 ### Requirements
 
-**Install during daylight hours!**
-- Inverters are powered by the sun and offline at night
-- Integration validates real PVS connection during setup process
+**Can now install anytime - day or night!**
+- Dynamic entity discovery allows setup even when inverters are offline (nighttime)
+- Entities are automatically created when inverters come online at sunrise
+- You'll receive a notification when your solar system is fully discovered and monitored
 
 ### Upgrading from SunStrong (pvs-hass) Integration
 
@@ -537,6 +534,14 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 ---
 
 **Enjoying reliable SunPower monitoring with simplified 24/7 polling, mobile alerts, individual inverter health tracking, authentication support, and diagnostic dashboard monitoring? Consider starring this repository to help others find these improvements!**
+
+---
+
+## Contributors
+
+Special thanks to community contributors who have helped improve this integration:
+
+- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18)
 
 ---
 

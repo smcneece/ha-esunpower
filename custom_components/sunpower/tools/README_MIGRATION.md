@@ -69,13 +69,36 @@ See the install instructions on our github page:
    - Review migration plan
    - Confirm migration
 
-4. **Watch the progress:**
+4. **⚠️ EXPECTED: Terminal may show "Press ⏎ to Reconnect"**
+
+   When the script stops Home Assistant, your terminal may briefly show a reconnect message:
    ```
+   🛑 Stopping Home Assistant Core...
+   [Press ⏎ to Reconnect button appears]
+   ```
+
+   **This is NORMAL! Do NOT panic!**
+   - The script is still running in the background
+   - Wait 30-60 seconds for HA to stop and restart
+   - The terminal will reconnect automatically
+   - You'll then see migration progress and completion message
+
+   **If you see the reconnect button:**
+   - ✅ **Do nothing** - wait 30-60 seconds
+   - ✅ **OR click/press Enter** to reconnect manually
+   - ❌ **Do NOT close the terminal** - the script is still running!
+
+5. **After reconnect, watch the progress:**
+   ```
+   🔄 Migrating entities...
    ✅ Inverter        sensor.mi_e00122142080335_current_power_production
                       → sensor.sunpower_inverter_e00122142080335_p_3phsum_kw
    ✅ Power Meter     sensor.meter_pvs6m22283193p_3_phase_power
                       → sensor.sunpower_power_meter_pvs6m22283193p_p_3phsum_kw
    ...
+   💾 Saving updated entity registry...
+   🚀 Starting Home Assistant Core...
+   ✅ Migration complete!
    ```
 
 ### Step 4: Configure Enhanced SunPower

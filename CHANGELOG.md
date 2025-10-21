@@ -3,6 +3,50 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.14] - 2025-10-20
+
+### New Features
+
+**Nighttime Installation Support**
+- Setup now succeeds even when inverters are offline (nighttime installation)
+- Dynamic entity discovery - entities created automatically when devices come online
+- User notification when inverters discovered and all sensors created
+- Coordinator listener pattern monitors for device availability
+- No more "Install during daylight hours!" restriction
+
+**Implementation:**
+- Entity tracking prevents duplicate creation on coordinator updates
+- Deferred entity creation for both sensors and binary sensors
+- Hybrid field checking - only creates entities when field exists AND has value
+- `notify_inverters_discovered()` notifies user when solar system fully monitored
+
+**Impact:** Users can now install the integration anytime - entities will populate automatically at sunrise when inverters power on
+
+**Files Modified:**
+- `sensor.py`: Added coordinator listener, entity tracking, deferred creation logic
+- `binary_sensor.py`: Same pattern for binary sensors
+- `notifications.py`: Added `notify_inverters_discovered()` function
+- `pypvs_converter.py`: Added STATE/STATEDESCR to ESS devices (was missing)
+
+**Contributor:** Special thanks to [@jtooley307](https://github.com/jtooley307) for implementing this feature (PR #18)
+
+---
+
+### Technical Improvements
+
+**Enhanced Exception Logging for Troubleshooting**
+- Added full stack traces to config flow validation errors
+- No user configuration required - visible in default Home Assistant logs
+- Helps diagnose connection failures, authentication issues, and network problems
+- Users can now provide complete error details in bug reports
+
+**Impact:** Faster troubleshooting and diagnosis of setup issues without requiring debug mode
+
+**Files Modified:**
+- `config_flow.py`: Added `exc_info=True` to critical exception handlers (lines 53, 158, 172, 189)
+
+---
+
 ## [v2025.10.13] - 2025-10-18
 
 ### Code Quality Improvements

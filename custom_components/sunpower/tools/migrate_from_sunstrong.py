@@ -4,17 +4,25 @@ SunStrong → Enhanced SunPower Migration Tool
 
 USAGE (Home Assistant Terminal):
 1. Create backup: Settings → System → Backups → Create Backup
-2. Disable SunStrong integration (Settings → Devices → SunStrong → Disable)
-3. Run: python3 /config/tools/migrate_from_sunstrong.py
-4. Install Enhanced SunPower integration
-5. Delete SunStrong integration
+2. Install Enhanced SunPower integration (but don't configure yet)
+3. Restart Home Assistant
+4. Disable SunStrong integration (Settings → Devices → SunStrong → Disable)
+5. Run: python3 /config/custom_components/sunpower/tools/migrate_from_sunstrong.py
+6. Script will automatically stop HA, migrate entities, and restart HA
+7. Configure Enhanced SunPower integration
+8. Delete SunStrong integration
 
 This script converts SunStrong entity_ids and unique_ids to Enhanced SunPower format
 while preserving all historical data in the recorder database.
+
+NOTE: This script will automatically stop and restart Home Assistant Core to prevent
+registry file conflicts. Your SSH terminal session will remain active.
 """
 
 import json
 import sys
+import subprocess
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -53,6 +61,40 @@ METER_FIELD_MAP = {
 
 
 # ===== HELPER FUNCTIONS =====
+
+def stop_home_assistant():
+    """Stop Home Assistant Core to prevent registry file conflicts"""
+    print("🛑 Stopping Home Assistant Core...")
+    try:
+        result = subprocess.run(['ha', 'core', 'stop'], capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            print(f"⚠️  Warning: Could not stop HA Core: {result.stderr}")
+            return False
+        print("✅ Home Assistant Core stopped")
+        # Wait for shutdown to complete
+        time.sleep(5)
+        return True
+    except Exception as e:
+        print(f"⚠️  Warning: Could not stop HA Core: {e}")
+        return False
+
+
+def start_home_assistant():
+    """Start Home Assistant Core after migration"""
+    print("🚀 Starting Home Assistant Core...")
+    try:
+        result = subprocess.run(['ha', 'core', 'start'], capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            print(f"❌ ERROR: Could not start HA Core: {result.stderr}")
+            return False
+        print("✅ Home Assistant Core started")
+        print("⏳ Waiting for Home Assistant to initialize (30 seconds)...")
+        time.sleep(30)
+        return True
+    except Exception as e:
+        print(f"❌ ERROR: Could not start HA Core: {e}")
+        return False
+
 
 def load_entity_registry():
     """Load Home Assistant entity registry"""
@@ -318,6 +360,19 @@ def main():
         sys.exit(0)
     print()
 
+    # Stop Home Assistant to prevent registry file conflicts
+    if not stop_home_assistant():
+        print()
+        print("⚠️  WARNING: Could not stop Home Assistant Core")
+        print("   Migration will continue, but there's a risk of file conflicts.")
+        print("   Recommend manually stopping HA Core and re-running this script.")
+        print()
+        response = input("Continue anyway? (yes/no): ").strip().lower()
+        if response not in ['yes', 'y']:
+            print("❌ Migration cancelled.")
+            sys.exit(0)
+    print()
+
     # Perform migration
     print("🔄 Migrating entities...")
     migrated_count = 0
@@ -329,12 +384,17 @@ def main():
             entity['entity_id'] = migration['new_entity_id']
             entity['unique_id'] = migration['new_unique_id']
             entity['platform'] = 'sunpower'
+            # COMPLETELY REMOVE config_entry_id so Enhanced SunPower can adopt these entities
+            # Using pop() to delete the key entirely (not just set to None)
+            entity.pop('config_entry_id', None)
 
             migrated_count += 1
             print(f"✅ {migration['device_type']:15} {migration['old_entity_id']}")
+            print(f"   {'':15} → {migration['new_entity_id']}")
         except Exception as e:
             error_count += 1
-            print(f"❌ {migration['device_type']:15} {migration['old_entity_id']} - ERROR: {e}")
+            print(f"❌ {migration['device_type']:15} {migration['old_entity_id']}")
+            print(f"   {'':15} ERROR: {e}")
 
     print()
 
@@ -342,6 +402,14 @@ def main():
     print("💾 Saving updated entity registry...")
     save_entity_registry(registry)
     print("✅ Entity registry saved")
+    print()
+
+    # Restart Home Assistant
+    if not start_home_assistant():
+        print()
+        print("⚠️  WARNING: Could not start Home Assistant Core")
+        print("   Please manually start HA Core: ha core start")
+        print()
     print()
 
     # Summary
@@ -357,14 +425,15 @@ def main():
 
     # Next steps
     print("📝 NEXT STEPS:")
-    print("   1. Install Enhanced SunPower integration (HACS or manual)")
-    print("   2. Configure Enhanced SunPower with your PVS IP address")
-    print("   3. Restart Home Assistant")
-    print("   4. Verify entities are working (check Developer Tools → States)")
+    print("   1. Configure Enhanced SunPower integration:")
+    print("      Settings → Devices & Services → Add Integration → Enhanced SunPower")
+    print("   2. Enter your PVS IP address and settings")
+    print("   3. Verify entities are working (check Developer Tools → States)")
+    print("   4. Check that history is preserved (click entity → History tab)")
     print("   5. Delete SunStrong integration (Settings → Devices → SunStrong → Delete)")
     print()
     print("✨ Your entity history has been preserved - automations should work!")
-    print()
+    print("⏰ Home Assistant is now running - wait ~1 minute before configuring.")
 
 
 if __name__ == "__main__":

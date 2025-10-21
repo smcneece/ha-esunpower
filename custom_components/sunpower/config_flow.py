@@ -50,7 +50,7 @@ async def get_supervisor_info(host):
                     return None, None, None, f"supervisor/info HTTP {response.status}"
 
     except Exception as e:
-        _LOGGER.warning("supervisor/info request failed: %s", e)
+        _LOGGER.warning("supervisor/info request failed: %s", e, exc_info=True)
         return None, None, None, str(e)
 
 
@@ -155,7 +155,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.info("✅ New firmware (pypvs) validated successfully")
                 return serial, True, last5, build, None
             except Exception as e:
-                _LOGGER.warning("❌ New firmware (pypvs) failed: %s - trying legacy fallback", e)
+                _LOGGER.warning("❌ New firmware (pypvs) failed: %s - trying legacy fallback", e, exc_info=True)
                 # SAFETY FALLBACK: Try legacy dl_cgi even for new firmware
                 # (Some firmware versions may have buggy LocalAPI implementation)
                 try:
@@ -169,7 +169,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     else:
                         return None, None, None, None, f"pypvs failed and legacy fallback returned invalid data"
                 except Exception as fallback_e:
-                    _LOGGER.error("❌ Both pypvs and legacy fallback failed: pypvs=%s, legacy=%s", e, fallback_e)
+                    _LOGGER.error("❌ Both pypvs and legacy fallback failed: pypvs=%s, legacy=%s", e, fallback_e, exc_info=True)
                     return None, None, None, None, f"New firmware failed: {str(e)} (fallback also failed: {str(fallback_e)})"
         else:
             # Old firmware (BUILD < 61840) - uses dl_cgi WITHOUT password
@@ -186,7 +186,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return None, None, None, None, "Old firmware returned invalid response"
 
             except Exception as e:
-                _LOGGER.error("❌ Old firmware validation failed: %s", e)
+                _LOGGER.error("❌ Old firmware validation failed: %s", e, exc_info=True)
                 return None, None, None, None, f"Old firmware (dl_cgi) failed: {str(e)}"
 
     async def _validate_pvs_legacy(self, host):
@@ -280,7 +280,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Page 1: Just IP and polling interval (like SunStrong)
         schema = vol.Schema({
-            vol.Required("host", default="192.168.1.73"): str,
+            vol.Required("host", default=""): str,
             vol.Required("polling_interval", default=DEFAULT_SUNPOWER_UPDATE_INTERVAL): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_SUNPOWER_UPDATE_INTERVAL,
