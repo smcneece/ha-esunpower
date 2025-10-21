@@ -50,9 +50,8 @@
 
 ## Important Notes & Breaking Changes
 
-**Breaking Changes:**
+**Breaking Changes from krbaker hass-sunpower:**
 - **Binary Sensors**: Now use proper boolean states (`on`/`off`) instead of text values like `"working"`. May break existing automations.
-- **Minimum Polling**: Firmware-aware enforcement (10s new firmware, 60s old firmware, 20s battery systems). Default remains 300s for safety.
 
 **Understanding Polling Intervals:**
 - **Integration polls PVS** at your configured interval (10-3600 seconds)
@@ -153,15 +152,6 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 6. Now to add the integration click link below, or on your main integration page in Home Assistant click Add Integration and look for the Enhanced Sunpower integration, and add it.
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
-
-### Automatic Discovery (Zeroconf)
-
-**New!** Enhanced SunPower now supports automatic discovery for PVS5 and PVS6 systems:
-- Home Assistant will automatically detect your PVS on the network
-- You'll see a notification: "New device discovered - Enhanced SunPower"
-- Click "Configure" to start setup with pre-filled IP address
-- Works for both new and old firmware
-- Manual setup still available if discovery doesn't work
 
 ### Network Best Practices
 
@@ -472,9 +462,8 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 ### PVS Port Selection
 
 **New Firmware (BUILD 61840+):**
-- **WAN Port (Recommended)**: Use the PVS WAN port IP address (gets DHCP, typically `192.168.1.x`)
+- **WAN Port (Recommended)**: Use the PVS WAN port IP address (gets DHCP, typically `192.168.1.x or 192.168.0.x`)
   - Easier to discover via your router's DHCP client list
-  - No fixed IP to remember
   - Authentication eliminates need for network isolation
 - **LAN Port (Alternative)**: Fixed IP `172.27.153.1` also works
   - Requires knowing the fixed address
@@ -511,7 +500,7 @@ We welcome contributions! Please:
 4. Submit a pull request with detailed description
 
 **Development Guidelines:**
-- Test both solar-only and battery-equipped systems
+- Test both solar-only and battery-equipped systems if possible
 - Never increase polling frequency or add PVS stress
 - Maintain backward compatibility with existing configurations
 
@@ -527,7 +516,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Disclaimer
 
-This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation. Use at your own risk. The PVS management interface was designed for installation/provisioning, not continuous monitoring. This enhanced version includes comprehensive protections, but prolonged use should be monitored for any effects on PVS performance or SunPower cloud connectivity.
+This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation. Use at your own risk. 
 
 ## Support
 
@@ -536,10 +525,6 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 - **Community**: [Home Assistant Community Forum](https://community.home-assistant.io/)
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-
----
-
-**Enjoying reliable SunPower monitoring with simplified 24/7 polling, mobile alerts, individual inverter health tracking, authentication support, and diagnostic dashboard monitoring? Consider starring this repository to help others find these improvements!**
 
 ---
 

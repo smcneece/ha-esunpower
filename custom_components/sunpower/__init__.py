@@ -553,9 +553,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             )
             _LOGGER.info("✅ pypvs object created successfully (version %s)", getattr(pypvs, '__version__', 'unknown'))
 
-            # Initialize pypvs - discover serial and authenticate
-            _LOGGER.info("Initializing pypvs: discovering serial and authenticating...")
-            await pvs_object.discover()
+            # Set serial number from config flow validation (skip discovery)
+            # Discovery makes multiple rapid requests that can timeout
+            pvs_serial = entry.unique_id
+            _LOGGER.info("Using serial from config: %s (skipping discovery)", pvs_serial)
+            pvs_object._serial_number = pvs_serial  # Set directly instead of discovering
+
+            # Initialize pypvs - authenticate only (serial already set)
+            _LOGGER.info("Initializing pypvs authentication...")
             await pvs_object.setup(auth_password=auth_password)
             _LOGGER.info("✅ pypvs initialized and authenticated successfully (serial: %s)", pvs_object.serial_number)
         except Exception as e:

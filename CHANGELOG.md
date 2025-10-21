@@ -3,6 +3,42 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.15] - 2025-10-21
+
+### CRITICAL Bug Fix: Setup Reliability
+
+**Integration Setup Now Succeeds on First Attempt**
+- Fixed "Failed to setup" error requiring integration reload to work
+- Fixed "Invalid flow specified" errors during setup
+- Removed pypvs discovery call that was timing out during setup
+- Removed zeroconf auto-discovery that was causing setup conflicts
+- Integration now uses serial number already validated in config flow
+- Setup completes in seconds instead of timing out and failing
+
+**Root Cause:**
+- During setup, integration called `pvs_object.discover()` to get PVS serial number
+- Discovery made multiple rapid requests to `/vars` endpoint
+- PVS connection would timeout, causing setup failure
+- User had to manually reload integration to retry setup
+- Serial number was already collected and validated during config flow
+- Zeroconf auto-discovery was running background processes that interfered with manual setup
+- Multiple simultaneous discovery/setup processes caused "Invalid flow specified" errors
+
+**The Fix:**
+- Skip `discover()` call during setup
+- Use serial number from `entry.unique_id` (already validated in config flow)
+- Only call `pvs_object.setup()` for authentication (much faster)
+- No more multiple rapid requests that could timeout
+- Removed zeroconf auto-discovery - users manually add integration (more reliable)
+
+**Impact:** **ALL users with new firmware (BUILD >= 61840)** - integration setup should now complete successfully on first attempt without requiring manual reload
+
+**Files Modified:**
+- `__init__.py`: Lines 556-565 - Removed `discover()` call, use serial from config flow
+- `manifest.json`: Removed zeroconf section - no more auto-discovery
+
+---
+
 ## [v2025.10.14] - 2025-10-20
 
 ### New Features
