@@ -3,6 +3,33 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.16] - 2025-10-22
+
+### CRITICAL Bug Fix: Config Flow Crash on Timeout
+
+**Fixed TypeError crash when supervisor/info times out or is unreachable**
+- Fixed crash: `TypeError: '>=' not supported between instances of 'NoneType' and 'int'`
+- Config flow now properly falls back to legacy detection when supervisor/info unreachable
+- Prevents setup failure when PVS network is restricted (filtered ports, firewalls, etc.)
+
+**Root Cause:**
+- When `/cgi-bin/dl_cgi/supervisor/info` times out or is blocked by firewall
+- Function returns `build = None` with error message
+- Line 142 tried to compare `None >= MIN_LOCALAPI_BUILD` → TypeError crash
+- Config flow would fail with "Unknown error occurred"
+
+**The Fix:**
+- Added `or build is None` check before using build variable
+- Forces fallback to legacy detection when build is None
+- Config flow completes without crashing
+
+**Impact:** Users with network restrictions (filtered ports, firewall rules) can now complete setup using legacy detection fallback
+
+**Files Modified:**
+- `config_flow.py`: Line 135 - Added None-check for build variable
+
+---
+
 ## [v2025.10.15] - 2025-10-21
 
 ### CRITICAL Bug Fix: Setup Reliability

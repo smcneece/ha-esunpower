@@ -132,8 +132,8 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Step 1: Get supervisor info for auto-detection
         serial, build, last5, error = await get_supervisor_info(host)
 
-        if error:
-            _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error)
+        if error or build is None:
+            _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error or "build is None")
             # Fallback to legacy detection without BUILD number
             return await self._validate_pvs_legacy(host)
 
