@@ -3,6 +3,43 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.17] - 2025-10-22
+
+### CRITICAL Bug Fix: Additional None-Check for Firmware Build
+
+**Fixed remaining firmware_build None comparison crashes in config flow**
+- Fixed crash in notifications step: `TypeError: '>=' not supported between instances of 'NoneType' and 'int'`
+- Fixed crash in options flow when updating configuration
+- Affects PVS5 systems and scenarios where firmware detection returns None
+
+**Root Cause:**
+- v2025.10.16 fixed initial BUILD comparison but missed subsequent uses
+- When legacy detection doesn't return BUILD number, `firmware_build = None`
+- Line 416 (notifications step): `if firmware_build >= 61840:` → TypeError crash
+- Line 675 (options flow): `if firmware_build >= 61840:` → TypeError crash
+
+**The Fix:**
+- Added `or 0` to firmware_build retrieval: `firmware_build = self._basic_config.get("firmware_build", 0) or 0`
+- Treats None as 0 (old firmware behavior) for flash memory threshold logic
+- Setup completes successfully when BUILD unavailable
+
+**UI Improvement:**
+- Removed outdated "Setup during daylight hours recommended" warnings
+- Nighttime installation fully supported since v2025.10.14
+- Cleaner config flow descriptions
+
+**Impact:** PVS5 users and restricted network scenarios can now complete full setup without crashes
+
+**Files Modified:**
+- `config_flow.py`: Lines 416, 675 - Added `or 0` for None-safe firmware_build comparison
+- `translations/en.json`: Removed daylight hours warnings (setup and options flows)
+
+**Issues Fixed:**
+- Discussion #21 (andreasplesch - PVS5 BUILD 5408)
+- Issue #22 (Originalme - PVS5 BUILD 5408)
+
+---
+
 ## [v2025.10.16] - 2025-10-22
 
 ### CRITICAL Bug Fix: Config Flow Crash on Timeout

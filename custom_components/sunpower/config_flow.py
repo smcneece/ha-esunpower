@@ -413,7 +413,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         email_options.update(email_services)
 
         # Firmware-aware flash memory threshold
-        firmware_build = self._basic_config.get("firmware_build", 0)
+        firmware_build = self._basic_config.get("firmware_build", 0) or 0
         if firmware_build >= 61840:
             # New firmware: Use percentage (0-100%)
             flash_default = 85
@@ -672,7 +672,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             current_email_recipient = ""
 
         # Firmware-aware flash memory threshold
-        firmware_build = self.config_entry.data.get("firmware_build", 0)
+        firmware_build = self.config_entry.data.get("firmware_build", 0) or 0
         if firmware_build >= 61840:
             # New firmware: Use percentage (0-100%)
             flash_max = 100

@@ -13,7 +13,7 @@
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Connection Setup",
-                "description": "Step 1: Enter your PVS IP address.\n\n\ud83c\udf1e IMPORTANT: Setup during daylight hours recommended for proper validation.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "Step 1: Enter your PVS IP address.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)"
@@ -82,7 +82,7 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\ud83c\udf1e IMPORTANT: Configuration changes during daylight hours recommended.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)",
