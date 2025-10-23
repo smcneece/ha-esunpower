@@ -664,7 +664,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 if auth_password and time_since_auth > cache.auth_refresh_interval:
                     _LOGGER.info("Proactive session refresh (last auth: %.0f seconds ago)", time_since_auth)
                     try:
-                        await pvs_object.discover()
                         await pvs_object.setup(auth_password=auth_password)
                         cache.last_auth_time = time.time()
                         _LOGGER.info("✅ Proactive re-authentication successful")
@@ -706,13 +705,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             if is_auth_error and pvs_object and auth_password:
                 _LOGGER.warning("⚠️ Authentication error detected during polling: %s", e)
-                _LOGGER.info("Attempting automatic re-authentication (re-discover + re-setup)...")
+                _LOGGER.info("Attempting automatic re-authentication...")
                 try:
-                    # Re-initialize pypvs session - both discover and setup
-                    await pvs_object.discover()
+                    # Re-authenticate pypvs session (serial already stored in pvs_object)
                     await pvs_object.setup(auth_password=auth_password)
                     cache.last_auth_time = time.time()  # Update auth timestamp
-                    _LOGGER.info("✅ Re-authentication successful (serial: %s), retrying poll...", pvs_object.serial_number)
+                    _LOGGER.info("✅ Re-authentication successful, retrying poll...")
 
                     # Retry the poll after successful re-auth
                     pvs_data = await pvs_object.update()
