@@ -195,18 +195,27 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
     if entities:
         _LOGGER.info("Adding %d new sensor entities", len(entities))
         async_add_entities(entities, True)
-        
-        # Notify user if inverters were just discovered
+
+        # Notify user if inverters were just discovered (only once ever, not on every HA restart)
         if inverters_newly_discovered:
             from .const import INVERTER_DEVICE_TYPE
             inverter_count = len(sunpower_data.get(INVERTER_DEVICE_TYPE, {}))
             if inverter_count > 0:
-                # Get cache from hass.data
-                sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
-                cache = sunpower_state.get("_cache")
-                if cache:
-                    notify_inverters_discovered(hass, config_entry, cache, inverter_count)
-                    _LOGGER.info("Notified user: %d inverters discovered and entities created", inverter_count)
+                # Check if we've already notified about inverters (persistent flag)
+                if not config_entry.data.get("inverters_discovered_notified", False):
+                    # Mark as notified in config entry (persists across restarts)
+                    hass.config_entries.async_update_entry(
+                        config_entry,
+                        data={**config_entry.data, "inverters_discovered_notified": True}
+                    )
+                    # Get cache from hass.data
+                    sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
+                    cache = sunpower_state.get("_cache")
+                    if cache:
+                        notify_inverters_discovered(hass, config_entry, cache, inverter_count)
+                        _LOGGER.info("Notified user: %d inverters discovered and entities created (first time)", inverter_count)
+                else:
+                    _LOGGER.debug("Inverters rediscovered after HA restart - skipping notification (already notified previously)")
 
 
 class SunPowerSensor(SunPowerEntity, SensorEntity):

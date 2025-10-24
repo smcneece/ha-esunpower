@@ -3,6 +3,55 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.18] - 2025-10-23
+
+### CRITICAL Bug Fix: Additional None-Check and Notification Logic
+
+**Fixed firmware_build None comparison in health checks**
+- Fixed crash in `health_check.py` during flash memory monitoring
+- Error: `TypeError: '>=' not supported between instances of 'NoneType' and 'int'`
+- Occurred every poll cycle when BUILD number unavailable (PVS5 systems, restricted networks)
+- Non-fatal but filled logs with errors
+
+**Fixed inverter discovery notification logic**
+- Notification now fires only once on true first discovery (not on every HA restart)
+- Added persistent flag `inverters_discovered_notified` to config entry
+- Prevents notification at night when inverters offline (HA restart scenario)
+- Debug log message when inverters rediscovered after restart
+
+**Root Cause:**
+- v2025.10.17 fixed config_flow.py firmware_build comparisons but missed health_check.py
+- Flash memory threshold check: `85 if firmware_build >= 61840 else 0` crashed with None
+- Inverter notification: `created_entities` set was in-memory only, cleared on every restart
+- Entity recreation after restart triggered notification even though inverters not newly discovered
+
+**The Fix:**
+- Added `or 0` to firmware_build retrieval in health_check.py (line 362)
+- Added persistent flag check before sending inverter notification (sensor.py lines 205-218)
+- Updates config entry data to track notification sent across restarts
+
+**Impact:**
+- PVS5 users no longer see flash memory errors every poll cycle
+- Inverter discovery notification fires once on true discovery, not every restart
+- Clean logs, appropriate notifications
+
+**Battery System Enhancement:**
+- Added missing ESS lifetime energy sensors for Energy Dashboard
+- `ESS_POS_LIFETIME_ENERGY` - Lifetime energy discharged (kWh)
+- `ESS_NEG_LIFETIME_ENERGY` - Lifetime energy charged (kWh)
+- Required for proper Energy Dashboard battery tracking
+
+**Files Modified:**
+- `health_check.py`: Line 362 - Added `or 0` for None-safe firmware_build comparison
+- `sensor.py`: Lines 205-218 - Added persistent flag to track inverter discovery notification
+- `battery_handler.py`: Lines 476-491 - Added missing ESS lifetime energy sensors
+
+**Issues Fixed:**
+- Discussion #21 (andreasplesch - PVS5 BUILD 5408 health check errors)
+- Discussion #24 (cdug619 - Missing ESS lifetime energy sensors)
+
+---
+
 ## [v2025.10.17] - 2025-10-22
 
 ### CRITICAL Bug Fix: Additional None-Check for Firmware Build

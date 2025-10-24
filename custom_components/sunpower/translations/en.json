@@ -5,7 +5,9 @@
         },
         "error": {
             "cannot_connect": "Cannot Connect",
-            "connection_failed": "PVS Connection Failed",
+            "connection_failed": "Failed to connect to PVS. Check IP address and network connection.",
+            "invalid_ip": "Invalid IP address format. Please enter a valid IPv4 address.",
+            "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "unknown": "Unknown Error",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
             "email_recipient_required": "Email recipient is required when email service is selected"
@@ -139,6 +141,8 @@
             }
         },
         "error": {
+            "invalid_ip": "Invalid IP address format. Please enter a valid IPv4 address.",
+            "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
             "email_recipient_required": "Email recipient is required when email service is selected"
         }

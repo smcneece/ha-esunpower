@@ -235,20 +235,35 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         description_placeholders = {}
 
         if user_input is not None:
+            # Validate IP address format
+            import ipaddress
+            host_input = user_input["host"].strip()
+            try:
+                # Handle host:port format
+                host_part = host_input.split(':')[0]
+                ipaddress.ip_address(host_part)
+            except ValueError:
+                errors["host"] = "invalid_ip"
+                description_placeholders["error_details"] = f"Invalid IP address format: {host_input}"
+                description_placeholders["help_text"] = "Enter a valid IP address (e.g., 172.27.153.1 or 192.168.1.73)"
+
             # Validate polling interval
             polling_interval = user_input["polling_interval"]
 
             if polling_interval < MIN_SUNPOWER_UPDATE_INTERVAL:
                 errors["polling_interval"] = "MIN_INTERVAL"
+            elif polling_interval > 3600:
+                errors["polling_interval"] = "MAX_INTERVAL"
 
             if not errors:
                 # Validate PVS connection with auto-detection
-                serial, uses_pypvs, last5, build, error_message = await self._validate_pvs(user_input["host"])
+                serial, uses_pypvs, last5, build, error_message = await self._validate_pvs(host_input)
 
                 if serial:
                     # Store IP, polling interval, firmware method, and auto-detected values
-                    self.ip_address = user_input["host"]
+                    self.ip_address = host_input
                     self._basic_config = user_input.copy()
+                    self._basic_config["host"] = host_input  # Use cleaned host
                     self._basic_config["uses_pypvs"] = uses_pypvs
                     self._basic_config["auto_detected_last5"] = last5  # Pre-fill password
                     self._basic_config["firmware_build"] = build
@@ -273,10 +288,31 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         # New firmware OR failed detection - ask for password (future-proof)
                         return await self.async_step_need_password()
                 else:
-                    # Connection failed - show error
+                    # Connection failed - show error with user-friendly guidance
                     _LOGGER.warning("Setup: PVS validation failed: %s", error_message)
                     errors["host"] = "connection_failed"
                     description_placeholders["error_details"] = error_message
+
+                    # Provide user-friendly troubleshooting guidance
+                    if "timeout" in error_message.lower() or "timed out" in error_message.lower():
+                        description_placeholders["help_text"] = (
+                            "PVS not responding. Check: 1) PVS is powered on, "
+                            "2) IP address is correct, 3) Network connection is working"
+                        )
+                    elif "auth" in error_message.lower() or "401" in error_message or "403" in error_message:
+                        description_placeholders["help_text"] = (
+                            "Authentication failed. This will be configured in the next step."
+                        )
+                    elif "connection" in error_message.lower() or "unreachable" in error_message.lower():
+                        description_placeholders["help_text"] = (
+                            "Cannot reach PVS. Check: 1) IP address (try 172.27.153.1 for LAN port), "
+                            "2) PVS is on same network, 3) No firewall blocking connection"
+                        )
+                    else:
+                        description_placeholders["help_text"] = (
+                            "Check PVS connectivity. Common IPs: 172.27.153.1 (LAN port) or "
+                            "192.168.1.x (WAN port - check router for actual IP)"
+                        )
 
         # Page 1: Just IP and polling interval (like SunStrong)
         schema = vol.Schema({
@@ -483,11 +519,24 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
 
         if user_input is not None:
+            # Validate IP address format
+            import ipaddress
+            host_input = user_input["host"].strip()
+            try:
+                # Handle host:port format
+                host_part = host_input.split(':')[0]
+                ipaddress.ip_address(host_part)
+                user_input["host"] = host_input  # Use cleaned host
+            except ValueError:
+                errors["host"] = "invalid_ip"
+
             polling_interval = user_input["polling_interval"]
 
             # Validate polling interval with appropriate minimum
             if polling_interval < MIN_SUNPOWER_UPDATE_INTERVAL:
                 errors["polling_interval"] = "MIN_INTERVAL"
+            elif polling_interval > 3600:
+                errors["polling_interval"] = "MAX_INTERVAL"
 
             # Validate PVS serial last 5 chars if provided (options flow)
             pvs_serial_last5 = user_input.get("pvs_serial_last5", "").strip()

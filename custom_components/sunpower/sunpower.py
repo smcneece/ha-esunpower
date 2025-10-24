@@ -106,8 +106,9 @@ class SunPowerMonitor:
                 logout_url = f"https://{self.host}/auth?logout"
                 async with self._session.get(logout_url, ssl=False):
                     pass  # Don't care about response
-            except Exception:
-                pass  # Ignore logout errors
+            except Exception as e:
+                _LOGGER.debug("Logout failed (non-critical): %s", e)
+                pass  # Logout errors are non-critical
             finally:
                 self._authenticated = False
 

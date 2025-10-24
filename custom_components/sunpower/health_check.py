@@ -359,7 +359,7 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
     # Get flash memory threshold
     # For old firmware (BUILD < 61840): value is MB (default 0 = disabled)
     # For new firmware (BUILD >= 61840): value is percentage (default 85%)
-    firmware_build = entry.data.get("firmware_build", 0)
+    firmware_build = entry.data.get("firmware_build", 0) or 0
     flash_threshold = entry.options.get("flash_memory_threshold_mb", 85 if firmware_build >= 61840 else 0)
 
     if flash_threshold <= 0:
