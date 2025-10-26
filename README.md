@@ -1,8 +1,9 @@
 # Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower - SunStrong PVS
 
-## PLEASE TAKE A FEW MINUTES TO READ - FIRMWARE COMPATIBILITY 
+## PLEASE TAKE A FEW MINUTES TO READ - FIRMWARE COMPATIBILITY
 
-**October 3, 2025 the integration should work with ALL PVS firmware versions** - Automatically detects and adapts to your firmware:
+**The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions** - Automatically detects and adapts to your system:
+- **PVS5 & PVS6 Hardware**: Full support for both hardware generations
 - **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
 - **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
@@ -532,7 +533,7 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 
 Special thanks to community contributors who have helped improve this integration:
 
-- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18)
+- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)
 
 ---
 

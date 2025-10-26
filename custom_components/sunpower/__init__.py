@@ -172,6 +172,10 @@ class SunPowerDataCache:
         self.last_auth_time = 0
         self.auth_refresh_interval = 3600  # Re-auth every hour proactively
 
+        # Authentication session tracking for pypvs
+        self.last_auth_time = 0
+        self.auth_refresh_interval = 3600  # Re-auth every hour proactively
+
 
 def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None):
     """Create diagnostic device data for sensors"""
@@ -670,7 +674,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     except Exception as refresh_error:
                         _LOGGER.warning("Proactive re-auth failed (will retry on error): %s", refresh_error)
                         # Don't fail the poll, just log and continue
-                
+
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
                 pvs_data = await pvs_object.update()
                 # Query flash wear percentage (not in pypvs PVSGateway model yet)
@@ -705,12 +709,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             if is_auth_error and pvs_object and auth_password:
                 _LOGGER.warning("⚠️ Authentication error detected during polling: %s", e)
-                _LOGGER.info("Attempting automatic re-authentication...")
+                _LOGGER.info("Attempting automatic re-authentication (re-setup)...")
                 try:
-                    # Re-authenticate pypvs session (serial already stored in pvs_object)
+                    # Re-initialize pypvs session - setup only (serial already set)
                     await pvs_object.setup(auth_password=auth_password)
                     cache.last_auth_time = time.time()  # Update auth timestamp
-                    _LOGGER.info("✅ Re-authentication successful, retrying poll...")
+                    _LOGGER.info("✅ Re-authentication successful (serial: %s), retrying poll...", pvs_object.serial_number)
 
                     # Retry the poll after successful re-auth
                     pvs_data = await pvs_object.update()
@@ -757,7 +761,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.diagnostic_stats['failed_polls'] += 1
                 cache.diagnostic_stats['consecutive_failures'] += 1
                 fresh_data = None
-                
+
                 # For legacy method, send additional error notifications
                 if not pvs_object:
                     await _handle_polling_error(hass, entry, cache, host_ip, e)
