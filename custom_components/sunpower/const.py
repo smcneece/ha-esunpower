@@ -668,6 +668,15 @@ SUNPOWER_SENSORS = {
                 "state": None,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
+            "POLLING_STATUS": {
+                "field": "polling_status",
+                "title": "Polling Status",
+                "unit": None,
+                "icon": "mdi:sync",
+                "device": None,
+                "state": None,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
         },
     },
 }

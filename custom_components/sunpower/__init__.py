@@ -106,7 +106,7 @@ except Exception as e:
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 
-PLATFORMS = ["sensor", "binary_sensor"]
+PLATFORMS = ["sensor", "binary_sensor", "switch"]
 
 # Default to 300 seconds (5 minutes) for PVS safety
 DEFAULT_POLLING_INTERVAL = 300
@@ -177,7 +177,7 @@ class SunPowerDataCache:
         self.auth_refresh_interval = 3600  # Re-auth every hour proactively
 
 
-def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None):
+def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None, polling_enabled=True):
     """Create diagnostic device data for sensors"""
 
     # Initialize stats if not present
@@ -216,6 +216,8 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling
         last_poll_str = "Never"
         last_poll_seconds = None
 
+    # Determine polling status
+    polling_status = "Enabled" if polling_enabled else "Disabled"
 
     # Create diagnostic device
     diagnostic_serial = "sunpower_diagnostics"
@@ -234,6 +236,7 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling
         "last_successful_poll": last_poll_str,
         "average_response_time": round(avg_response, 2),
         "active_inverters": active_inverters,
+        "polling_status": polling_status,
     }
 
     return diagnostic_serial, diagnostic_device
@@ -573,8 +576,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             cache.last_auth_time = time.time()  # Track initial auth time
             _LOGGER.info("✅ pypvs initialized and authenticated successfully (serial: %s)", pvs_object.serial_number)
         except Exception as e:
-            _LOGGER.error("❌ Failed to initialize pypvs object: %s", e, exc_info=True)
-            raise
+            _LOGGER.warning("⚠️ Failed to initialize pypvs during setup (PVS may be temporarily offline): %s", e)
+            _LOGGER.info("Integration will continue setup - coordinator will retry authentication during first poll")
+            cache.last_auth_time = 0  # Mark as needing authentication
+            # Don't raise - let coordinator handle retry gracefully
         sunpower_monitor = None  # Not used when using pypvs
     else:
         _LOGGER.info("🔓 Using legacy dl_cgi for old firmware (BUILD %s) WITHOUT authentication", firmware_build)
@@ -592,12 +597,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     async def async_update_data():
         """Simplified data fetching - single polling interval, always active"""
+        from .data_processor import convert_sunpower_data, validate_converted_data
 
         notify_diagnostic_coordinator_started(hass, entry, cache)
 
         # Track poll start time for diagnostic stats
         poll_start_time = time.time()
         cache.diagnostic_stats['total_polls'] += 1
+
+        # Check if polling is enabled via switch
+        polling_enabled = entry.options.get("polling_enabled", True)
+        if not polling_enabled:
+            _LOGGER.info("Polling disabled by user switch - returning cached data without PVS poll")
+            # Load cached data and return it without polling PVS
+            host_ip = entry.data['host']
+            cached_data, cache_age = await load_cache_file(hass, host_ip)
+            if cached_data and isinstance(cached_data, dict) and "devices" in cached_data:
+                # Convert raw cached data to device dictionary format
+                data = convert_sunpower_data(cached_data)
+
+                # Validate converted data
+                is_valid, device_count, error_message = validate_converted_data(data)
+                if not is_valid:
+                    _LOGGER.warning("Cached data validation failed: %s", error_message)
+                    raise UpdateFailed(f"Invalid cached data: {error_message}")
+
+                # Add diagnostic device to converted data before returning
+                inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
+                meter_data = data.get('Power Meter', {})
+                current_polling_interval = entry.options.get("polling_interval", entry.data.get("polling_interval", DEFAULT_POLLING_INTERVAL))
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
+                data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
+
+                # No notification here - switch already notified when toggled off
+                return data
+            else:
+                _LOGGER.warning("Polling disabled but no cached data available - cannot return data")
+                raise UpdateFailed("Polling disabled and no cached data available")
 
         # Get host IP for cache operations
         host_ip = entry.data['host']
@@ -650,7 +686,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.diagnostic_stats['consecutive_failures'] = 0
 
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval)
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
 
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age, current_polling_interval)
@@ -908,7 +944,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             try:
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval)
+                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
             except Exception as e:
                 _LOGGER.warning("Diagnostic device creation failed: %s", e)
@@ -936,7 +972,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                         meter_data = data.get('Power Meter', {})
                         pvs_data = data.get(PVS_DEVICE_TYPE, {})
-                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, pvs_data)
+                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     except Exception as e:
                         _LOGGER.warning("Diagnostic device creation failed for cached data: %s", e)
