@@ -3,6 +3,139 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.19] - 2025-10-25
+
+### Resilience Improvement: Integration Setup Failure Handling
+
+**Fixed integration complete failure when PVS temporarily unreachable during Home Assistant startup**
+- Integration now survives temporary PVS unavailability during HA restart
+- Previously: If PVS unreachable during `async_setup_entry`, entire integration failed to load
+- Now: Setup continues gracefully, coordinator handles authentication retry on first poll
+- Entities show "unavailable" until PVS responds, then populate normally
+
+**Root Cause:**
+- `async_setup_entry` called `await pvs_object.setup(auth_password=auth_password)` (line 568)
+- If PVS unreachable (network lag, PVS rebooting, etc.), exception was re-raised (line 573)
+- `raise` statement killed entire integration setup before coordinator could be created
+- Coordinator's excellent retry/fallback logic never had a chance to run
+
+**The Fix:**
+- Removed `raise` statement that killed integration setup (__init__.py line 573)
+- Changed error log level from ERROR to WARNING (temporary condition)
+- Set `cache.last_auth_time = 0` to mark authentication needed
+- Coordinator's first poll attempts authentication and handles retry gracefully
+- Leverages existing proactive re-auth and error handling logic (PR #23)
+
+**Impact:**
+- Integration survives HA restarts even if PVS temporarily offline/busy
+- No more "failed to setup" errors from network timing issues
+- Entities show as "unavailable" until PVS responds, then auto-recover
+- Better user experience during PVS firmware updates, reboots, or network lag
+
+**Error Condition:**
+```
+OSError: [Errno 113] Connect call failed ('192.168.1.73', 443)
+pypvs.exceptions.PVSError: General error
+Error setting up entry None for sunpower
+```
+
+**Files Modified:**
+- `__init__.py`: Lines 572-575 - Removed fatal `raise`, added graceful degradation with coordinator retry
+
+**When This Occurs:**
+- Home Assistant restarts while PVS is rebooting
+- Network comes up slower than HA during startup
+- PVS performing maintenance operations
+- Brief network connectivity issues during HA startup
+- Any scenario where PVS temporarily unreachable at exact moment of integration setup
+
+---
+
+### New Feature: Polling Control Switch
+
+**User-controlled polling enable/disable for nighttime disk I/O reduction**
+- New switch entity: `switch.sunpower_{serial}_polling_enabled`
+- Default: ON (polling enabled)
+- Turn OFF: Coordinator skips PVS poll, returns cached data without network traffic
+- Turn ON: Resumes normal PVS polling
+- Entities retain last known values when polling disabled
+
+**Diagnostic Integration:**
+- New `POLLING_STATUS` diagnostic sensor shows "Enabled" or "Disabled"
+- Cached data notification explains when polling disabled by user
+- Clear visibility into current polling state
+
+**Use Case:**
+- Reduce PVS disk I/O during nighttime hours (potential log writes, varserver operations)
+- User control via automations based on sun elevation, time, or other triggers
+- Inverters offline at night anyway - no fresh data to collect
+
+**Implementation:**
+- Switch stored in `config_entry.options["polling_enabled"]` (persists across restarts)
+- Coordinator checks flag at start of each poll cycle
+- Returns cached data without PVS communication when disabled
+- Notifications sent when switch toggled (with clear explanation)
+
+**Sample Automation (Sun-Based):**
+```yaml
+automation:
+  - alias: "Disable PVS polling at sunset"
+    trigger:
+      - platform: sun
+        event: sunset
+        offset: "+00:30:00"  # 30 minutes after sunset
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.sunpower_{your_serial}_polling_enabled
+
+  - alias: "Enable PVS polling before sunrise"
+    trigger:
+      - platform: sun
+        event: sunrise
+        offset: "-00:15:00"  # 15 minutes before sunrise
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.sunpower_{your_serial}_polling_enabled
+```
+
+**Sample Automation (Time-Based):**
+```yaml
+automation:
+  - alias: "PVS polling schedule"
+    trigger:
+      - platform: time
+        at: "20:00:00"  # 8 PM - disable
+      - platform: time
+        at: "06:00:00"  # 6 AM - enable
+    action:
+      - service: >
+          {% if now().hour == 20 %}
+            switch.turn_off
+          {% else %}
+            switch.turn_on
+          {% endif %}
+        target:
+          entity_id: switch.sunpower_{your_serial}_polling_enabled
+```
+
+**Files Modified:**
+- `switch.py`: New file - polling control switch implementation (lines 1-103)
+- `notifications.py`: Added `notify_polling_enabled()` and `notify_polling_disabled()` functions (lines 524-547)
+- `notifications.py`: Updated `notify_using_cached_data()` to detect polling disabled (lines 444-450)
+- `const.py`: Added `POLLING_STATUS` diagnostic sensor definition (lines 671-679)
+- `__init__.py`: Added polling check in coordinator `async_update_data()` (lines 603-615)
+- `__init__.py`: Updated `create_diagnostic_device_data()` to include `polling_status` field (line 176, 216, 235)
+- `__init__.py`: Registered switch platform (line 109)
+
+**User Request:**
+- Requested in Issue #25 as alternative to built-in sun elevation polling logic
+- User control preferred over automatic behavior
+- Addresses potential PVS disk wear concerns from continuous polling
+
+---
+
 ## [v2025.10.18] - 2025-10-23
 
 ### CRITICAL Bug Fix: Additional None-Check and Notification Logic

@@ -441,6 +441,14 @@ def notify_data_update_success(hass, entry, cache, last_poll_timestamp):
 
 def notify_using_cached_data(hass, entry, cache, reason, time_info=None, polling_interval=None):
     """GENERAL: Cached data usage - FIXED TEXT CONVERSION"""
+    # Check if polling is disabled via switch
+    polling_enabled = entry.options.get("polling_enabled", True)
+    if not polling_enabled:
+        msg = "📦 Using cached data: Polling disabled by user (switch off) - PVS not being polled"
+        safe_notify(hass, msg, "Enhanced SunPower", entry, is_general=True,
+                   notification_category="polling", cache=cache)
+        return
+
     # Simplified polling - just use reason directly
     readable_reason = reason
 
@@ -520,3 +528,38 @@ def notify_battery_system_issue(hass, entry, cache, consecutive_failures):
 
     safe_notify(hass, msg, "Enhanced SunPower Battery Alert", entry, force_notify=True,
                notification_category="battery", cache=cache)
+
+async def notify_polling_disabled(hass, entry, serial):
+    """INFO: Polling disabled notification"""
+    msg = (f"⏸️ PVS Polling Disabled\n\n"
+           f"PVS {serial} will not be polled until polling is re-enabled.\n\n"
+           f"Entities will retain last known values. "
+           f"Use this to reduce PVS disk I/O during nighttime hours.")
+
+    await hass.services.async_call(
+        "persistent_notification",
+        "create",
+        {
+            "message": msg,
+            "title": "Enhanced SunPower Polling Status",
+            "notification_id": f"sunpower_polling_disabled_{serial}"
+        },
+        blocking=False
+    )
+
+async def notify_polling_enabled(hass, entry, serial):
+    """INFO: Polling enabled notification"""
+    msg = (f"▶️ PVS Polling Enabled\n\n"
+           f"PVS {serial} polling has been resumed.\n\n"
+           f"Normal data collection will continue.")
+
+    await hass.services.async_call(
+        "persistent_notification",
+        "create",
+        {
+            "message": msg,
+            "title": "Enhanced SunPower Polling Status",
+            "notification_id": f"sunpower_polling_enabled_{serial}"
+        },
+        blocking=False
+    )
