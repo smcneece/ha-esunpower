@@ -170,11 +170,7 @@ class SunPowerDataCache:
         
         # Authentication session tracking for pypvs
         self.last_auth_time = 0
-        self.auth_refresh_interval = 3600  # Re-auth every hour proactively
-
-        # Authentication session tracking for pypvs
-        self.last_auth_time = 0
-        self.auth_refresh_interval = 3600  # Re-auth every hour proactively
+        self.auth_refresh_interval = 600  # Re-auth every 10 minutes proactively (PVS sessions expire quickly)
 
 
 def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None, polling_enabled=True):
@@ -702,17 +698,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 # Proactive session refresh if auth is old (prevents session expiration)
                 time_since_auth = time.time() - cache.last_auth_time
                 if auth_password and time_since_auth > cache.auth_refresh_interval:
-                    _LOGGER.info("Proactive session refresh (last auth: %.0f seconds ago)", time_since_auth)
+                    _LOGGER.debug("Proactive session refresh (last auth: %.0f seconds ago)", time_since_auth)
                     try:
                         await pvs_object.setup(auth_password=auth_password)
                         cache.last_auth_time = time.time()
-                        _LOGGER.info("✅ Proactive re-authentication successful")
+                        _LOGGER.debug("✅ Proactive re-authentication successful")
                     except Exception as refresh_error:
-                        _LOGGER.warning("Proactive re-auth failed (will retry on error): %s", refresh_error)
+                        _LOGGER.debug("Proactive re-auth failed (will retry on error): %s", refresh_error)
                         # Don't fail the poll, just log and continue
 
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
-                pvs_data = await pvs_object.update()
+                
+                # Suppress only the specific "Login to the PVS failed" inverter errors at night
+                # (expected when inverters are offline/asleep - not a real auth problem)
+                # Keep other pypvs logging intact for real issues
+                import logging
+                
+                class InverterLoginFilter(logging.Filter):
+                    """Filter out expected inverter login failures at night"""
+                    def filter(self, record):
+                        # Suppress "Login to the PVS failed" from inverter updater
+                        if "Login to the PVS failed" in record.getMessage():
+                            return False
+                        return True
+                
+                pypvs_inverter_logger = logging.getLogger("pypvs.updaters.production_inverters")
+                login_filter = InverterLoginFilter()
+                pypvs_inverter_logger.addFilter(login_filter)
+                
+                try:
+                    pvs_data = await pvs_object.update()
+                finally:
+                    pypvs_inverter_logger.removeFilter(login_filter)
                 # Query flash wear percentage (not in pypvs PVSGateway model yet)
                 flashwear_pct = 0
                 try:
