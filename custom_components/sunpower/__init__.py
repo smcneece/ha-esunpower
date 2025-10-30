@@ -709,27 +709,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
                 
-                # Suppress only the specific "Login to the PVS failed" inverter errors at night
-                # (expected when inverters are offline/asleep - not a real auth problem)
+                # Suppress only the specific "Login to the PVS failed" errors at night
+                # (expected when inverters/meters are offline/asleep - not a real auth problem)
                 # Keep other pypvs logging intact for real issues
                 import logging
                 
-                class InverterLoginFilter(logging.Filter):
-                    """Filter out expected inverter login failures at night"""
+                class DeviceLoginFilter(logging.Filter):
+                    """Filter out expected device login failures at night"""
                     def filter(self, record):
-                        # Suppress "Login to the PVS failed" from inverter updater
+                        # Suppress "Login to the PVS failed" from device updaters
                         if "Login to the PVS failed" in record.getMessage():
                             return False
                         return True
                 
                 pypvs_inverter_logger = logging.getLogger("pypvs.updaters.production_inverters")
-                login_filter = InverterLoginFilter()
+                pypvs_meter_logger = logging.getLogger("pypvs.updaters.meter")
+                login_filter = DeviceLoginFilter()
                 pypvs_inverter_logger.addFilter(login_filter)
+                pypvs_meter_logger.addFilter(login_filter)
                 
                 try:
                     pvs_data = await pvs_object.update()
                 finally:
                     pypvs_inverter_logger.removeFilter(login_filter)
+                    pypvs_meter_logger.removeFilter(login_filter)
                 # Query flash wear percentage (not in pypvs PVSGateway model yet)
                 flashwear_pct = 0
                 try:
