@@ -3,6 +3,53 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.10.20] - 2025-10-27
+
+### Bug Fix: Incorrect Authentication Notifications for Old Firmware
+
+**Fixed misleading auth failure notifications for old firmware users (BUILD < 61840)**
+- Users with old firmware (legacy dl_cgi) were receiving "Authentication Failed" notifications
+- Error occurred when polling failed and error message contained auth-related keywords
+- Old firmware does NOT require authentication, notification was incorrect and misleading
+- Caused notification spam (every poll cycle) for users experiencing network issues
+
+**Root Cause:**
+- `_handle_polling_error()` function checked for auth-related keywords in ALL error messages
+- Function is ONLY called for legacy dl_cgi method (old firmware, no auth required)
+- If old firmware error message contained words like "authentication" or "check pvs serial", showed wrong notification
+- Notification said "new firmware requires authentication" when user actually has OLD firmware
+
+**The Fix:**
+- Removed auth-checking logic from `_handle_polling_error()` function (__init__.py lines 457-461)
+- Now only shows standard polling failure notification for old firmware
+- Auth-related notifications only appear for new firmware (pypvs) where they're appropriate
+
+**Impact:**
+- Old firmware users (BUILD < 61840) no longer see misleading "Authentication Failed" spam
+- Standard polling failure notifications still shown (appropriate for the actual problem)
+- New firmware users unaffected (don't use this error handler)
+
+**Error Notification (OLD - Incorrect):**
+```
+🔒 CRITICAL: Enhanced SunPower Authentication Failed!
+The new firmware requires authentication but login failed.
+```
+
+**Error Notification (NEW - Correct):**
+```
+❌ Enhanced SunPower polling failed.
+URL: http://192.168.1.x/cgi-bin/dl_cgi?Command=DeviceList
+Error: [actual error message]
+```
+
+**Files Modified:**
+- `__init__.py`: Lines 457-461 - Removed misleading auth checks from legacy error handler
+
+**Issues Fixed:**
+- Issue #27 (BUILD 61829 user receiving auth failure notification spam)
+
+---
+
 ## [v2025.10.19] - 2025-10-25
 
 ### Resilience Improvement: Integration Setup Failure Handling

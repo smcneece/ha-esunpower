@@ -451,29 +451,14 @@ async def _handle_polling_error(hass, entry, cache, host_ip, error):
         error: Exception that occurred during polling
 
     Sends appropriate notifications based on error type (auth vs network).
+    NOTE: This function is ONLY called for legacy dl_cgi method (old firmware).
     """
 
-    # Check for authentication-specific failures
-    error_str = str(error).lower()
-    if any(auth_error in error_str for auth_error in [
-        "authentication failed", "check pvs serial", "authentication required",
-        "session authentication failed", "initial authentication failed"
-    ]):
-        # Critical authentication failure
-        auth_msg = (
-            f"🔒 CRITICAL: Enhanced SunPower Authentication Failed!\n\n"
-            f"The new firmware requires authentication but login failed.\n\n"
-            f"✅ Check: PVS Serial Number (last 5 digits) in integration settings\n"
-            f"🔄 Error: {str(error)}\n\n"
-            f"Go to Settings → Devices & Services → Enhanced SunPower → Configure\n"
-            f"to verify your PVS serial number is correct."
-        )
-        safe_notify(hass, auth_msg, "Enhanced SunPower Authentication", entry,
-                   force_notify=True, notification_category="health", cache=cache)
-    else:
-        # Standard polling failure
-        polling_url = f"http://{host_ip}/cgi-bin/dl_cgi?Command=DeviceList"
-        notify_polling_failed(hass, entry, cache, polling_url, error)
+    # For old firmware (legacy method), authentication is NOT required
+    # So we should NOT show auth-related notifications
+    # Just show standard polling failure
+    polling_url = f"http://{host_ip}/cgi-bin/dl_cgi?Command=DeviceList"
+    notify_polling_failed(hass, entry, cache, polling_url, error)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
