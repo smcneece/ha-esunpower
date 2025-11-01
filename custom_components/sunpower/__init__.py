@@ -694,30 +694,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 _LOGGER.debug("Polling PVS using pypvs (new firmware)")
                 
-                # Suppress only the specific "Login to the PVS failed" errors at night
-                # (expected when inverters/meters are offline/asleep - not a real auth problem)
-                # Keep other pypvs logging intact for real issues
-                import logging
+                # Check if sun is below horizon (nighttime) to conditionally suppress errors
+                # Only suppress "Login to the PVS failed" when inverters are expected to be offline
+                sun_elevation = None
+                sun_entity = hass.states.get("sun.sun")
+                if sun_entity and sun_entity.attributes:
+                    sun_elevation = sun_entity.attributes.get("elevation")
                 
-                class DeviceLoginFilter(logging.Filter):
-                    """Filter out expected device login failures at night"""
-                    def filter(self, record):
-                        # Suppress "Login to the PVS failed" from device updaters
-                        if "Login to the PVS failed" in record.getMessage():
-                            return False
-                        return True
+                is_nighttime = sun_elevation is not None and sun_elevation < 0
                 
-                pypvs_inverter_logger = logging.getLogger("pypvs.updaters.production_inverters")
-                pypvs_meter_logger = logging.getLogger("pypvs.updaters.meter")
-                login_filter = DeviceLoginFilter()
-                pypvs_inverter_logger.addFilter(login_filter)
-                pypvs_meter_logger.addFilter(login_filter)
+                # Only apply filter at night when inverters are expected to be offline
+                # This prevents hiding legitimate auth issues during daylight hours
+                if is_nighttime:
+                    import logging
+                    
+                    class DeviceLoginFilter(logging.Filter):
+                        """Filter out expected device login failures when sun is below horizon"""
+                        def filter(self, record):
+                            # Suppress "Login to the PVS failed" from device updaters at night
+                            # Note: This is a pypvs library issue - it throws login errors when
+                            # inverters are offline, even though PVS is accessible and auth works
+                            if "Login to the PVS failed" in record.getMessage():
+                                return False
+                            return True
+                    
+                    pypvs_inverter_logger = logging.getLogger("pypvs.updaters.production_inverters")
+                    pypvs_meter_logger = logging.getLogger("pypvs.updaters.meter")
+                    login_filter = DeviceLoginFilter()
+                    pypvs_inverter_logger.addFilter(login_filter)
+                    pypvs_meter_logger.addFilter(login_filter)
+                    _LOGGER.debug("Applied nighttime device login filter (sun elevation: %.1f°)", sun_elevation)
                 
                 try:
                     pvs_data = await pvs_object.update()
                 finally:
-                    pypvs_inverter_logger.removeFilter(login_filter)
-                    pypvs_meter_logger.removeFilter(login_filter)
+                    if is_nighttime:
+                        pypvs_inverter_logger.removeFilter(login_filter)
+                        pypvs_meter_logger.removeFilter(login_filter)
                 # Query flash wear percentage (not in pypvs PVSGateway model yet)
                 flashwear_pct = 0
                 try:
