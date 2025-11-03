@@ -132,9 +132,10 @@ def create_vmeter(data):
             "HWVER": "Virtual",
             "origin": "virtual",
             # Fixed field names to match real power meters
-            "net_ltea_3phsum_kwh": kwh,  # Lifetime Power
+            # Round lifetime energy to 2 decimals to prevent float jitter (HA total_increasing requirement)
+            "net_ltea_3phsum_kwh": round(kwh, 2),  # Lifetime Power
             "p_3phsum_kw": kw,  # Power
-            "neg_ltea_3phsum_kwh": kwh,  # kWh To Grid (production meter shows all as export)
+            "neg_ltea_3phsum_kwh": round(kwh, 2),  # kWh To Grid (production meter shows all as export)
             "freq_hz": freq_avg,  # Frequency
             "i_a": amps,  # Amps
             "v12_v": volts_avg,  # Supply Volts

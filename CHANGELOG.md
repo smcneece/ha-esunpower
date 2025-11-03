@@ -3,6 +3,75 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.1] - 2025-11-01
+
+### Bug Fix: Home Assistant State Class Violations
+
+**Fixed "state is not strictly increasing" warnings for lifetime power sensors**
+- Home Assistant Recorder was logging warnings every 15-30 minutes
+- Lifetime power values were decreasing by tiny amounts (0.000122 kWh) due to floating point precision
+- Violated HA's `total_increasing` state class requirement (values must only increase)
+
+**Root Cause:**
+- PVS returns slightly different floating point values for lifetime energy across polls
+- Rounding errors caused values like 1665.559204 → 1665.559082 (decrease of 0.000122 kWh)
+- Home Assistant's statistics system rejected these as invalid decreases
+
+**The Fix:**
+- Round all lifetime energy values to 2 decimal places (0.01 kWh = 10 Wh precision)
+- Applied to inverters, meters, and virtual meters in both pypvs and legacy methods
+- Values now only change by minimum 0.01 kWh, eliminating float jitter
+
+**Files Modified:**
+- `pypvs_converter.py`: Lines 95, 133, 150, 152 - Round lifetime energy for new firmware
+- `data_processor.py`: Lines 136, 138 - Round lifetime energy for virtual meters (old firmware)
+
+**Impact:**
+- No more "state class total_increasing" warnings in Home Assistant logs
+- Energy statistics remain accurate (10 Wh precision is more than sufficient)
+- Both new firmware (pypvs) and old firmware (dl_cgi) fixed
+
+---
+
+### Enhancement: Nighttime Error Suppression & Auth Session Management
+
+**Contributor:** Special thanks to [@jtooley307](https://github.com/jtooley307) for these improvements (PR #30)
+
+**Nighttime Login Error Suppression (Sun Elevation Aware)**
+- Suppresses expected "Login to the PVS failed" errors when sun is below horizon
+- Prevents log spam during nighttime hours when inverters are offline/asleep
+- Only filters errors when sun elevation < 0 degrees (nighttime)
+- Daytime authentication errors remain visible for troubleshooting
+- Applies to both pypvs inverter and meter updater loggers
+
+**Why This Matters:**
+- pypvs library throws "login failed" errors when inverters don't respond at night
+- PVS is accessible, meters work, authentication works - inverters are just offline
+- Generated hundreds of error messages every night (every 5-10 minutes)
+- Now logs are clean at night while preserving visibility of real daytime issues
+
+**Proactive Authentication Refresh (New Firmware)**
+- Changed auth refresh interval from 3600s (1 hour) to 600s (10 minutes)
+- Prevents session expiration errors before they occur
+- Logging changed from INFO to DEBUG (reduces log noise)
+- Only affects new firmware (BUILD >= 61840) using pypvs
+
+**Additional Logging Improvements:**
+- "No inverters found" message changed from WARNING to DEBUG (expected at night)
+- Proactive re-auth messages now at DEBUG level (reduces routine log noise)
+
+**Files Modified:**
+- `__init__.py`: Lines 173, 686-692, 697-733 - Auth refresh + nighttime filter with sun elevation
+- `pypvs_converter.py`: Line 110 - Logging level improvement
+
+**Impact:**
+- Dramatically cleaner logs during nighttime hours (no more "login failed" spam)
+- Reduced authentication session failures through proactive refresh
+- Real authentication problems during daytime remain visible
+- Debug logging for routine operations (enable if troubleshooting needed)
+
+---
+
 ## [v2025.10.20] - 2025-10-27
 
 ### Bug Fix: Incorrect Authentication Notifications for Old Firmware

@@ -32,6 +32,7 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
         # Convert Gateway (PVS device)
         if hasattr(pvs_data, 'gateway') and pvs_data.gateway:
             gateway = pvs_data.gateway
+            _LOGGER.info("Converting pypvs gateway to PVS device...")
             serial = pvs_serial or "Unknown"
             raw_model = getattr(gateway, 'model', 'PVS6')
             _LOGGER.debug("Gateway model from pypvs: '%s'", raw_model)
@@ -74,7 +75,10 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                 "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
             }
             devices.append(pvs_device)
-            _LOGGER.debug("Converted pypvs gateway to PVS device")
+            _LOGGER.info("✅ Converted pypvs gateway to PVS device (serial: %s)", serial)
+        else:
+            _LOGGER.error("❌ No gateway data in pypvs response! hasattr=%s, gateway=%s",
+                         hasattr(pvs_data, 'gateway'), getattr(pvs_data, 'gateway', None))
 
         # Convert Inverters - using EXACT pypvs field names from inverter.py model
         if hasattr(pvs_data, 'inverters') and pvs_data.inverters:
@@ -91,7 +95,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "SWVER": "pypvs",
                     "HWVER": inverter.model or 'AC_Module_Type_E',
                     # pypvs inverter fields mapped to dl_cgi field names for entity compatibility
-                    "ltea_3phsum_kwh": str(inverter.lte_kwh),
+                    # Round lifetime energy to 2 decimals to prevent float jitter (HA total_increasing requirement)
+                    "ltea_3phsum_kwh": str(round(float(inverter.lte_kwh), 2)),
                     "p_3phsum_kw": str(inverter.last_report_kw),
                     "vln_3phavg_v": str(inverter.last_report_voltage_v),
                     "i_3phsum_a": str(inverter.last_report_current_a),
@@ -106,7 +111,7 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                 devices.append(inv_device)
             _LOGGER.info("✅ Converted %d pypvs inverters to legacy format", len(pvs_data.inverters))
         else:
-            _LOGGER.warning("⚠️ No inverters found in pypvs data - inverters may be offline (nighttime?)")
+            _LOGGER.debug("No inverters found in pypvs data - inverters may be offline (nighttime)")
 
         # Convert Meters - using EXACT pypvs field names from meter.py model
         if hasattr(pvs_data, 'meters') and pvs_data.meters:
@@ -128,7 +133,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "p_3phsum_kw": str(meter.power_3ph_kw),
                     "v12_v": str(meter.v12_v),
                     "freq_hz": str(meter.freq_hz),
-                    "net_ltea_3phsum_kwh": str(meter.net_lte_kwh),
+                    # Round lifetime energy to 2 decimals to prevent float jitter (HA total_increasing requirement)
+                    "net_ltea_3phsum_kwh": str(round(float(meter.net_lte_kwh), 2)),
                     "ct_scl_fctr": str(int(meter.ct_scale_factor)),
                     "q_3phsum_kvar": str(meter.q3phsum_kvar),
                     "s_3phsum_kva": str(meter.s3phsum_kva),
@@ -143,10 +149,11 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                 # Consumption meters: Add per-leg data and bidirectional energy
                 else:
                     # Bidirectional energy (consumption meters only)
+                    # Round lifetime energy to 2 decimals to prevent float jitter
                     if meter.neg_lte_kwh != 0:
-                        meter_device["neg_ltea_3phsum_kwh"] = str(meter.neg_lte_kwh)
+                        meter_device["neg_ltea_3phsum_kwh"] = str(round(float(meter.neg_lte_kwh), 2))
                     if meter.pos_lte_kwh != 0:
-                        meter_device["pos_ltea_3phsum_kwh"] = str(meter.pos_lte_kwh)
+                        meter_device["pos_ltea_3phsum_kwh"] = str(round(float(meter.pos_lte_kwh), 2))
                     # Per-leg data (consumption meters only)
                     if meter.p1_kw != 0:
                         meter_device["p1_kw"] = str(meter.p1_kw)
