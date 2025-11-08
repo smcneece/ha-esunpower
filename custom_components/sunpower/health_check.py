@@ -287,7 +287,7 @@ def check_firmware_upgrade(hass, entry, cache, pvs_data):
 
                 # Only notify if it's been more than 1 hour since last check
                 if current_time - stored['last_check'] > 3600:
-                    notify_firmware_upgrade(hass, entry, cache, serial, stored['current'], swver)
+                    notify_firmware_upgrade(hass, entry, cache, stored['current'], swver)
                     stored['upgrade_notified'] = True
 
                 # Update stored version

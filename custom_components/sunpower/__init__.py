@@ -106,7 +106,7 @@ except Exception as e:
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 
-PLATFORMS = ["sensor", "binary_sensor", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "select"]
 
 # Default to 300 seconds (5 minutes) for PVS safety
 DEFAULT_POLLING_INTERVAL = 300

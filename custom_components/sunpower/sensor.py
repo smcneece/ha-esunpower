@@ -62,26 +62,30 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     else:
         _LOGGER.debug("Found No ESS Data")
 
+    # Set up coordinator listener to create entities when new devices appear
+    # This handles both initial setup (no data yet) and ongoing discovery (new inverters added)
+    def _add_entities_when_ready():
+        """Add entities when coordinator data becomes available or changes."""
+        if coordinator.data and PVS_DEVICE_TYPE in coordinator.data:
+            # Schedule the async entity creation
+            hass.async_create_task(
+                _create_entities(hass, config_entry, async_add_entities, coordinator,
+                                do_descriptive_names, do_product_names, created_entities)
+            )
+
+    # Listen for coordinator updates (for ongoing device discovery)
+    config_entry.async_on_unload(
+        coordinator.async_add_listener(_add_entities_when_ready)
+    )
+
     # IMPROVED: Allow setup even without PVS data initially
     if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
         _LOGGER.info("PVS data not available yet - entities will be created when data arrives")
-        # Set up coordinator listener to create entities when data becomes available
-        async def _async_add_entities_when_ready():
-            """Add entities when coordinator data becomes available."""
-            if coordinator.data and PVS_DEVICE_TYPE in coordinator.data:
-                await _create_entities(hass, config_entry, async_add_entities, coordinator, 
-                                      do_descriptive_names, do_product_names, created_entities)
-        
-        # Listen for coordinator updates
-        config_entry.async_on_unload(
-            coordinator.async_add_listener(_async_add_entities_when_ready)
-        )
-        
-        # Return empty list for now - entities will be added when data arrives
+        # Return empty list for now - entities will be added when data arrives via listener
         async_add_entities([], True)
         return
-    
-    # Data is available - create entities now
+
+    # Data is available - create entities now (listener will handle future additions)
     await _create_entities(hass, config_entry, async_add_entities, coordinator,
                           do_descriptive_names, do_product_names, created_entities)
 

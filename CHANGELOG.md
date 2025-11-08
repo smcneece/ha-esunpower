@@ -3,6 +3,92 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.2] - 2025-11-05
+
+### Bug Fix: RuntimeWarning in Coordinator Listener
+
+**Fixed "coroutine was never awaited" warning in entity discovery**
+- Home Assistant logs showed RuntimeWarning from update_coordinator.py
+- Warning: "coroutine 'async_setup_entry.<locals>._async_add_entities_when_ready' was never awaited"
+- Coordinator listener callback was async but called synchronously
+
+**Root Cause:**
+- `coordinator.async_add_listener()` expects a synchronous callback function
+- We were passing an async function, which never got awaited
+- Caused runtime warnings and potentially prevented dynamic discovery from working
+
+**The Fix:**
+- Changed listener callback from async to sync function
+- Use `hass.async_create_task()` to schedule the async entity creation work
+- Callback now properly executes without warnings
+
+**Files Modified:**
+- `sensor.py`: Lines 67-74 - Synchronous callback with scheduled async task
+- `binary_sensor.py`: Lines 56-63 - Synchronous callback with scheduled async task
+
+**Impact:**
+- No more RuntimeWarning in logs
+- Dynamic discovery now works reliably
+- Proper async/await handling for entity creation
+
+---
+
+### Bug Fix: Dynamic Device Discovery Not Working
+
+**Fixed new inverters not being auto-discovered after initial setup**
+- When users replaced failed inverters, new units weren't automatically discovered
+- Integration only listened for new devices during initial setup (when no data exists)
+- Once data was present, the coordinator listener was never set up
+- New inverters added later would never appear without deleting/re-adding the integration
+
+**Root Cause:**
+- `sensor.py` and `binary_sensor.py` only created coordinator listeners in the "no data" code path
+- After initial setup with data present, no listener existed for ongoing device discovery
+- The `created_entities` tracking system worked correctly, but was never called for new devices
+
+**The Fix:**
+- Moved coordinator listener setup outside the conditional block in both files
+- Listener now always active, handling both initial setup AND ongoing discovery
+- New inverters will auto-discover on next poll cycle (default: 5 minutes)
+
+**Files Modified:**
+- `sensor.py`: Lines 65-87 - Coordinator listener now always active
+- `binary_sensor.py`: Lines 54-76 - Coordinator listener now always active
+
+**Impact:**
+- New inverters auto-discovered within one polling cycle (no integration reload needed)
+- Replacement inverters appear automatically after PVS recognizes them
+- Battery systems added later will be auto-discovered
+- Users no longer need to delete/re-add integration for new devices
+
+---
+
+### Bug Fix: Firmware Upgrade Notification TypeError
+
+**Fixed crash in firmware upgrade notification**
+- When PVS firmware was upgraded, health check threw TypeError every 5 minutes
+- Error: "notify_firmware_upgrade() takes 5 positional arguments but 6 were given"
+- Notification system failed silently, users never received firmware upgrade alerts
+
+**Root Cause:**
+- `check_firmware_upgrade()` in `health_check.py` called notification function with 6 arguments
+- `notify_firmware_upgrade()` in `notifications.py` only accepts 5 arguments
+- Extra `serial` argument passed but not needed (notification uses entry.unique_id)
+
+**The Fix:**
+- Removed unnecessary `serial` argument from function call (health_check.py:290)
+- Function signature now matches: `notify_firmware_upgrade(hass, entry, cache, old_version, new_version)`
+
+**Files Modified:**
+- `health_check.py`: Line 290 - Removed extra `serial` argument
+
+**Impact:**
+- Firmware upgrade notifications now work correctly
+- No more repeated TypeError errors in logs during firmware updates
+- Users will receive proper notification when PVS firmware is upgraded
+
+---
+
 ## [v2025.11.1] - 2025-11-01
 
 ### Bug Fix: Home Assistant State Class Violations
