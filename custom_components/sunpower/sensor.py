@@ -100,6 +100,7 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
     
     entities = []
     inverters_newly_discovered = False
+    new_inverter_serials = []  # Track which inverters are genuinely new
 
     pvs = next(iter(sunpower_data[PVS_DEVICE_TYPE].values()))
 
@@ -127,14 +128,25 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
                 # Generate unique entity ID for tracking
                 entity_unique_id = f"{device_serial}_pvs_{sensor['field']}"
                 
+                # Track new inverters BEFORE checking if entity exists
+                # Check against PERSISTENT list of known inverters (survives HA restarts)
+                from .const import INVERTER_DEVICE_TYPE
+                known_inverters = config_entry.data.get("known_inverter_serials", [])
+
+                is_new_inverter_entity = (device_type == INVERTER_DEVICE_TYPE and
+                                         entity_unique_id not in created_entities and
+                                         sensor['field'] == 'p_3phsum_kw' and  # First sensor per inverter
+                                         device_serial not in known_inverters)  # Not seen before
+
+                if is_new_inverter_entity:
+                    if device_serial not in new_inverter_serials:
+                        new_inverter_serials.append(device_serial)
+                    if not inverters_newly_discovered:
+                        inverters_newly_discovered = True
+
                 # Skip if already created
                 if entity_unique_id in created_entities:
                     continue
-                
-                # Track if this is the first inverter entity being created
-                from .const import INVERTER_DEVICE_TYPE
-                if device_type == INVERTER_DEVICE_TYPE and not inverters_newly_discovered:
-                    inverters_newly_discovered = True
                 
                 # NEW: Hybrid approach - field exists AND has value (upgrade compatible + clean interface)
                 field_name = sensor["field"]
@@ -200,26 +212,67 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
         _LOGGER.info("Adding %d new sensor entities", len(entities))
         async_add_entities(entities, True)
 
-        # Notify user if inverters were just discovered (only once ever, not on every HA restart)
-        if inverters_newly_discovered:
-            from .const import INVERTER_DEVICE_TYPE
-            inverter_count = len(sunpower_data.get(INVERTER_DEVICE_TYPE, {}))
-            if inverter_count > 0:
-                # Check if we've already notified about inverters (persistent flag)
-                if not config_entry.data.get("inverters_discovered_notified", False):
-                    # Mark as notified in config entry (persists across restarts)
-                    hass.config_entries.async_update_entry(
-                        config_entry,
-                        data={**config_entry.data, "inverters_discovered_notified": True}
-                    )
-                    # Get cache from hass.data
-                    sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
-                    cache = sunpower_state.get("_cache")
-                    if cache:
-                        notify_inverters_discovered(hass, config_entry, cache, inverter_count)
-                        _LOGGER.info("Notified user: %d inverters discovered and entities created (first time)", inverter_count)
-                else:
-                    _LOGGER.debug("Inverters rediscovered after HA restart - skipping notification (already notified previously)")
+        # Update persistent list of known inverters
+        # NOTE: We only ADD new inverters, never remove old ones automatically
+        # This prevents temporarily offline inverters from being treated as "new" when they recover
+        # User must manually delete the integration and re-add it to clean up permanently removed inverters
+        from .const import INVERTER_DEVICE_TYPE
+        current_inverter_serials = list(sunpower_data.get(INVERTER_DEVICE_TYPE, {}).keys())
+        known_inverters = config_entry.data.get("known_inverter_serials", [])
+
+        # Add any new inverters to the known list (never remove)
+        updated_known_inverters = list(set(known_inverters + current_inverter_serials))
+
+        # Check if we added any new inverters
+        newly_added_count = len(set(updated_known_inverters) - set(known_inverters))
+        if newly_added_count > 0:
+            _LOGGER.debug("Added %d new inverter(s) to persistent storage. Total known: %d",
+                         newly_added_count, len(updated_known_inverters))
+
+        # Notify user when NEW inverters are discovered (only if we actually found new ones)
+        if inverters_newly_discovered and len(new_inverter_serials) > 0:
+            total_inverter_count = len(sunpower_data.get(INVERTER_DEVICE_TYPE, {}))
+            new_inverter_count = len(new_inverter_serials)
+
+            # Check if this is the initial discovery (never notified before)
+            is_initial_discovery = not config_entry.data.get("inverters_discovered_notified", False)
+
+            if is_initial_discovery:
+                # Initial discovery - notify about all inverters and save them
+                hass.config_entries.async_update_entry(
+                    config_entry,
+                    data={
+                        **config_entry.data,
+                        "inverters_discovered_notified": True,
+                        "known_inverter_serials": updated_known_inverters
+                    }
+                )
+                sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
+                cache = sunpower_state.get("_cache")
+                if cache:
+                    notify_inverters_discovered(hass, config_entry, cache, total_inverter_count)
+                    _LOGGER.info("Notified user: %d inverters discovered and entities created (initial discovery)", total_inverter_count)
+            else:
+                # New inverters added after initial setup - save them and notify
+                sunpower_state = hass.data[DOMAIN][config_entry.entry_id]
+                cache = sunpower_state.get("_cache")
+                if cache:
+                    from .notifications import safe_notify
+                    msg = (f"☀️ New Inverters Detected!\n\n"
+                           f"Enhanced SunPower discovered {new_inverter_count} new inverter{'s' if new_inverter_count != 1 else ''} "
+                           f"and created all sensor entities.\n\n"
+                           f"Total inverters now: {total_inverter_count}")
+                    safe_notify(hass, msg, "Enhanced SunPower Discovery", config_entry, force_notify=True,
+                               notification_category="discovery", cache=cache)
+                    _LOGGER.info("Notified user: %d new inverters discovered (serials: %s, total now: %d)",
+                               new_inverter_count, ', '.join(new_inverter_serials), total_inverter_count)
+
+        # Update config if we added any new inverters
+        if newly_added_count > 0 or (set(updated_known_inverters) != set(known_inverters)):
+            hass.config_entries.async_update_entry(
+                config_entry,
+                data={**config_entry.data, "known_inverter_serials": updated_known_inverters}
+            )
 
 
 class SunPowerSensor(SunPowerEntity, SensorEntity):

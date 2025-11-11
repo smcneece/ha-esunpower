@@ -13,7 +13,7 @@
 
 ---
 
-**⚠️ CRITICAL: If upgrading from original krbaker integration, BACK YOUR SYSTEM UP! (You are doing daily backups right?) BACKUP FIRST AND FOLLOW UPGRADE INSTRUCTIONS EXACTLY below!**
+⚠️ CRITICAL: Migrating from krbaker? See [MIGRATION.md](docs/MIGRATION.md) for step-by-step instructions. Backup first!
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -36,10 +36,11 @@
 ## What Makes This Enhanced?
 
 **Core Improvements:**
+- **🔋 Battery Control (NEW - Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant - enable TOU optimization, emergency backup, or automated battery management via HA automations
 - **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
-- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI.
+- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI
 - **Diagnostic Dashboard**: 7 sensors tracking integration reliability and performance
 - **PVS Hardware Protection**: Firmware-aware throttling (10s new firmware, 60s old firmware, 20s battery), health checking, and intelligent backoff
 
@@ -51,33 +52,9 @@
 
 ## Important Notes & Breaking Changes
 
-**Breaking Changes from krbaker hass-sunpower:**
-- **Binary Sensors**: Now use proper boolean states (`on`/`off`) instead of text values like `"working"`. May break existing automations.
-
-**Understanding Polling Intervals:**
-- **Integration polls PVS** at your configured interval (10-3600 seconds)
-- **PVS updates different data at different rates internally:**
-  - **PVS gateway sensors** (uptime, RAM, CPU, errors) → Update every PVS scan (~30-60s)
-  - **Meter/Inverter power sensors** → Update every ~5 minutes (PVS internal cache)
-  - **Battery sensors** → May update more frequently (if battery system present)
-- **Faster polling does NOT make meter/inverter data update faster** - this is controlled by PVS hardware, likely to reduce device polling stress
-- **Verify polling works**: Watch PVS **Uptime** sensor - should update at your configured interval
-
-**Migration Guide:**
-```yaml
-# OLD automation (will break):
-- condition: state
-  entity_id: binary_sensor.sunpower_pvs_state  
-  state: "working"
-
-# NEW automation (Enhanced SunPower):
-- condition: state
-  entity_id: binary_sensor.sunpower_pvs_state
-  state: "on"
-```
 
 **Disclaimers:**
-- Extensively tested on a 30-panel SunPower system **without batteries**. Battery system users welcome to test and provide feedback.
+- Extensively tested on a 30-panel SunPower system **without batteries**. Battery system users welcome to test and provide feedback. We have also had several users with battery systems test on old and new firmwares. 
 
 ## Installation
 
@@ -97,42 +74,6 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 - Bridges were only needed for old firmware - new firmware has built-in authentication
 
 ---
-
-### Upgrading from Original Keith Baker (krbaker) SunPower Integration
-
-**⚠️ This upgrade is a one-way process** - backup recommended before proceeding. You may be able to roll back, but my test failed, and I won't be investing time in debugging why.
-
-**Step-by-Step Upgrade: GO SLOW**
-
-1. **Remove Original Integration**
-   - Go to "Settings" → "Devices & Services"
-   - Find and click on "SunPower" integration → three dots menu → "Delete"
-
-2. **Remove Original HACS Repository** (if installed via HACS)
-   - Go to HACS → Integrations → Find "SunPower" → three dots → "Remove"
-   - Also remove custom repo: HACS → 3 dots (top right) → "Custom repositories" → delete original repository
-
-3. **Restart Home Assistant** (DO NOT SKIP)
-   - Go to "Settings" → "System" → "Restart"
-
-4. **Install Enhanced Version** (follow steps below)
-
-5. **Clean Up Old Virtual Devices** (Battery Systems Only)
-   - krbaker integration created "Virtual Battery" and "Virtual SunVault" devices
-   - These will appear as orphaned/unavailable after upgrade
-   - **Safe to delete manually** - Enhanced SunPower uses real ESS devices from PVS instead of virtual aggregations
-   - Go to "Settings" → "Devices & Services" → "Entities" → Search for "virtual" → Delete orphaned entities
-
-**Why Remove First?**
-- Prevents entity conflicts between old and new versions
-- Enhanced version automatically migrates configuration
-- Entity history is preserved - no data loss
-
-**Battery System Changes:**
-- **Old krbaker approach**: Created virtual aggregation devices from ESS endpoint
-- **Enhanced SunPower approach**: Uses real ESS devices from PVS with comprehensive sensor suite
-- **Result**: More accurate data, better device organization, eliminates virtual device complexity
-- **Note**: Some calculated sensors (power input/output based on amperage) may be unavailable due to pypvs library limitations
 
 ### Install via HACS
 
@@ -285,6 +226,48 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - **ESS System**: Environmental conditions, power meters
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
 
+### 🔋 Battery Control (NEW - Beta Testing)
+
+**Requirements:**
+- SunVault or compatible battery system
+- New firmware (BUILD >= 61840) with authentication
+- Integration configured with PVS password (auto-detected during setup)
+
+**Control your battery directly from Home Assistant:**
+
+**Select Entities:**
+- `select.battery_control_mode` - Switch between operating modes
+  - **Self Supply**: Use battery to offset home consumption (default)
+  - **Cost Savings**: Charge during off-peak, discharge during peak hours (TOU optimization)
+  - **Emergency Reserve**: Preserve battery for backup power only
+- `select.battery_reserve_percentage` - Set minimum battery reserve (10%-100%)
+
+**Example TOU Automation:**
+```yaml
+# Switch to Cost Savings before peak hours (5pm-9pm)
+automation:
+  - alias: "Battery: Cost Savings During Peak"
+    trigger:
+      - platform: time
+        at: "15:00:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().month >= 10 or now().month <= 4 }}"  # Winter only
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Cost Savings"
+```
+
+**More automation examples:** [docs/battery_tou_automation_example.yaml](docs/battery_tou_automation_example.yaml)
+
+**Beta Testing:**
+- ✅ Code complete and safety audited
+- ⚠️ Real-world testing in progress
+- Want to help test? Join [Discussion #28](https://github.com/smcneece/ha-esunpower/discussions/28)
+
 ### Individual Inverter Health Monitoring
 - **24-Hour Persistent Error Tracking**: Only alerts after 24+ hours of continuous problems, eliminating false positives
 - **Batched Notifications**: Multiple inverter issues grouped into single notification instead of spam
@@ -359,26 +342,38 @@ notify:
 
 **Entity Naming:** The integration shows proper inverter identification (e.g., "Inverter E001221370442207 Lifetime Power") for easy energy dashboard setup.
 
+**Understanding Your Meters:**
+- **P Meter (Production)**: Tracks solar energy exported to grid - one direction only
+- **C Meter (Consumption, CT clamps)**: Tracks bidirectional grid flow - import FROM grid AND export TO grid
+
 **Setting Up Solar Production:**
-- **Production Meter**: `sensor.power_meter_*p_lifetime_power` (most accurate)
-- **Virtual Production Meter**: `sensor.virtual_production_meter_*_lifetime_power` (aggregated)
-- **Individual Panels**: Add each `sensor.sunpower_inverter_*_lifetime_power` separately
+
+**Recommended: Individual Inverters (Most Accurate)**
+- Add each `sensor.sunpower_inverter_*_lifetime_power` separately
+- Provides per-panel visibility and troubleshooting
+- More resilient during integration migrations
+- Takes a few minutes to add all inverters but worth it
+
+**Alternative: Production Meter**
+- **Production Meter**: `sensor.power_meter_*p_lifetime_power`
+- **Virtual Production Meter**: `sensor.virtual_production_meter_*_lifetime_power` (when no physical P meter)
+- Shows total solar production as single summed value
 
 ![Solar Production Setup](images/production.png)
 
 **Setting Up Grid Consumption:**
 
-**⚠️ IMPORTANT: Use the 'c' meter sensors (CT clamps), NOT the 'p' meter or "Lifetime Power" sensors!**
+**⚠️ IMPORTANT: Use the 'c' meter sensors (CT clamps), NOT the 'p' meter!**
 
 - **Grid consumption**: `sensor.power_meter_*c_kwh_to_home`
 - **Return to grid**: `sensor.power_meter_*c_kwh_to_grid`
 
-**Why the 'c' meter?** Only the 'c' consumption meter (CT clamps) provides the bidirectional energy sensors needed for proper Energy Dashboard calculations. The 'p' production meter and "Lifetime Power" sensors only show net totals and will cause incorrect calculations.
+**Why the C meter?** Only the C meter (consumption meter with CT clamps) provides the bidirectional sensors needed for grid import/export tracking. The P meter only tracks solar production going one direction to the grid.
 
 **⚠️ TROUBLESHOOTING: Grid sensors not available?**
 - **Missing consumption meter entirely**: CT clamps may not be installed OR not provisioned in PVS settings - contact installer
 - **CT clamps present but not working**: Installer may need to provision/enable them in PVS configuration
-- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export - see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
+- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export - see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
 - **Alternative**: Use utility smart meter integration for most accurate grid tracking
 
 ![Consumption Setup](images/consumption.png)
@@ -477,7 +472,7 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 **Old Firmware (BUILD < 61840):**
 - **LAN Port Required**: Must use `172.27.153.1`
 - **Network Isolation Required**: PVS LAN port must be isolated (VLAN or separate network)
-  - See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for VLAN setup
+  - See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for VLAN setup
   - Or use Raspberry Pi proxy ([@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup))
 
 **Quick Test:** Check if your WAN port responds: `curl http://YOUR_PVS_WAN_IP/cgi-bin/dl_cgi/supervisor/info`
@@ -490,7 +485,7 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 - **Diagnostic Sensors Not Working**: Wait for a few polling cycles, check "Enhanced SunPower Diagnostics" device
 - **Mobile Notifications Not Working**: Verify Home Assistant mobile app installed and mobile service configured
 
-**For detailed troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+**For detailed troubleshooting**: See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## Contributing
 
@@ -524,8 +519,9 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 - **Issues**: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/smcneece/ha-esunpower/discussions)  
 - **Community**: [Home Assistant Community Forum](https://community.home-assistant.io/)
-- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
-- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Changelog**: [CHANGELOG.md](docs/CHANGELOG.md)
+- **Troubleshooting**: [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- **Migration Guide**: [MIGRATION.md](docs/MIGRATION.md)
 
 ---
 

@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 BATTERY_MODE_MAP = {
     "Self Supply": "SELF_CONSUMPTION",
     "Cost Savings": "ENERGY_ARBITRAGE",
-    "Emergency Reserve": "EMERGENCY_RESERVE",  # TODO: Verify this value with testing
+    "Emergency Reserve": "BACKUP_ONLY",
 }
 
 # Reverse mapping: API value -> Friendly name
@@ -103,17 +103,16 @@ class SunPowerBatteryModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current battery mode."""
-        if not self.coordinator.data or "devices" not in self.coordinator.data:
+        # Read control_mode from coordinator data (populated during battery config polling)
+        if not self.coordinator.data or "battery_config" not in self.coordinator.data:
             return None
 
-        # Find ESS device and read op_mode
-        for device in self.coordinator.data["devices"]:
-            if device.get("DEVICE_TYPE") == "Energy Storage System":
-                api_mode = device.get("op_mode", "")
-                # Convert API value to friendly name
-                return BATTERY_MODE_REVERSE.get(api_mode, None)
+        control_mode = self.coordinator.data["battery_config"].get("control_mode")
+        if not control_mode:
+            return None
 
-        return None
+        # Convert API value to friendly name
+        return BATTERY_MODE_REVERSE.get(control_mode, None)
 
     async def async_select_option(self, option: str) -> None:
         """Change the battery mode."""
@@ -171,11 +170,18 @@ class SunPowerReservePercentageSelect(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current reserve percentage."""
-        # TODO: Need to read current min_customer_soc from config endpoint
-        # For now, return None (unknown)
-        # The config value is at /ess/config/dcm/control_param/min_customer_soc
-        # but we need to fetch it separately as it's not in the regular polling data
-        return None
+        # Read min_customer_soc from coordinator data if available
+        # This is populated during battery config polling
+        if not self.coordinator.data or "battery_config" not in self.coordinator.data:
+            return None
+
+        min_soc = self.coordinator.data["battery_config"].get("min_customer_soc")
+        if min_soc is None:
+            return None
+
+        # Convert 0.20 to "20%"
+        percentage = int(float(min_soc) * 100)
+        return f"{percentage}%"
 
     async def async_select_option(self, option: str) -> None:
         """Change the minimum reserve percentage."""

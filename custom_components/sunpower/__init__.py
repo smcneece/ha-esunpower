@@ -931,6 +931,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
                     # Don't re-raise - continue with PVS data
 
+                # Poll battery configuration for select entity current states
+                # Only works with new firmware (pypvs)
+                if pvs_object:
+                    try:
+                        _LOGGER.debug("Polling battery configuration (control_mode, min_customer_soc)")
+                        control_mode_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/mode_param/control_mode"})
+                        min_soc_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/control_param/min_customer_soc"})
+
+                        battery_config = {}
+                        if control_mode_response and "values" in control_mode_response:
+                            values = control_mode_response["values"]
+                            if values and len(values) > 0:
+                                battery_config["control_mode"] = values[0].get("value")
+
+                        if min_soc_response and "values" in min_soc_response:
+                            values = min_soc_response["values"]
+                            if values and len(values) > 0:
+                                battery_config["min_customer_soc"] = values[0].get("value")
+
+                        if battery_config:
+                            data["battery_config"] = battery_config
+                            _LOGGER.debug("Battery config: control_mode=%s, min_customer_soc=%s",
+                                        battery_config.get("control_mode"),
+                                        battery_config.get("min_customer_soc"))
+                    except Exception as config_error:
+                        _LOGGER.debug("Battery config polling failed (non-critical): %s", config_error)
+                        # Don't fail - battery config is optional for select entities
+
             # Step 5: Health checks
             try:
                 pvs_data = data.get(PVS_DEVICE_TYPE, {})

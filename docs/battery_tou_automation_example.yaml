@@ -1,0 +1,208 @@
+# Battery Time-of-Use (TOU) Automation Example
+# Optimizes battery usage based on electricity pricing and solar production
+
+# This example assumes:
+# - Peak pricing: 5pm-9pm (November-April when solar production is low)
+# - Goal: Use battery during peak hours, preserve it during off-peak
+
+automation:
+  # Switch to Cost Savings mode before peak hours (charge battery during day)
+  - alias: "Battery: Cost Savings Before Peak Hours"
+    description: "Charge battery during off-peak to use during expensive peak hours"
+    trigger:
+      # Start at 3pm to ensure battery is charged before 5pm peak
+      - platform: time
+        at: "15:00:00"
+    condition:
+      # Only during winter months when solar production is low
+      - condition: template
+        value_template: >
+          {{ now().month >= 10 or now().month <= 4 }}
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Cost Savings"
+      - service: notify.persistent_notification
+        data:
+          title: "Battery Mode Changed"
+          message: "Switched to Cost Savings mode before peak hours (5pm-9pm)"
+
+  # Switch back to Self Supply after peak hours
+  - alias: "Battery: Self Supply After Peak Hours"
+    description: "Return to normal self-consumption mode after peak pricing ends"
+    trigger:
+      - platform: time
+        at: "21:00:00"
+    condition:
+      # Only during winter months
+      - condition: template
+        value_template: >
+          {{ now().month >= 10 or now().month <= 4 }}
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Self Supply"
+      - service: notify.persistent_notification
+        data:
+          title: "Battery Mode Changed"
+          message: "Switched back to Self Supply mode (peak hours ended)"
+
+  # Emergency: Switch to Emergency Reserve if severe weather forecast
+  # (Requires weather integration with alerts)
+  - alias: "Battery: Emergency Reserve on Severe Weather"
+    description: "Preserve battery for backup power during severe weather"
+    trigger:
+      - platform: state
+        entity_id: sensor.weather_alerts
+        to: "severe"
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Emergency Reserve"
+      - service: select.select_option
+        target:
+          entity_id: select.battery_reserve_percentage
+        data:
+          option: "80%"
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "⚠️ Battery Emergency Mode"
+          message: "Battery set to Emergency Reserve (80%) due to severe weather alert"
+
+  # Return from Emergency Reserve after weather clears
+  - alias: "Battery: Return from Emergency Reserve"
+    description: "Resume normal operation after severe weather passes"
+    trigger:
+      - platform: state
+        entity_id: sensor.weather_alerts
+        from: "severe"
+        to: "none"
+        for:
+          hours: 2
+    condition:
+      - condition: state
+        entity_id: select.battery_control_mode
+        state: "Emergency Reserve"
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Self Supply"
+      - service: select.select_option
+        target:
+          entity_id: select.battery_reserve_percentage
+        data:
+          option: "20%"
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "Battery Normal Mode"
+          message: "Weather clear - returned to Self Supply with 20% reserve"
+
+# Advanced: Dynamic mode based on battery state of charge
+  - alias: "Battery: Smart TOU with SOC Check"
+    description: "Only use Cost Savings if battery has enough charge"
+    trigger:
+      - platform: time
+        at: "15:00:00"
+    condition:
+      # Winter months
+      - condition: template
+        value_template: >
+          {{ now().month >= 10 or now().month <= 4 }}
+      # Battery has at least 40% charge to be useful during peak
+      - condition: numeric_state
+        entity_id: sensor.sunvault_battery_state_of_charge
+        above: 40
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Cost Savings"
+      - service: notify.persistent_notification
+        data:
+          title: "Battery Cost Savings Enabled"
+          message: "Battery at {{ states('sensor.sunvault_battery_state_of_charge') }}% - ready for peak hours"
+
+# Weekend mode: No TOU optimization on weekends (different pricing)
+  - alias: "Battery: Weekend Self Supply"
+    description: "Keep battery in Self Supply mode on weekends (no peak pricing)"
+    trigger:
+      - platform: time
+        at: "00:00:01"
+    condition:
+      - condition: time
+        weekday:
+          - sat
+          - sun
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Self Supply"
+
+# Summer mode: Always Self Supply (plenty of solar, no TOU needed)
+  - alias: "Battery: Summer Self Supply Mode"
+    description: "Use Self Supply during summer months (May-September)"
+    trigger:
+      - platform: time
+        at: "00:00:01"
+    condition:
+      - condition: template
+        value_template: >
+          {{ now().month >= 5 and now().month <= 9 }}
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Self Supply"
+      - service: select.select_option
+        target:
+          entity_id: select.battery_reserve_percentage
+        data:
+          option: "20%"
+
+# EV Charging integration: Increase reserve when EV charging scheduled
+  - alias: "Battery: Reserve for EV Charging"
+    description: "Increase reserve percentage when EV charging overnight"
+    trigger:
+      # EV plugged in
+      - platform: state
+        entity_id: binary_sensor.ev_charger_plugged_in
+        to: "on"
+    condition:
+      # During winter peak pricing months
+      - condition: template
+        value_template: >
+          {{ now().month >= 10 or now().month <= 4 }}
+      # Evening hours (before midnight)
+      - condition: time
+        after: "18:00:00"
+        before: "23:59:59"
+    action:
+      # Increase reserve so battery doesn't discharge for EV
+      - service: select.select_option
+        target:
+          entity_id: select.battery_reserve_percentage
+        data:
+          option: "50%"
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "Battery Reserve Increased"
+          message: "Battery reserve set to 50% while EV charging (preserves battery for home use)"
+
+# Notes:
+# - Replace "sensor.sunvault_battery_state_of_charge" with your actual battery SOC sensor
+# - Replace "sensor.weather_alerts" with your weather integration alert sensor
+# - Replace "binary_sensor.ev_charger_plugged_in" with your EV charger sensor
+# - Adjust times based on your utility's TOU schedule
+# - Test in Self Supply mode first before enabling Cost Savings

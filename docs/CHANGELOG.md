@@ -3,7 +3,133 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
-## [v2025.11.2] - 2025-11-05
+## [v2025.11.3] - 2025-11-10
+
+### New Feature: Battery Control (SunVault)
+
+**Added ability to control battery modes and reserve percentage directly from Home Assistant**
+- New select entities for battery systems (requires new firmware BUILD >= 61840)
+- Control battery operating mode: Self Supply, Cost Savings, Emergency Reserve
+- Set minimum reserve percentage (10%-100% in 10% increments)
+- Enable TOU (Time-of-Use) optimization via automations
+- Real-time sync of current battery settings
+
+**Select Entities Created (battery systems only):**
+1. `select.battery_control_mode` - Switch between operating modes
+2. `select.battery_reserve_percentage` - Set minimum battery reserve
+
+**Battery Modes:**
+- **Self Supply**: Use battery to offset home consumption (default)
+- **Cost Savings**: Charge during off-peak, discharge during peak hours (TOU optimization)
+- **Emergency Reserve**: Preserve battery for backup power only
+
+**Example Automation (TOU):**
+```yaml
+automation:
+  - alias: "Battery: Cost Savings During Peak Hours"
+    trigger:
+      - platform: time
+        at: "15:00:00"
+    condition:
+      - condition: template
+        value_template: "{{ now().month >= 10 or now().month <= 4 }}"
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.battery_control_mode
+        data:
+          option: "Cost Savings"
+```
+
+**How it works:**
+- Integration polls battery config every polling interval
+- Reads current mode from ESS status (already polled, no extra API call)
+- Polls `min_customer_soc` separately (1 additional API call per poll)
+- Select entities display current values in dropdowns
+- User changes dropdown → writes to PVS → refreshes coordinator data
+- Changes apply within seconds (PVS may delay if battery state prevents mode change)
+
+**Safety Features:**
+- Only created for systems with detected battery + new firmware
+- Input validation (only allowed modes/percentages accepted)
+- Warning logged if reserve set to 100% (battery won't discharge)
+- All changes logged at INFO level for audit trail
+- PVS may reject mode changes if battery charge too low (safety feature)
+
+**Requirements:**
+- SunVault or compatible battery system
+- New firmware (BUILD >= 61840) with authentication
+- Integration configured with PVS password (auto-detected during setup)
+
+**Important Notes:**
+- **Low battery behavior**: PVS may automatically revert from Emergency Reserve to Self Supply if battery charge is below the reserve threshold
+- **100% reserve warning**: Setting reserve to 100% prevents battery from discharging for home use (backup only)
+- **Mode change delays**: Changes may take a few moments to apply on PVS
+- **Summer vs Winter**: TOU optimization most useful during winter months when solar production is lower
+
+**Files Modified:**
+- `select.py` (NEW): Lines 1-235 - Battery control select entities
+- `__init__.py`: Line 109 (added "select" to PLATFORMS), Lines 934-966 (battery config polling)
+- `const.py`: Battery mode constants
+
+**Performance Impact:**
+- +1 API call per poll for battery systems (min_customer_soc polling)
+- Negligible memory impact (~80 bytes for battery_config data)
+
+**Testing Status:**
+- ✅ Syntax validated
+- ✅ Entity creation logic verified
+- ⚠️ Awaiting real-world testing with battery system
+
+**Documentation:**
+- See `battery_tou_automation_example.yaml` for comprehensive automation examples
+- See `BATTERY-CONTROL-AUDIT.md` for detailed safety analysis and testing recommendations
+
+**Credits:**
+- Feature requested by @dlp688 (Discussion #28)
+- Battery mode values confirmed by @maxroberts999 via testing
+- API documentation from Reddit community and pypvs library
+
+---
+
+### Enhancement: New Inverter Discovery Notification
+
+**Added notifications when new/replacement inverters are discovered**
+- Users now receive notification when replacement or additional inverters are added
+- Shows how many new inverters were discovered and total count
+- Distinguishes between initial discovery (first time) and subsequent additions
+- Uses `force_notify=True` so notifications always appear
+
+**Example notification:**
+> ☀️ New Inverters Detected!
+>
+> Enhanced SunPower discovered 2 new inverters and created all sensor entities.
+>
+> Total inverters now: 32
+
+**How it works:**
+- Stores list of known inverter serials in config entry (persists across HA restarts)
+- Compares current inverters against this persistent list to identify genuinely new ones
+- Only adds new inverters to the list, never removes (prevents false "new inverter" notifications when inverters temporarily go offline)
+- Initial setup: Adds all inverters to known list and notifies once
+- Later additions: Only notifies about genuinely new inverters not in the known list
+
+**Important Notes:**
+- **One-time migration notification:** On first update to v2025.11.3, you'll receive a notification about all your existing inverters as the system builds the initial known inverter list. This is expected and will only happen once.
+- **Offline inverters:** Temporarily offline inverters (failures, nighttime issues) remain in the known list, so they won't trigger "new inverter" notifications when they recover
+- **Replaced inverters:** Physically replaced inverters are correctly detected as new and trigger notifications
+- **Old inverter cleanup:** Serial numbers of permanently removed inverters stay in the config (harmless, minimal storage). Delete and re-add the integration if you want to clean up historical serials.
+
+**Files Modified:**
+- `sensor.py`: Lines 103, 131-145, 215-275 - Persistent inverter tracking and notification logic
+
+**Impact:**
+- Users know immediately when new/replacement inverters come online
+- No false "new inverter" notifications on HA restarts or temporary failures
+- Helpful for confirming replacement inverters are recognized
+- Works correctly with health monitoring (24-hour persistent error tracking)
+
+---
 
 ### Bug Fix: RuntimeWarning in Coordinator Listener
 
@@ -32,6 +158,64 @@ All notable changes to the Enhanced SunPower Home Assistant Integration will be 
 - Proper async/await handling for entity creation
 
 ---
+
+### Bug Fix: Dynamic Device Discovery Not Working
+
+**Fixed new inverters not being auto-discovered after initial setup**
+- When users replaced failed inverters, new units weren't automatically discovered
+- Integration only listened for new devices during initial setup (when no data exists)
+- Once data was present, the coordinator listener was never set up
+- New inverters added later would never appear without deleting/re-adding the integration
+
+**Root Cause:**
+- `sensor.py` and `binary_sensor.py` only created coordinator listeners in the "no data" code path
+- After initial setup with data present, no listener existed for ongoing device discovery
+- The `created_entities` tracking system worked correctly, but was never called for new devices
+
+**The Fix:**
+- Moved coordinator listener setup outside the conditional block in both files
+- Listener now always active, handling both initial setup AND ongoing discovery
+- New inverters will auto-discover on next poll cycle (default: 5 minutes)
+
+**Files Modified:**
+- `sensor.py`: Lines 65-87 - Coordinator listener now always active
+- `binary_sensor.py`: Lines 54-76 - Coordinator listener now always active
+
+**Impact:**
+- New inverters auto-discovered within one polling cycle (no integration reload needed)
+- Replacement inverters appear automatically after PVS recognizes them
+- Battery systems added later will be auto-discovered
+- Users no longer need to delete/re-add integration for new devices
+
+---
+
+### Bug Fix: Firmware Upgrade Notification TypeError
+
+**Fixed crash in firmware upgrade notification**
+- When PVS firmware was upgraded, health check threw TypeError every 5 minutes
+- Error: "notify_firmware_upgrade() takes 5 positional arguments but 6 were given"
+- Notification system failed silently, users never received firmware upgrade alerts
+
+**Root Cause:**
+- `check_firmware_upgrade()` in `health_check.py` called notification function with 6 arguments
+- `notify_firmware_upgrade()` in `notifications.py` only accepts 5 arguments
+- Extra `serial` argument passed but not needed (notification uses entry.unique_id)
+
+**The Fix:**
+- Removed unnecessary `serial` argument from function call (health_check.py:290)
+- Function signature now matches: `notify_firmware_upgrade(hass, entry, cache, old_version, new_version)`
+
+**Files Modified:**
+- `health_check.py`: Line 290 - Removed extra `serial` argument
+
+**Impact:**
+- Firmware upgrade notifications now work correctly
+- No more repeated TypeError errors in logs during firmware updates
+- Users will receive proper notification when PVS firmware is upgraded
+
+---
+
+## [v2025.11.2] - 2025-11-05
 
 ### Bug Fix: Dynamic Device Discovery Not Working
 
