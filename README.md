@@ -36,7 +36,7 @@
 ## What Makes This Enhanced?
 
 **Core Improvements:**
-- **🔋 Battery Control (NEW - Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant - enable TOU optimization, emergency backup, or automated battery management via HA automations
+- **Battery Control (NEW - Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant - enable TOU optimization, emergency backup, or automated battery management via HA automations
 - **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
