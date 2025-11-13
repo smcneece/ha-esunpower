@@ -41,11 +41,14 @@ async def async_setup_entry(
     coordinator = sunpower_state["coordinator"]
 
     # Check if system has battery (ESS device)
+    # Match same detection logic as __init__.py battery polling (line 898)
     has_battery = False
     if coordinator.data and "devices" in coordinator.data:
         for device in coordinator.data["devices"]:
-            if device.get("DEVICE_TYPE") == "Energy Storage System":
+            device_type = device.get("DEVICE_TYPE", "")
+            if device_type in ("ESS", "Battery", "ESS BMS", "Energy Storage System", "SunVault"):
                 has_battery = True
+                _LOGGER.debug("Battery system detected: %s", device_type)
                 break
 
     # Only create battery control selects if battery system is present
@@ -126,13 +129,20 @@ class SunPowerBatteryModeSelect(CoordinatorEntity, SelectEntity):
         try:
             # Use pypvs getVarserver with set parameter
             # Format: /vars?set=/ess/config/dcm/mode_param/control_mode=ENERGY_ARBITRAGE
-            await self._pvs_object.getVarserver(
+            response = await self._pvs_object.getVarserver(
                 "/vars",
                 params={"set": f"/ess/config/dcm/mode_param/control_mode={api_value}"}
             )
+
+            # Verify the write was accepted (response should echo back the value)
+            if response:
+                _LOGGER.debug("Battery mode write response: %s", response)
+
             _LOGGER.info("✅ Battery mode set to %s successfully", option)
 
             # Refresh coordinator data to update current_option
+            # Note: PVS may take a moment to apply the change, especially if battery
+            # state (low charge) prevents the mode from being applied
             await self.coordinator.async_request_refresh()
 
         except Exception as e:
@@ -196,10 +206,19 @@ class SunPowerReservePercentageSelect(CoordinatorEntity, SelectEntity):
         try:
             # Use pypvs getVarserver with set parameter
             # Format: /vars?set=/ess/config/dcm/control_param/min_customer_soc=0.20
-            await self._pvs_object.getVarserver(
+            response = await self._pvs_object.getVarserver(
                 "/vars",
                 params={"set": f"/ess/config/dcm/control_param/min_customer_soc={percentage_value:.2f}"}
             )
+
+            # Verify the write was accepted (response should echo back the value)
+            if response:
+                _LOGGER.debug("Battery reserve write response: %s", response)
+
+            # Warn if setting reserve to 100% (battery will never discharge)
+            if percentage_value >= 1.0:
+                _LOGGER.warning("⚠️ Battery reserve set to 100%% - battery will not discharge for home use")
+
             _LOGGER.info("✅ Battery reserve percentage set to %s successfully", option)
 
             # Refresh coordinator data

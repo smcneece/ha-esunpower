@@ -935,15 +935,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 # Only works with new firmware (pypvs)
                 if pvs_object:
                     try:
-                        _LOGGER.debug("Polling battery configuration (control_mode, min_customer_soc)")
-                        control_mode_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/mode_param/control_mode"})
-                        min_soc_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/control_param/min_customer_soc"})
-
                         battery_config = {}
-                        if control_mode_response and "values" in control_mode_response:
-                            values = control_mode_response["values"]
-                            if values and len(values) > 0:
-                                battery_config["control_mode"] = values[0].get("value")
+
+                        # control_mode is already in ESS status data as "operational_mode"
+                        # Extract it from the already-polled ESS data to avoid extra API call
+                        ess_device = data.get("Energy Storage System", {})
+                        if ess_device:
+                            for serial, device in ess_device.items():
+                                op_mode = device.get("op_mode")
+                                if op_mode:
+                                    battery_config["control_mode"] = op_mode
+                                    break
+
+                        # min_customer_soc is NOT in ESS status, must poll separately
+                        _LOGGER.debug("Polling battery minimum reserve (min_customer_soc)")
+                        min_soc_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/control_param/min_customer_soc"})
 
                         if min_soc_response and "values" in min_soc_response:
                             values = min_soc_response["values"]

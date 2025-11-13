@@ -3,6 +3,38 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.4] - 2025-11-12
+
+### Critical Bug Fix: krbaker Migration Statistics Issue
+
+**Fixed negative lifetime energy values after migrating from krbaker integration**
+- **Problem**: Users migrating from krbaker seeing massive negative energy spikes (e.g., -7,573 kWh)
+- **Root Cause**: State class mismatch between krbaker (TOTAL) and Enhanced SunPower (TOTAL_INCREASING)
+- **Impact**: Home Assistant statistics engine tried to reconcile the state class change, creating incorrect adjustments
+
+**State Classes Reverted for Migration Compatibility:**
+- `METER_TO_GRID`: Changed from `TOTAL_INCREASING` → `TOTAL` (matches krbaker)
+- `INVERTER_NET_KWH`: Changed from `TOTAL_INCREASING` → `TOTAL` (matches krbaker)
+- `METER_NET_KWH`: Already `TOTAL` (no change needed)
+
+**Why This Matters:**
+- `TOTAL` state class allows values to increase or decrease (handles PVS float precision variations)
+- `TOTAL_INCREASING` enforces strictly increasing values (causes HA statistics reconciliation issues)
+- Matching krbaker's state classes prevents HA from adjusting statistics during migration
+
+**Existing Users:**
+- If you already migrated and have negative spikes, you'll need to clean up HA statistics database
+- See [MIGRATION.md](docs/MIGRATION.md) for statistics cleanup instructions
+- New migrations after v2025.11.4 will not experience this issue
+
+**Files Modified:**
+- `const.py`: Lines 346, 529 - Reverted state classes to TOTAL
+
+**Issues Fixed:**
+- Issue #33 - Negative lifetime energy after krbaker migration
+
+---
+
 ## [v2025.11.3] - 2025-11-10
 
 ### New Feature: Battery Control (SunVault)

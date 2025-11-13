@@ -1,5 +1,15 @@
 # Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower - SunStrong PVS
 
+## ⚠️ IMPORTANT: v2025.11.4 Release Notice
+
+**This release contains untested battery control features (from v2025.11.3) but was released publicly to fix critical migration bugs (Issues #33 & #34).**
+
+- ✅ **Migration fix tested and working**: State class compatibility with krbaker restored
+- ⚠️ **Battery control untested**: Select entities for battery mode/reserve (requires real-world testing)
+- **Recommendation**: Non-battery users can update safely. Battery users should wait for beta testing completion or help test in [Discussion #28](https://github.com/smcneece/ha-esunpower/discussions/28).
+
+---
+
 ## PLEASE TAKE A FEW MINUTES TO READ - FIRMWARE COMPATIBILITY
 
 **The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions** - Automatically detects and adapts to your system:

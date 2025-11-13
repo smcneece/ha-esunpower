@@ -343,7 +343,7 @@ SUNPOWER_SENSORS = {
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
-                "state": SensorStateClass.TOTAL_INCREASING,
+                "state": SensorStateClass.TOTAL,
             },
             "METER_TO_HOME": {
                 "field": "pos_ltea_3phsum_kwh",
@@ -526,7 +526,7 @@ SUNPOWER_SENSORS = {
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
-                "state": SensorStateClass.TOTAL_INCREASING,
+                "state": SensorStateClass.TOTAL,
             },
             "INVERTER_KW": {
                 "field": "p_3phsum_kw",
