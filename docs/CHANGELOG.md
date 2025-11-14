@@ -3,6 +3,55 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.6] - 2025-11-14
+
+### CRITICAL Bug Fix: MPPT Backwards Compatibility Broken
+
+**Fixed integration crash for users without pypvs 0.2.7**
+- **Problem**: v2025.11.5 completely broken, all polling crashes with `AttributeError: 'PVSInverter' object has no attribute 'last_mppt_power_kw'`
+- **Root Cause**: MPPT code assumed pypvs 0.2.7 attributes exist, didn't check for backwards compatibility
+- **Impact**: Integration completely non-functional, no data polling, all entities unavailable
+
+**The Fix:**
+- Use `getattr()` with fallback for MPPT attributes (works with any pypvs version)
+- Falls back to AC values if MPPT attributes don't exist (pypvs < 0.2.7)
+- Home Assistant doesn't always auto-upgrade pypvs immediately, need backwards compatibility
+
+**Files Modified:**
+- `pypvs_converter.py`: Lines 107-109 - Added getattr() for MPPT fields with fallback
+
+**⚠️ v2025.11.5 Users:** Update to v2025.11.6 immediately, v2025.11.5 is broken!
+
+---
+
+### Bug Fix: Old Firmware False Authentication Errors
+
+**Fixed confusing "Authentication required" notifications for old firmware users**
+- **Problem**: Users with old firmware (BUILD < 61840) receiving "The new firmware requires authentication but login failed" notifications when PVS temporarily returns HTTP 403 errors (bridge failures, network glitches)
+- **Root Cause**: Legacy `SunPowerMonitor` code treating all 401/403 responses as authentication failures, even when no auth is configured (old firmware mode)
+- **Impact**: Users unable to use automation scripts to recover from transient PVS/bridge failures, forced to reconfigure integration
+
+**The Fix:**
+- Old firmware mode now treats 401/403 as generic connection failures (not auth errors)
+- Error message clarified: "PVS connection failed: HTTP 403 (old firmware should not require authentication)"
+- Allows `consecutive_failures` counter to increment normally for automation-based recovery
+- No more confusing "check PVS serial number" prompts for old firmware users
+
+**Why This Happens:**
+Old firmware doesn't require authentication, so HTTP 403 errors indicate:
+- Raspberry Pi bridge offline/glitching
+- Network connectivity issues
+- PVS hardware temporarily unresponsive
+- NOT an authentication problem
+
+**Files Modified:**
+- `sunpower.py`: Lines 143-144, 176-179 - Added old firmware detection and proper error handling for 401/403
+
+**Issues Fixed:**
+- Issue #35 - False authentication errors on old firmware with transient 403 responses
+
+---
+
 ## [v2025.11.5] - 2025-11-14
 
 ### Bug Fix: Battery Control Select Entities Not Created (New Firmware)

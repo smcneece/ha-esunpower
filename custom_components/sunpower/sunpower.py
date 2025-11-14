@@ -140,6 +140,8 @@ class SunPowerMonitor:
                     return simplejson.loads(text)
                 elif response.status in [401, 403]:
                     # Authentication required (new firmware) - try session-based auth
+                    # BUT: Old firmware shouldn't return 401/403 (no auth). If it does,
+                    # treat as connection error (PVS glitch, bridge failure) not auth error.
                     if self._auth_header:
                         # Authenticate session to get cookie
                         if await self._authenticate_session():
@@ -171,7 +173,10 @@ class SunPowerMonitor:
                         else:
                             raise ConnectionException("Initial authentication failed - check PVS serial number")
                     else:
-                        raise ConnectionException("Authentication required but no PVS serial provided")
+                        # No auth credentials configured (old firmware mode)
+                        # Old firmware shouldn't need auth, so 401/403 = connection problem (PVS offline, bridge failure)
+                        _LOGGER.warning("Received HTTP %d but no auth configured (old firmware mode) - treating as connection failure", response.status)
+                        raise ConnectionException(f"PVS connection failed: HTTP {response.status} (old firmware should not require authentication)")
                 else:
                     # Other HTTP errors (500, 404, etc.) - don't try authentication
                     response_text = await response.text()

@@ -103,9 +103,10 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "freq_hz": str(inverter.last_report_frequency_hz),
                     "t_htsnk_degc": str(inverter.last_report_temperature_c),
                     # MPPT data - DC measurements from solar panel (pypvs v0.2.7+)
-                    "p_mppt1_kw": str(inverter.last_mppt_power_kw) if inverter.last_mppt_power_kw is not None else str(inverter.last_report_kw),
-                    "v_mppt1_v": str(inverter.last_mppt_voltage_v) if inverter.last_mppt_voltage_v is not None else str(inverter.last_report_voltage_v),
-                    "i_mppt1_a": str(inverter.last_mppt_current_a) if inverter.last_mppt_current_a is not None else str(inverter.last_report_current_a),
+                    # Use getattr with fallback for older pypvs versions
+                    "p_mppt1_kw": str(getattr(inverter, 'last_mppt_power_kw', None) or inverter.last_report_kw),
+                    "v_mppt1_v": str(getattr(inverter, 'last_mppt_voltage_v', None) or inverter.last_report_voltage_v),
+                    "i_mppt1_a": str(getattr(inverter, 'last_mppt_current_a', None) or inverter.last_report_current_a),
                     "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(inv_device)
