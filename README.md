@@ -1,4 +1,4 @@
-# Enhanced SunPower - The most feature-rich and best supported Home Assistant integration for your SunPower - SunStrong PVS
+# Enhanced SunPower: The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
 
 ## ⚠️ IMPORTANT: v2025.11.4 Release Notice
 
@@ -10,16 +10,18 @@
 
 ---
 
-## PLEASE TAKE A FEW MINUTES TO READ - FIRMWARE COMPATIBILITY
+## PLEASE TAKE A FEW MINUTES TO READ: FIRMWARE COMPATIBILITY
 
-**The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions** - Automatically detects and adapts to your system:
+**The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions.** Automatically detects and adapts to your system:
 - **PVS5 & PVS6 Hardware**: Full support for both hardware generations
 - **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
 - **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
-### Battery systems are working! (Tested on new firmware)- If you're on new firmware and have a battery system you should be able to use this integraiton now.
+### Battery systems are working! (Tested on new firmware)
+
+If you're on new firmware and have a battery system you should be able to use this integration now.
 
 ---
 
@@ -46,8 +48,8 @@
 ## What Makes This Enhanced?
 
 **Core Improvements:**
-- **Battery Control (NEW - Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant - enable TOU optimization, emergency backup, or automated battery management via HA automations
-- **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage configurable notification thresholds
+- **Battery Control (NEW, Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
+- **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage, configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI
@@ -56,7 +58,7 @@
 
 **Technical Enhancements:**
 - **Multi-Channel Notifications**: 6 separate notification streams
-- **Comprehensive Battery Monitoring**: 10 dedicated ESS/battery sensors (SOC, SOH, power, temps, voltages, charge/discharge limits) - more data than original or SunStrong forks
+- **Comprehensive Battery Monitoring**: 10 dedicated ESS/battery sensors (SOC, SOH, power, temps, voltages, charge/discharge limits), more data than original or SunStrong forks
 - **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns
 - **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
 
@@ -78,16 +80,16 @@
 **IMPORTANT - New Firmware Users (BUILD 61840+):**
 
 If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect directly to your PVS WAN port:
-- New firmware requires HTTPS (port 443) for authentication - bridges don't support this
+- New firmware requires HTTPS (port 443) for authentication; bridges don't support this
 - Use PVS WAN port IP (check your router's DHCP leases for "PVS" or "SunPower" device)
-- LAN port (172.27.153.1) still has DHCP server - requires VLAN isolation if used
-- Bridges were only needed for old firmware - new firmware has built-in authentication
+- LAN port (172.27.153.1) still has DHCP server; requires VLAN isolation if used
+- Bridges were only needed for old firmware; new firmware has built-in authentication
 
 ---
 
 ### Install via HACS
 
-**Don't have HACS yet?** [Install HACS first](https://www.hacs.xyz/docs/use/) - it's the easiest way to manage custom integrations.
+**Don't have HACS yet?** [Install HACS first](https://www.hacs.xyz/docs/use/); it's the easiest way to manage custom integrations.
 
 1. **Add Custom Repository:**
 
@@ -155,7 +157,7 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 
 ### 🔒 PVS Authentication (Automatic!)
 
-**✨ Fully Automated** - No manual serial number entry required!
+**✨ Fully Automated:** No manual serial number entry required!
 
 **How Auto-Detection Works:**
 1. Integration queries PVS for firmware BUILD number and full serial number
@@ -172,7 +174,7 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 
 **Manual Override (if needed):**
 If auto-detection fails, you can manually enter the last 5 characters of your PVS serial:
-- **Physical Device**: Remove PVS cover - serial on device label
+- **Physical Device**: Remove PVS cover, serial on device label
 - **SunPower/SunStrong App**: Profile → System Info → Serial Number
 - **Format**: UPPERCASE letters/numbers only (e.g., "W3193" not "w3193")
 
@@ -193,7 +195,7 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - **Home automation**: Reliable data for automations and energy tracking
 
 **Configuration:**
-- **Standard setup**: 300 seconds (5 minutes) - recommended default balancing data freshness with hardware protection
+- **Standard setup**: 300 seconds (5 minutes), recommended default balancing data freshness with hardware protection
 - **Faster updates (new firmware)**: 10-60 seconds for frequent data updates
 - **Conservative setup**: 600-3600 seconds for minimal PVS load
 - **Battery systems**: 20-second minimum (per SunStrong guidance for less aggressive polling)
@@ -205,14 +207,14 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - **Current default**: 300 seconds maintained for proven stability
 
 **Benefits:**
-- Consistent behavior - no complex day/night mode switching
-- Simpler troubleshooting - predictable polling schedule
-- Better battery support - continuous monitoring with appropriate intervals
-- Hardware protection - built-in minimums prevent system overload
-- Future-ready - prepared for varserver's faster capabilities
+- Consistent behavior: no complex day/night mode switching
+- Simpler troubleshooting: predictable polling schedule
+- Better battery support: continuous monitoring with appropriate intervals
+- Hardware protection: built-in minimums prevent system overload
+- Future-ready: prepared for varserver's faster capabilities
 
 **Performance Considerations:**
-- **Faster polling (10-60s)**: Significantly increases Home Assistant database size - 10s polling creates 30x more data than 300s polling
+- **Faster polling (10-60s)**: Significantly increases Home Assistant database size; 10s polling creates 30x more data than 300s polling
 - **Database growth**: With ~50 solar entities, 10s polling generates ~180,000 database entries per hour vs 600 entries with 300s polling
 - **Hardware impact**: Larger databases slow performance on Raspberry Pi systems, affect backup times, and increase storage requirements
 - **Standard polling (300s)**: Recommended default balances data freshness with manageable database size
@@ -353,8 +355,8 @@ notify:
 **Entity Naming:** The integration shows proper inverter identification (e.g., "Inverter E001221370442207 Lifetime Power") for easy energy dashboard setup.
 
 **Understanding Your Meters:**
-- **P Meter (Production)**: Tracks solar energy exported to grid - one direction only
-- **C Meter (Consumption, CT clamps)**: Tracks bidirectional grid flow - import FROM grid AND export TO grid
+- **P Meter (Production)**: Tracks solar energy exported to grid, one direction only
+- **C Meter (Consumption, CT clamps)**: Tracks bidirectional grid flow (import FROM grid AND export TO grid)
 
 **Setting Up Solar Production:**
 
@@ -381,9 +383,9 @@ notify:
 **Why the C meter?** Only the C meter (consumption meter with CT clamps) provides the bidirectional sensors needed for grid import/export tracking. The P meter only tracks solar production going one direction to the grid.
 
 **⚠️ TROUBLESHOOTING: Grid sensors not available?**
-- **Missing consumption meter entirely**: CT clamps may not be installed OR not provisioned in PVS settings - contact installer
+- **Missing consumption meter entirely**: CT clamps may not be installed OR not provisioned in PVS settings; contact installer
 - **CT clamps present but not working**: Installer may need to provision/enable them in PVS configuration
-- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export - see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
+- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export; see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
 - **Alternative**: Use utility smart meter integration for most accurate grid tracking
 
 ![Consumption Setup](images/consumption.png)
@@ -423,8 +425,8 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 
 **[SEM-Meter (Smart Home Energy Meter)](https://www.amazon.com/Energy-Monitor-Circuit-Sensors-Real-Time/dp/B0D6VZQBPF?th=1)** *(Developer Tested)*
 - **Whole house**: ~$100 for main monitoring
-- **Circuit-level**: ~$129 for 16 individual circuits & mains. 
-- **100% Local Operation** - No cloud dependency required
+- **Circuit-level**: ~$129 for 16 individual circuits & mains.
+- **100% Local Operation**: No cloud dependency required
 - **Direct HA integration** via MQTT
 - **Real-time updates** (1-second intervals)
 - **Professional installation** recommended for CT clamps
@@ -432,19 +434,19 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 *This monitor is used and recommended by the integration developer for production reliability.*
 
 **Enhanced SunPower Role**
-- **Individual inverter diagnostics** - Per-panel performance monitoring
-- **PVS system health** - Firmware tracking, error detection, communication monitoring
-- **Equipment maintenance** - Temperature monitoring, MPPT analysis, inverter health tracking
-- **Solar-specific metrics** - Frequency analysis, power factor, voltage regulation
-- **System reliability** - Integration performance and diagnostic monitoring
-- **Network troubleshooting** - Connection monitoring and diagnostic capabilities
-- **Simplified polling** - Consistent 24/7 monitoring
+- **Individual inverter diagnostics**: Per-panel performance monitoring
+- **PVS system health**: Firmware tracking, error detection, communication monitoring
+- **Equipment maintenance**: Temperature monitoring, MPPT analysis, inverter health tracking
+- **Solar-specific metrics**: Frequency analysis, power factor, voltage regulation
+- **System reliability**: Integration performance and diagnostic monitoring
+- **Network troubleshooting**: Connection monitoring and diagnostic capabilities
+- **Simplified polling**: Consistent 24/7 monitoring
 
 **Why Separate Monitoring Systems?**
 
 **Energy Monitor Strengths:**
 - Real-time data (1-second updates)
-- Continuous reliability (purpose-built for 24/7 operation)  
+- Continuous reliability (purpose-built for 24/7 operation)
 - Energy Dashboard optimized (designed for utility-scale accuracy)
 - Whole-home coverage (beyond just solar)
 
@@ -490,9 +492,9 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 ## Troubleshooting
 
 **Quick Fixes:**
-- **PVS Not Responding**: Check network connectivity, verify IP address (WAN port recommended for new firmware)
+- **PVS Not Responding**: Check network connectivity; verify IP address (WAN port recommended for new firmware)
 - **All Entities Unavailable**: Force browser refresh (Ctrl+F5 / Cmd+Shift+R) to clear cached files
-- **Diagnostic Sensors Not Working**: Wait for a few polling cycles, check "Enhanced SunPower Diagnostics" device
+- **Diagnostic Sensors Not Working**: Wait for a few polling cycles; check "Enhanced SunPower Diagnostics" device
 - **Mobile Notifications Not Working**: Verify Home Assistant mobile app installed and mobile service configured
 
 **For detailed troubleshooting**: See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
