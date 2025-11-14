@@ -905,9 +905,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.battery_detected_once = True
 
             # Battery processing (if detected from cache OR fresh data)
-            if has_battery:
+            # Only poll separate ESS endpoint for old firmware (legacy dl_cgi)
+            # New firmware (pypvs) already includes ESS data in main response
+            if has_battery and sunpower_monitor:
                 try:
-                    _LOGGER.debug("Polling ESS endpoint for battery data")
+                    _LOGGER.debug("Polling ESS endpoint for battery data (legacy dl_cgi)")
                     old_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
                     ess_data = await sunpower_monitor.energy_storage_system_status_async()
 
@@ -930,6 +932,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 except Exception as convert_error:
                     _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
                     # Don't re-raise - continue with PVS data
+            elif has_battery and not sunpower_monitor:
+                _LOGGER.debug("Battery detected with new firmware (pypvs) - ESS data already included in main response")
 
                 # Poll battery configuration for select entity current states
                 # Only works with new firmware (pypvs)

@@ -120,15 +120,7 @@ If you have a SunVault battery system:
 
 **Reference:** [HA Community: Change Energy Dashboard Values](https://community.home-assistant.io/t/change-energy-dashboard-values/464683)
 
-## Rollback (If Needed)
 
-If you need to rollback to krbaker:
-
-1. Remove Enhanced SunPower integration
-2. Restart Home Assistant
-3. Restore from backup taken in Step 1
-
-**Note:** User testing showed rollback may not work reliably. **Backup first** and be prepared to stay on Enhanced SunPower or restore full system backup.
 
 ## Need Help?
 

@@ -3,6 +3,49 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.5] - 2025-11-14
+
+### Bug Fix: Battery Control Select Entities Not Created (New Firmware)
+
+**Fixed battery control select entities not appearing for new firmware users with batteries**
+- **Problem**: Users with new firmware (BUILD >= 61840) and battery systems could not see `select.battery_control_mode` or `select.battery_reserve_percentage` entities
+- **Root Cause**: Integration attempting to poll legacy ESS endpoint even for new firmware, causing AttributeError crash before select entities could be created
+- **Impact**: Battery control feature completely non-functional for new firmware users
+
+**The Fix:**
+- Skip legacy ESS polling for new firmware (pypvs already includes ESS data in main response)
+- Only call `sunpower_monitor.energy_storage_system_status_async()` when using old firmware
+- Added debug logging to clarify when pypvs battery data is being used
+
+**Files Modified:**
+- `__init__.py`: Lines 910, 935-936 - Added check for `sunpower_monitor` before legacy ESS polling
+
+**Issues Fixed:**
+- Discussion #28 - Battery control entities not appearing for deltaxiii
+
+---
+
+### Enhancement: MPPT Data Now Uses DC Values
+
+**Updated MPPT sensors to show actual DC voltage/current/power from solar panels**
+- **Previous Behavior**: MPPT sensors showed AC values (~240V) as fallback when pypvs didn't provide DC data
+- **New Behavior**: Uses actual DC MPPT data from pypvs v0.2.7+ (typically 30-60V DC from panels)
+- **Requires**: pypvs >= 0.2.7 (automatically installed/updated by Home Assistant)
+
+**MPPT Fields Now Accurate:**
+- `v_mppt1_v`: DC voltage from panel (e.g., 57V instead of 240V AC)
+- `i_mppt1_a`: DC current from panel
+- `p_mppt1_kw`: DC power from panel
+
+**Files Modified:**
+- `pypvs_converter.py`: Lines 106-108 - Updated to use `last_mppt_voltage_v`, `last_mppt_current_a`, `last_mppt_power_kw` with AC fallback
+- `manifest.json`: Line 16 - Updated pypvs requirement to >= 0.2.7
+
+**Issues Fixed:**
+- Issue #14 - MPPT voltage showing AC values instead of DC
+
+---
+
 ## [v2025.11.4] - 2025-11-12
 
 ### Critical Bug Fix: krbaker Migration Statistics Issue
