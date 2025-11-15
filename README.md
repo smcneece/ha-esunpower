@@ -91,7 +91,11 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 
 **Don't have HACS yet?** [Install HACS first](https://www.hacs.xyz/docs/use/); it's the easiest way to manage custom integrations.
 
-1. **Add Custom Repository:**
+**⚠️ IMPORTANT: Use the install button below - do NOT manually add this repository to HACS custom repositories**
+
+HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. This integration uses the direct install method instead.
+
+1. **Click the install button:**
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=smcneece&repository=ha-esunpower&category=integration)
 

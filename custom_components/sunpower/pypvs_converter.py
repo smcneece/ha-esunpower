@@ -187,9 +187,9 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "HWVER": ess.model,
                     # pypvs PVSESS fields mapped to dl_cgi-style field names
                     # pypvs provides SOC/SOH as decimals (0-1), convert to percentages (0-100)
-                    "soc_val": str(ess.soc_val * 100),
-                    "customer_soc_val": str(ess.customer_soc_val * 100),
-                    "soh_val": str(ess.soh_val * 100),
+                    "soc_val": str(ess.soc_val),  # pypvs already returns as percentage (0-100)
+                    "customer_soc_val": str(ess.customer_soc_val),  # pypvs already returns as percentage
+                    "soh_val": str(ess.soh_val),  # pypvs already returns as percentage
                     "op_mode": ess.op_mode,
                     "power_3ph_kw": str(ess.power_3ph_kw),
                     "neg_lte_kwh": str(ess.neg_lte_kwh),

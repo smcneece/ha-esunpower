@@ -3,6 +3,47 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.10] - 2025-11-15
+
+### Bug Fix: Battery SOC Display (100x Too High)
+
+**Fixed battery state of charge showing 3100% instead of 31%**
+- **Problem**: Battery SOC, Customer SOC, and SOH displaying 100x too high (3100% instead of 31%)
+- **Root Cause**: pypvs v0.2.7 changed to return percentages already multiplied by 100, but our converter multiplied by 100 again
+- **Impact**: Made battery charge levels misleading; displayed "3100%" when actual charge was 31%
+
+**The Fix:**
+- Removed `* 100` multiplication in pypvs_converter.py for SOC/SOH fields
+- pypvs now provides percentages directly (0-100 range), no conversion needed
+- Battery percentages now display correctly
+
+**Files Modified:**
+- `pypvs_converter.py`: Lines 190-192 - Removed percentage multiplication for soc_val, customer_soc_val, soh_val
+
+**User Impact:** Battery control users with pypvs 0.2.7 - battery charge percentages now show correctly
+
+---
+
+## [v2025.11.9] - 2025-11-14
+
+### CRITICAL Bug Fix: Deploy Script Breaking manifest.json
+
+**Fixed deploy script silently stripping pypvs version requirement**
+- **Problem**: Deploy script was using stale manifest data, causing `pypvs>=0.2.7` to revert to just `pypvs`
+- **Root Cause**: Script loaded old staging manifest for version calculation, then used that stale data when writing updated manifest (instead of reloading after copying from VM)
+- **Impact**: Users weren't getting pypvs 0.2.7 automatically, causing MPPT crashes and other issues. Affected all releases since pypvs requirement was added.
+
+**The Fix:**
+- Reload manifest.json after copying from VM to get current requirements
+- Ensures pypvs version requirement (and all other fields) are preserved
+
+**Files Modified:**
+- `deploy_to_github.py`: Lines 380-382 - Reload manifest after copying before updating version
+
+**⚠️ All Previous v2025.11.x Releases Affected:** If you installed any v2025.11.5-11.8 release, update to v2025.11.9 to get correct pypvs requirement!
+
+---
+
 ## [v2025.11.8] - 2025-11-14
 
 ### CRITICAL Bug Fix: pvs_object Not Stored in hass.data

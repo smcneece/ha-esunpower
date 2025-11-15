@@ -94,33 +94,6 @@ If you have a SunVault battery system:
 
 **Note:** Some calculated sensors (power input/output based on amperage) may be unavailable due to pypvs library limitations.
 
-## Known Migration Issues
-
-### Issue: Negative Lifetime Energy Values
-
-**Symptoms:**
-- Energy Dashboard shows negative spike after migration
-- Production meter shows large negative value
-
-**Cause:**
-- Home Assistant statistics database adjustment during migration gap
-- More common if integration was offline for extended period before migrating
-
-**Solution:**
-1. **Clean up statistics manually:**
-   - **Developer Tools** → **Statistics**
-   - Find affected entity (usually production power meter)
-   - Delete negative adjustment entries
-   - HA will recalculate Energy Dashboard graphs
-
-2. **Switch to inverter entities (recommended):**
-   - More resilient during migrations
-   - Better troubleshooting visibility
-   - See [Energy Dashboard Setup](README.md#energy-dashboard-integration)
-
-**Reference:** [HA Community: Change Energy Dashboard Values](https://community.home-assistant.io/t/change-energy-dashboard-values/464683)
-
-
 
 ## Need Help?
 
