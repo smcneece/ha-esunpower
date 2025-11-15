@@ -21,6 +21,10 @@ body:
       label: Integration Version
       description: What version are you running?
       options:
+        - v2025.11.9 (latest)
+        - v2025.10.7 or older
+        - Not sure
+      options:
         - v2025.11.8 (latest)
         - v2025.10.7 or older
         - Not sure

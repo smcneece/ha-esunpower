@@ -15,10 +15,9 @@
     "pypvs"
   ],
   "requirements": [
-    "pypvs",
+    "pypvs>=0.2.7",
     "simplejson"
   ],
   "ssdp": [],
-  "version": "2025.11.8",
-  "zeroconf": []
+  "version": "2025.11.9"
 }
