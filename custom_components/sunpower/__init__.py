@@ -1060,6 +1060,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         SUNPOWER_OBJECT: sunpower_monitor,
         SUNPOWER_COORDINATOR: coordinator,
+        "pvs_object": pvs_object,  # Store pypvs object for battery control (select platform)
         "_cache": cache,  # Make cache accessible for diagnostics
     }
 

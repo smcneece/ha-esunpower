@@ -3,6 +3,24 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.11.8] - 2025-11-14
+
+### CRITICAL Bug Fix: pvs_object Not Stored in hass.data
+
+**Fixed battery control select entities not being created (final piece)**
+- **Problem**: Even with battery detected and new firmware, select entities never created - log shows "Battery control requires new firmware (pypvs), skipping selects"
+- **Root Cause**: `pvs_object` created during setup but never stored in `hass.data`, so `select.py` couldn't access it
+- **Impact**: Battery control completely non-functional even after v2025.11.7 battery detection fix
+
+**The Fix:**
+- Store `pvs_object` in `hass.data[DOMAIN][entry.entry_id]` alongside coordinator
+- `select.py` can now successfully retrieve `pvs_object` and create select entities
+
+**Files Modified:**
+- `__init__.py`: Line 1063 - Added `"pvs_object": pvs_object` to hass.data storage
+
+---
+
 ## [v2025.11.7] - 2025-11-14
 
 ### CRITICAL Bug Fix: Battery Detection Completely Broken
