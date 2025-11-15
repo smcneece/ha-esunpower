@@ -41,11 +41,10 @@ async def async_setup_entry(
     coordinator = sunpower_state["coordinator"]
 
     # Check if system has battery (ESS device)
-    # Match same detection logic as __init__.py battery polling (line 898)
+    # Check coordinator.data keys for battery device types
     has_battery = False
-    if coordinator.data and "devices" in coordinator.data:
-        for device in coordinator.data["devices"]:
-            device_type = device.get("DEVICE_TYPE", "")
+    if coordinator.data:
+        for device_type in coordinator.data.keys():
             if device_type in ("ESS", "Battery", "ESS BMS", "Energy Storage System", "SunVault"):
                 has_battery = True
                 _LOGGER.debug("Battery system detected: %s", device_type)

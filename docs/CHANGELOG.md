@@ -3,7 +3,24 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
-## [v2025.11.6] - 2025-11-14
+## [v2025.11.7] - 2025-11-14
+
+### CRITICAL Bug Fix: Battery Detection Completely Broken
+
+**Fixed battery control select entities never being created**
+- **Problem**: Battery control select entities (`select.battery_control_mode`, `select.battery_reserve_percentage`) never appeared, even with battery systems detected
+- **Root Cause**: `select.py` checking for non-existent `coordinator.data["devices"]` instead of checking top-level device type keys
+- **Impact**: Battery control feature completely non-functional since v2025.11.3
+
+**The Fix:**
+- Changed detection to check `coordinator.data.keys()` for battery device types
+- Now correctly detects "Energy Storage System", "ESS", "Battery", etc. in coordinator data structure
+- Matches how `sensor.py` and `binary_sensor.py` detect devices
+
+**Files Modified:**
+- `select.py`: Lines 46-51 - Fixed battery detection to check data structure keys
+
+---
 
 ### CRITICAL Bug Fix: MPPT Backwards Compatibility Broken
 
