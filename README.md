@@ -1,12 +1,12 @@
 # Enhanced SunPower: The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
 
-## ⚠️ IMPORTANT: v2025.11.4 Release Notice
+## ⚠️ IMPORTANT: Release Notice
 
-**This release contains untested battery control features (from v2025.11.3) but was released publicly to fix critical migration bugs (Issues #33 & #34).**
+**This release contains new battery control features (from v2025.11.3) but was released publicly to fix critical migration bugs (Issues #33 & #34).**
 
 - **Migration fix implemented**: State class compatibility with krbaker restored (awaiting user validation)
-- ⚠️ **Battery control untested**: Select entities for battery mode/reserve (requires real-world testing)
-- **Recommendation**: Non-battery users can update safely. Battery users should wait for beta testing completion or help test in [Discussion #28](https://github.com/smcneece/ha-esunpower/discussions/28).
+- ⚠️ **Battery control**: Select entities for battery mode/reserve - in early testing but working great so far!  
+- **Recommendation**: Non-battery users can update safely. Battery users please report any issues with battery controls, and monitor your system closely.
 
 ---
 
@@ -93,7 +93,7 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 
 **⚠️ IMPORTANT: Use the install button below - do NOT manually add this repository to HACS custom repositories**
 
-HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. This integration uses the direct install method instead.
+HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. This integration uses the direct install method instead. Once the integration is installed you will get notified of updates just like any other HACS install. 
 
 1. **Click the install button:**
 
@@ -545,7 +545,9 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 
 Special thanks to community contributors who have helped improve this integration:
 
-- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)
+- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)  
+**Max Roberts** - For helping get battery functionality working  
+**Ian Jones** - For helping beta test Battery control features.  
 
 ---
 
