@@ -93,7 +93,7 @@ If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect d
 
 **⚠️ IMPORTANT: Use the install button below - do NOT manually add this repository to HACS custom repositories**
 
-HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. This integration uses the direct install method instead. Once the integration is installed you will get notified of updates just like any other HACS install. 
+HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. (Well you can manually install, but it's tricky, just use the buttons below) This integration uses the direct install method instead. Also once the integration is installed you will get notified of updates just like any other HACS install. 
 
 1. **Click the install button:**
 
@@ -546,8 +546,8 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 Special thanks to community contributors who have helped improve this integration:
 
 - **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)  
-**Max Roberts** - For helping get battery functionality working  
-**Ian Jones** - For helping beta test Battery control features.  
+**Max Roberts** - For helping get basic battery functionality working  
+**Ian Jones** - For helping beta test Battery control features  
 
 ---
 
