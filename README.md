@@ -4,7 +4,7 @@
 
 **This release contains new battery control features (from v2025.11.3) but was released publicly to fix critical migration bugs (Issues #33 & #34).**
 
-- **Migration fix implemented**: State class compatibility with krbaker restored (awaiting user validation)
+- **Migration fix implemented**: State class compatibility with krbaker restored
 - ⚠️ **Battery control**: Select entities for battery mode/reserve - in early testing but working great so far!  
 - **Recommendation**: Non-battery users can update safely. Battery users please report any issues with battery controls, and monitor your system closely.
 
@@ -547,7 +547,7 @@ Special thanks to community contributors who have helped improve this integratio
 
 - **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)  
 **Max Roberts** - For helping get basic battery functionality working  
-**Ian Jones** - For helping beta test Battery control features  
+**Ian Jones** - For helping beta test battery control features  
 
 ---
 
