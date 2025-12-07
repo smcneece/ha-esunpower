@@ -3,6 +3,88 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.12.1] - 2025-12-07
+
+### Bug Fix: Virtual Production Meter "KWh To Grid" Sensor
+
+**Removed misleading "KWh To Grid" sensor from virtual production meters**
+- **Problem**: Virtual production meters incorrectly created a "KWh To Grid" sensor that duplicated the "Lifetime Power" value
+- **Root Cause**: Virtual meters don't have CT clamps and can't measure grid flow, but were creating `neg_ltea_3phsum_kwh` field anyway
+- **Impact**: Users saw a misleading sensor showing the same value as production, not actual grid export
+
+**The Fix:**
+- Removed `neg_ltea_3phsum_kwh` field from virtual production meter creation
+- Virtual meters now only show production-related sensors (Lifetime Power, Power, Frequency, etc.)
+- Matches krbaker's original behavior
+
+**Files Modified:**
+- `data_processor.py`: Line 138 - Removed neg_ltea_3phsum_kwh from virtual meter
+
+**User Impact:**
+- Virtual production meter no longer shows misleading "KWh To Grid" sensor
+- **BREAKING CHANGE**: Existing "KWh To Grid" entity on virtual meters will become unavailable - users should delete this orphaned entity from Settings → Devices & Services → Enhanced SunPower → Virtual Production Meter
+- Only real consumption meters (with CT clamps) should have "KWh To Grid" sensors
+
+---
+
+### Bug Fix: Old Firmware 403 Error Messaging
+
+**Improved error messages for old firmware 403 errors**
+- **Problem**: Old firmware (BUILD < 61840) users experiencing 403 errors received confusing error messages about authentication
+- **Root Cause**: Old firmware doesn't use authentication, so 403 errors indicate network/hardware issues, not auth problems
+- **Impact**: Users were confused about whether they needed to configure authentication or restart their hardware
+
+**The Fix:**
+- Old firmware 403 errors now show clear network/hardware issue messages
+- Error messages suggest specific recovery actions: "Try restarting your Raspberry Pi (if using proxy) and/or PVS"
+- Eliminates false authentication error messages for old firmware
+- New firmware (BUILD >= 61840) continues to handle 403 as potential auth errors with re-auth attempts
+
+**Files Modified:**
+- `__init__.py`: Lines 871-891 - Improved error messaging for old firmware 403 errors
+
+**User Impact:**
+- Old firmware users get actionable error messages with specific recovery steps
+- No more confusion about authentication requirements on old firmware
+- New firmware users unaffected - re-auth logic continues working as designed
+
+**Issues Fixed:**
+- Issue #35 - Old firmware 403 errors showing confusing messages
+
+---
+
+### Diagnostic Enhancement: pypvs Return Value Logging
+
+**Added diagnostic logging to track pypvs library data returns (Issue #39)**
+- **Problem**: Some users experiencing stuck inverter values (showing 0W or stale data from previous days)
+- **Root Cause**: Unknown - investigating if pypvs library is returning empty inverter data
+- **Diagnostic Tool**: New logging shows exactly what pypvs returns each poll cycle
+
+**The Enhancement:**
+- Logs inverter/meter/gateway counts from pypvs after each poll
+- INFO level: Normal operation shows device counts
+- WARNING level: Alerts when 0 inverters returned during daytime (sun above horizon)
+- Helps diagnose whether stuck inverter issue is pypvs library bug or integration issue
+
+**Files Modified:**
+- `__init__.py`: Lines 783-795 - Added pypvs return value logging after polling
+
+**User Impact:**
+- Users experiencing stuck inverter issues can provide logs showing pypvs return counts
+- Helps differentiate between pypvs library failures vs integration cache issues
+- No functionality changes - purely diagnostic logging
+
+**Log Examples:**
+```
+INFO [custom_components.sunpower] pypvs returned 24 inverters, 2 meters, gateway=present
+WARNING [custom_components.sunpower] ⚠️ pypvs returned 0 inverters during daytime (sun elevation: 45.3°) - possible pypvs issue
+```
+
+**Issues Being Investigated:**
+- Issue #39 - Stuck inverter values requiring HA restart to clear
+
+---
+
 ## [v2025.11.10] - 2025-11-15
 
 ### Bug Fix: Battery SOC Display (100x Too High)

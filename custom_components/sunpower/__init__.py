@@ -173,7 +173,59 @@ class SunPowerDataCache:
         self.auth_refresh_interval = 600  # Re-auth every 10 minutes proactively (PVS sessions expire quickly)
 
 
-def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling_interval=None, polling_enabled=True):
+def _determine_diagnostic_serial(hass, entry):
+    """Determine diagnostic device serial based on PVS creation order.
+
+    First PVS: 'sunpower_diagnostics' (preserves existing single-PVS users)
+    Additional PVS: 'sunpower_diagnostics_{last5}' (multi-PVS support)
+
+    If anything fails, defaults to 'sunpower_diagnostics' (safe fallback)
+    """
+    try:
+        # Get all ACTIVE config entries sorted by creation time (filter out ignored/disabled)
+        all_entries = sorted(
+            [e for e in hass.config_entries.async_entries(DOMAIN) if e.source != "ignore" and e.disabled_by is None],
+            key=lambda e: e.created_at
+        )
+
+        # VERBOSE: Log all entries for debugging
+        _LOGGER.info("Multi-PVS Detection: Found %d total PVS integration(s)", len(all_entries))
+        for idx, e in enumerate(all_entries):
+            _LOGGER.info("  - PVS #%d: entry_id=%s, created_at=%s, host=%s",
+                        idx + 1, e.entry_id[:8], e.created_at, e.data.get('host', 'unknown'))
+
+        # Find our position
+        our_index = next((i for i, e in enumerate(all_entries) if e.entry_id == entry.entry_id), -1)
+        _LOGGER.info("Multi-PVS Detection: Current integration has index=%d (entry_id=%s)", our_index, entry.entry_id[:8])
+
+        # If we can't find ourselves, default to standard serial (safe)
+        if our_index == -1:
+            _LOGGER.warning("Multi-PVS: Could not determine PVS order - using standard diagnostic serial")
+            return "sunpower_diagnostics"
+
+        # First PVS gets standard serial
+        if our_index == 0:
+            _LOGGER.info("Multi-PVS: This is the first PVS integration - using standard diagnostic serial")
+            return "sunpower_diagnostics"
+
+        # Additional PVS gets unique serial
+        pvs_serial_last5 = entry.options.get("pvs_serial_last5") or entry.data.get("pvs_serial_last5")
+
+        if not pvs_serial_last5:
+            _LOGGER.error("Multi-PVS: pvs_serial_last5 missing from config for PVS #%d! Using entry_id fallback.", our_index + 1)
+            pvs_serial_last5 = entry.entry_id[:8]
+
+        unique_serial = f"sunpower_diagnostics_{pvs_serial_last5}"
+        _LOGGER.info("Multi-PVS: This is PVS #%d - using unique diagnostic serial: %s", our_index + 1, unique_serial)
+        return unique_serial
+
+    except Exception as e:
+        # SAFETY: If anything fails, use standard serial (protects single-PVS users)
+        _LOGGER.error("Multi-PVS detection failed: %s - defaulting to standard diagnostic serial", e, exc_info=True)
+        return "sunpower_diagnostics"
+
+
+def create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data=None, polling_interval=None, polling_enabled=True):
     """Create diagnostic device data for sensors"""
 
     # Initialize stats if not present
@@ -216,7 +268,7 @@ def create_diagnostic_device_data(cache, inverter_data, meter_data=None, polling
     polling_status = "Enabled" if polling_enabled else "Disabled"
 
     # Create diagnostic device
-    diagnostic_serial = "sunpower_diagnostics"
+    diagnostic_serial = _determine_diagnostic_serial(hass, entry)
     diagnostic_device = {
         "SERIAL": diagnostic_serial,
         "MODEL": "Enhanced SunPower Diagnostics",
@@ -607,7 +659,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 meter_data = data.get('Power Meter', {})
                 current_polling_interval = entry.options.get("polling_interval", entry.data.get("polling_interval", DEFAULT_POLLING_INTERVAL))
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
+                diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
 
                 # No notification here - switch already notified when toggled off
@@ -667,7 +719,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.diagnostic_stats['consecutive_failures'] = 0
 
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
+                diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
 
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age, current_polling_interval)
@@ -727,6 +779,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                 try:
                     pvs_data = await pvs_object.update()
+
+                    # Debug logging for Issue #39: Log what pypvs actually returns
+                    # This helps diagnose stuck inverter issues by showing if pypvs returns empty data
+                    if pvs_data and hasattr(pvs_data, 'inverters'):
+                        inverter_count = len(pvs_data.inverters) if pvs_data.inverters else 0
+                        _LOGGER.info("pypvs returned %d inverters, %d meters, gateway=%s",
+                                    inverter_count,
+                                    len(pvs_data.meters) if hasattr(pvs_data, 'meters') and pvs_data.meters else 0,
+                                    'present' if hasattr(pvs_data, 'gateway') and pvs_data.gateway else 'missing')
+                        if inverter_count == 0 and not is_nighttime:
+                            _LOGGER.warning("⚠️ pypvs returned 0 inverters during daytime (sun elevation: %.1f°) - possible pypvs issue",
+                                          sun_elevation if sun_elevation is not None else 0)
+                    else:
+                        _LOGGER.warning("pypvs returned data with no 'inverters' attribute - possible pypvs library issue")
                 finally:
                     if is_nighttime:
                         pypvs_inverter_logger.removeFilter(login_filter)
@@ -755,11 +821,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         except Exception as e:
             # Check if this is an authentication error and attempt automatic re-auth
             # Note: pypvs updaters may throw various exception types, not just PVSError
+            # IMPORTANT: Only new firmware (pypvs) uses authentication - old firmware never does
             error_str = str(e).lower()
-            is_auth_error = any(keyword in error_str for keyword in [
-                '401', '403', 'auth', 'unauthorized', 'forbidden',
-                'login to the pvs failed', 'login failed', 'authentication failed'
-            ])
+            is_auth_error = False
+
+            # Only check for auth errors if using pypvs (new firmware)
+            # Old firmware: ALL errors are poll failures, never auth issues
+            if pvs_object:
+                # New firmware - check for auth-related errors
+                is_auth_error = any(keyword in error_str for keyword in [
+                    '401', '403', 'auth', 'unauthorized', 'forbidden',
+                    'login to the pvs failed', 'login failed', 'authentication failed'
+                ])
+            else:
+                # Old firmware - log 403/auth errors as regular poll failures
+                if '403' in error_str or 'forbidden' in error_str:
+                    _LOGGER.warning("Old firmware error (PVS busy/temp issue, not auth): %s", e)
 
             if is_auth_error and pvs_object and auth_password:
                 _LOGGER.warning("⚠️ Authentication error detected during polling: %s", e)
@@ -807,11 +884,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     )
             else:
                 # Non-auth error or can't retry - just log and fail
-                if not auth_password:
-                    _LOGGER.error("pypvs polling error (no auth configured): %s", e)
+                if not pvs_object:
+                    # Old firmware error - never an auth issue
+                    _LOGGER.error("Old firmware polling error (network/PVS issue): %s", e)
+                    if '403' in error_str or 'forbidden' in error_str:
+                        _LOGGER.warning("⚠️ Old firmware 403 error - possible network/hardware issue")
+                        _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
+                elif not auth_password:
+                    _LOGGER.error("New firmware polling error (no auth configured): %s", e)
                     _LOGGER.error("This may be an authentication error but no PVS serial is configured")
                 else:
-                    _LOGGER.error("pypvs polling error (non-auth): %s", e)
+                    _LOGGER.error("New firmware polling error (non-auth): %s", e)
+
                 cache.diagnostic_stats['failed_polls'] += 1
                 cache.diagnostic_stats['consecutive_failures'] += 1
                 fresh_data = None
@@ -1000,7 +1084,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             try:
                 inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                 meter_data = data.get('Power Meter', {})
-                diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
+                diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
             except Exception as e:
                 _LOGGER.warning("Diagnostic device creation failed: %s", e)
@@ -1028,7 +1112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         inverter_data = data.get(INVERTER_DEVICE_TYPE, {})
                         meter_data = data.get('Power Meter', {})
                         pvs_data = data.get(PVS_DEVICE_TYPE, {})
-                        diag_serial, diag_device = create_diagnostic_device_data(cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
+                        diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     except Exception as e:
                         _LOGGER.warning("Diagnostic device creation failed for cached data: %s", e)
