@@ -3,6 +3,111 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.12.2] - 12-12-2025
+
+### Bug Fix: Stale Power Values at Night (Issue #41)
+
+**Fixed inverters showing non-zero power values when offline at night**
+- **Problem**: Cached inverters retained last production values (e.g., showing 1.7W at 11 PM when offline)
+- **Root Cause**: Cache restoration preserved all field values including stale power readings from sunset
+- **Impact**: Energy dashboards and graphs showed misleading "ghost production" during nighttime hours
+
+**The Fix:**
+- Added `_sanitize_cached_inverter()` function to zero out power-related fields when restoring from cache
+- Zeroed fields: power (kW), current (A), voltage (V), frequency (Hz), MPPT power/current/voltage
+- Preserved fields: lifetime production (cumulative, doesn't change), temperature, device info
+- Applied during nighttime cache restoration when inverters go offline
+
+**Files Modified:**
+- `__init__.py`: Lines 516-553 - Added `_sanitize_cached_inverter()` function
+- `__init__.py`: Lines 991-995 - Applied sanitization during cache restoration
+
+**User Impact:**
+- Inverter power sensors now correctly show 0W when panels offline at night
+- Eliminates confusing "ghost production" in energy dashboards and graphs
+- Cached inverter structure preserved (prevents entities from disappearing)
+- Temperature and lifetime production remain accurate
+
+**Issues Addressed:**
+- Issue #41 - Fixed stale power values showing in nighttime graphs
+
+---
+
+### Bug Fix: Timestamp Accuracy (DATATIME Field)
+
+**Fixed DATATIME timestamps to reflect actual PVS measurement time**
+- **Problem**: DATATIME field was stamped with when integration processed data (datetime.utcnow()), not when PVS measured it
+- **Root Cause**: pypvs provides actual measurement timestamp in `last_report_date`, but converter was ignoring it
+- **Impact**: Cache files showed misleading timestamps, making it hard to diagnose stale data issues (Issue #39)
+
+**The Fix:**
+- Convert pypvs `last_report_date` (Unix timestamp) to DATATIME format instead of using current time
+- Applies to: Inverters, Meters, ESS/Battery devices, Transfer Switches
+- PVS/Gateway continues using current time (no `last_report_date` available)
+
+**Files Modified:**
+- `pypvs_converter.py`: Lines 9, 111, 145, 210, 238 - Added timezone import and fixed DATATIME conversion
+
+**User Impact:**
+- DATATIME now shows when PVS hardware measured the data, not when integration converted it
+- Cache files accurately reflect measurement timestamps for diagnostics
+- Helps identify stale cached data during Issue #39 debugging
+
+**Issues Addressed:**
+- Issue #39 - Improved diagnostic capability by showing accurate measurement timestamps
+
+---
+
+### Enhancement: Last Reported Timestamp Sensor (NEW)
+
+**Added "Last Reported" sensor for each inverter showing when PVS last measured data**
+- **Purpose**: Match pvs-hass functionality and provide visibility into data staleness (Issue #39)
+- **Benefit**: Instantly see if inverter data is current or stale at a glance
+- **Display**: Shows as relative time ("3 hours ago") in HA UI, click to see actual timestamp
+
+**The Implementation:**
+- Added INVERTER_LAST_REPORTED sensor using SensorDeviceClass.TIMESTAMP
+- Reads from DATATIME field (now accurate thanks to timestamp fix above)
+- Converts DATATIME string format to datetime object for HA timestamp display
+- HA automatically displays as relative time with full date/time on click
+
+**Files Modified:**
+- `const.py`: Lines 604-612 - Added INVERTER_LAST_REPORTED sensor definition
+- `sensor.py`: Lines 363-378 - Added DATATIME to datetime conversion for TIMESTAMP sensors
+
+**User Impact:**
+- Each inverter now has "Last Reported" sensor showing measurement age
+- Easier to identify stale inverter data during Issue #39 debugging
+- Matches pvs-hass feature parity
+
+---
+
+### Enhancement: Increased Inverter Sensor Precision (3 Decimals)
+
+**Added 3 decimal precision to inverter sensors matching pvs-hass**
+- **Purpose**: Show precise values and match pvs-hass for direct comparison (requested by user in Issue #39)
+- **Benefit**: Better visibility during low light conditions, precise daily production tracking
+- **Matches**: pvs-hass where they explicitly set 3 decimal precision
+
+**The Fix:**
+- Added `suggested_display_precision: 3` to inverter energy/current sensors:
+  - Lifetime Production: 3 decimals (2,329.650 kWh)
+  - Production Current: 3 decimals (0.005 A)
+  - MPPT Current: 3 decimals (0.035 A)
+
+**Files Modified:**
+- `const.py`: Lines 530, 556, 584 - Added suggested_display_precision: 3 to INVERTER_NET_KWH, INVERTER_AMPS, and INVERTER_MPPT_A
+- `sensor.py`: Line 293 - Added `suggested_display_precision` parameter to SunPowerSensor.__init__()
+- `sensor.py`: Lines 327-330 - Added `suggested_display_precision` property to expose precision to Home Assistant
+- `sensor.py`: Line 191 - Pass `suggested_display_precision` from sensor config during entity creation
+
+**User Impact:**
+- Lifetime production and current sensors now show 3 decimal places
+- Matches pvs-hass display for easier comparison
+- No action required - display automatically updates after integration reload
+
+---
+
 ## [v2025.12.1] - 2025-12-07
 
 ### Bug Fix: Virtual Production Meter "KWh To Grid" Sensor

@@ -6,7 +6,7 @@ with existing data_processor.py logic.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +107,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "p_mppt1_kw": str(getattr(inverter, 'last_mppt_power_kw', None) or inverter.last_report_kw),
                     "v_mppt1_v": str(getattr(inverter, 'last_mppt_voltage_v', None) or inverter.last_report_voltage_v),
                     "i_mppt1_a": str(getattr(inverter, 'last_mppt_current_a', None) or inverter.last_report_current_a),
-                    "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+                    # Use actual PVS measurement timestamp (not conversion time)
+                    "DATATIME": datetime.fromtimestamp(inverter.last_report_date, tz=timezone.utc).strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(inv_device)
             _LOGGER.info("✅ Converted %d pypvs inverters to legacy format", len(pvs_data.inverters))
@@ -140,7 +141,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "q_3phsum_kvar": str(meter.q3phsum_kvar),
                     "s_3phsum_kva": str(meter.s3phsum_kva),
                     "tot_pf_rto": str(meter.tot_pf_ratio),
-                    "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+                    # Use actual PVS measurement timestamp (not conversion time)
+                    "DATATIME": datetime.fromtimestamp(meter.last_report_date, tz=timezone.utc).strftime("%Y,%m,%d,%H,%M,%S"),
                 }
 
                 # Production meters: Add combined current (i_a) if available
@@ -204,7 +206,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "min_t_batt_cell_degc": str(ess.min_t_batt_cell_degc),
                     "max_v_batt_cell_v": str(ess.max_v_batt_cell_v),
                     "min_v_batt_cell_v": str(ess.min_v_batt_cell_v),
-                    "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+                    # Use actual PVS measurement timestamp (not conversion time)
+                    "DATATIME": datetime.fromtimestamp(ess.last_report_date, tz=timezone.utc).strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(ess_device)
             _LOGGER.debug("Converted %d pypvs ESS devices", len(pvs_data.ess))
@@ -231,7 +234,8 @@ def convert_pypvs_to_legacy(pvs_data, pvs_serial=None, flashwear_percent=0):
                     "v1n_v": str(ts.v1n_v),
                     "v2n_v": str(ts.v2n_v),
                     "v_supply_v": str(ts.v_supply_v),
-                    "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+                    # Use actual PVS measurement timestamp (not conversion time)
+                    "DATATIME": datetime.fromtimestamp(ts.last_report_date, tz=timezone.utc).strftime("%Y,%m,%d,%H,%M,%S"),
                 }
                 devices.append(ts_device)
             _LOGGER.debug("Converted %d pypvs transfer switches", len(pvs_data.transfer_switches))

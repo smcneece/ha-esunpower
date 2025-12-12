@@ -188,6 +188,7 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
                     device_class=sensor["device"],
                     state_class=sensor["state"],
                     entity_category=sensor.get("entity_category", None),
+                    suggested_display_precision=sensor.get("suggested_display_precision", None),
                 )
                 
                 # HYBRID: Field exists + has value (original compatibility + our clean interface)
@@ -290,6 +291,7 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
         device_class,
         state_class,
         entity_category,
+        suggested_display_precision=None,
     ):
         """Initialize the sensor."""
         super().__init__(coordinator, my_info, parent_info)
@@ -302,6 +304,7 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
         self._my_device_class = device_class
         self._my_state_class = state_class
         self._entity_category = entity_category
+        self._suggested_display_precision = suggested_display_precision
 
     @property
     def native_unit_of_measurement(self):
@@ -321,6 +324,11 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
     def state_class(self):
         """Return state class."""
         return self._my_state_class
+
+    @property
+    def suggested_display_precision(self):
+        """Return suggested display precision."""
+        return self._suggested_display_precision
 
     @property
     def icon(self):
@@ -359,7 +367,24 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
                 return formatted_value  # Already formatted as timestamp in __init__.py
             except (KeyError, TypeError, AttributeError):
                 return "Never"
-        
+
+        # Special handling for TIMESTAMP device class - convert DATATIME string to datetime
+        if self._my_device_class == SensorDeviceClass.TIMESTAMP and self._field == "DATATIME":
+            try:
+                from datetime import datetime, timezone
+                datatime_str = self.coordinator.data[self._device_type][self.base_unique_id].get(self._field)
+                if datatime_str:
+                    # Parse DATATIME format: "YYYY,MM,DD,HH,MM,SS"
+                    parts = datatime_str.split(',')
+                    if len(parts) == 6:
+                        dt = datetime(int(parts[0]), int(parts[1]), int(parts[2]),
+                                     int(parts[3]), int(parts[4]), int(parts[5]),
+                                     tzinfo=timezone.utc)
+                        return dt
+                return None
+            except (ValueError, KeyError, TypeError, AttributeError, IndexError):
+                return None
+
         if self._my_device_class == SensorDeviceClass.POWER_FACTOR:
             try:
                 value = float(

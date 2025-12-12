@@ -513,6 +513,46 @@ async def _handle_polling_error(hass, entry, cache, host_ip, error):
     notify_polling_failed(hass, entry, cache, polling_url, error)
 
 
+def _sanitize_cached_inverter(inverter_data: dict) -> dict:
+    """Sanitize cached inverter data for nighttime display.
+
+    When inverters go offline at night, we restore them from cache to preserve
+    entity structure. However, we must zero out power-related fields to avoid
+    showing stale production values.
+
+    Args:
+        inverter_data: Raw inverter device dict from cache
+
+    Returns:
+        Sanitized inverter dict with power values zeroed
+    """
+    # Create a copy to avoid modifying original cache
+    sanitized = dict(inverter_data)
+
+    # Zero out all power-related fields
+    power_fields = {
+        'p_3phsum_kw': '0.0',      # AC Power output (kW)
+        'i_3phsum_a': '0.0',       # AC Current (A)
+        'p_mppt1_kw': '0.0',       # MPPT Power (kW)
+        'i_mppt1_a': '0.0',        # MPPT Current (A)
+        'v_mppt1_v': '0.0',        # MPPT Voltage (V) - no DC voltage at night
+        'vln_3phavg_v': '0.0',     # AC Voltage (V) - inverter disconnected
+        'freq_hz': '0.0',          # AC Frequency (Hz) - no AC connection
+    }
+
+    for field, zero_value in power_fields.items():
+        if field in sanitized:
+            sanitized[field] = zero_value
+
+    # Keep these fields unchanged:
+    # - ltea_3phsum_kwh: Lifetime production (cumulative, doesn't change)
+    # - t_htsnk_degc: Temperature (actual inverter temp, valid even offline)
+    # - STATE/STATEDESCR: Device state info
+    # - SERIAL/MODEL/DESCR: Device identification
+
+    return sanitized
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Enhanced SunPower from a config entry"""
     _LOGGER.info("=== ENHANCED SUNPOWER INTEGRATION STARTUP ===")
@@ -944,12 +984,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         
                         # Preserve inverters if missing from fresh data (night-time)
                         if 'Inverter' not in fresh_device_types:
-                            cached_inverters = [dev for dev in cached_devices 
-                                               if dev.get('DEVICE_TYPE') == 'Inverter' 
+                            cached_inverters = [dev for dev in cached_devices
+                                               if dev.get('DEVICE_TYPE') == 'Inverter'
                                                and dev.get('SERIAL') not in fresh_serials]
                             if cached_inverters:
-                                fresh_data['devices'].extend(cached_inverters)
-                                _LOGGER.debug("Restored %d inverters from cache (offline at night)", len(cached_inverters))
+                                # Sanitize cached inverters to zero out power values
+                                sanitized_inverters = [_sanitize_cached_inverter(inv) for inv in cached_inverters]
+                                fresh_data['devices'].extend(sanitized_inverters)
+                                _LOGGER.debug("Restored %d inverters from cache with power values zeroed (offline at night)",
+                                            len(sanitized_inverters))
                         
                         # Preserve power meters if missing
                         if 'Power Meter' not in fresh_device_types:

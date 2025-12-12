@@ -527,6 +527,7 @@ SUNPOWER_SENSORS = {
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
                 "state": SensorStateClass.TOTAL,
+                "suggested_display_precision": 3,
             },
             "INVERTER_KW": {
                 "field": "p_3phsum_kw",
@@ -553,6 +554,7 @@ SUNPOWER_SENSORS = {
                 "device": SensorDeviceClass.CURRENT,
                 "state": SensorStateClass.MEASUREMENT,
                 "entity_category": EntityCategory.DIAGNOSTIC,
+                "suggested_display_precision": 3,
             },
             "INVERTER_MPPT1_KW": {
                 "field": "p_mppt1_kw",
@@ -580,6 +582,7 @@ SUNPOWER_SENSORS = {
                 "device": SensorDeviceClass.CURRENT,
                 "state": SensorStateClass.MEASUREMENT,
                 "entity_category": EntityCategory.DIAGNOSTIC,
+                "suggested_display_precision": 3,
             },
             "INVERTER_TEMPERATURE": {
                 "field": "t_htsnk_degc",
@@ -597,6 +600,15 @@ SUNPOWER_SENSORS = {
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.FREQUENCY,
                 "state": SensorStateClass.MEASUREMENT,
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+            "INVERTER_LAST_REPORTED": {
+                "field": "DATATIME",
+                "title": "{SUN_POWER}{DESCR}Last Reported",
+                "unit": None,
+                "icon": "mdi:clock-outline",
+                "device": SensorDeviceClass.TIMESTAMP,
+                "state": None,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
         },
