@@ -3,6 +3,38 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.12.3] - 12-15-2025
+
+### Bug Fix: Multi-Module Battery Systems Not Detected (Issue #42)
+
+**Fixed battery systems with 4+ modules being silently rejected during data processing**
+- **Problem**: Battery systems with multiple modules (4-5+ batteries) were not creating entities in Home Assistant
+- **Root Cause**: Serial validation in `data_processor.py` rejected device serials longer than 50 characters
+- **Impact**: Large battery installations (like sid's 4-module system with 72-char serial) were completely ignored
+
+**The Fix:**
+- Increased serial validation limit from 50 to 150 characters
+- Multi-module battery serials can be 70+ characters: base hub (12 chars) + each module (15 chars each)
+- Still protects against truly corrupted data (>150 chars)
+- Added explanatory comment for future maintainers
+
+**Files Modified:**
+- `data_processor.py`: Lines 221-226 - Increased serial length validation limit
+
+**Serial Format Examples:**
+- 2-module system: `00001D5A134A_M00122147A2165_M00122147A2157` (42 chars) - Always worked
+- 4-module system: `00001C398F32_M00122132A10D3_M00122125A0B6F_M00122132A0EBD_M00122132A10D0` (72 chars) - Now works!
+
+**User Impact:**
+- Battery systems with 4+ modules now properly detected and create all ESS entities
+- State of Charge, Power, Temperature, and all battery sensors now appear correctly
+- No impact on existing installations (backward compatible)
+
+**Issues Addressed:**
+- Issue #42 - Fixed large multi-module battery systems not creating entities
+
+---
+
 ## [v2025.12.2] - 12-12-2025
 
 ### Bug Fix: Stale Power Values at Night (Issue #41)

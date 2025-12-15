@@ -219,9 +219,10 @@ def convert_sunpower_data(sunpower_data):
                 continue
             
             # Validate device serial is reasonable (not obviously corrupted)
-            if len(str(device_serial)) > 50:
-                _LOGGER.warning("convert_sunpower_data: Device %d has suspiciously long serial: %s", 
-                               i, str(device_serial)[:50])
+            # Note: Battery system serials can be 70+ chars for multi-module systems
+            if len(str(device_serial)) > 150:
+                _LOGGER.warning("convert_sunpower_data: Device %d has suspiciously long serial (>150 chars): %s",
+                               i, str(device_serial)[:100])
                 continue
             
             # Add device to data structure
