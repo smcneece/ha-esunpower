@@ -3,6 +3,44 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2025.12.4] - 12-21-2025
+
+### Bug Fix: PVS5 New Firmware Installation Failure (Discussion #44)
+
+**Fixed "invalid flow" error when installing integration on PVS5 systems with new firmware**
+- **Problem**: Users with PVS5 firmware `0.0.25.5412` (and similar) couldn't install the integration - received "invalid flow" error during setup
+- **Root Cause**: New PVS5 firmware returns BUILD in format `"2025.11, Build 5412"` (string with version prefix), breaking firmware detection logic that expected plain integer or string number
+- **Impact**: Integration completely unable to install on affected PVS5 systems after firmware update
+
+**The Fix:**
+- Added `parse_build_number()` function to handle multiple BUILD formats from different firmware versions
+- Supports formats:
+  - PVS5 new: `"2025.11, Build 5412"` → extracts `5412`
+  - PVS6 string: `"61846"` → converts to `61846`
+  - PVS6 integer: `61846` → returns as-is
+  - PVS5 dotted: `"0.0.25.5412"` → extracts `5412`
+- Enhanced logging shows both raw and parsed BUILD values for debugging
+- Gracefully falls back to legacy detection if BUILD format is unparseable
+
+**Files Modified:**
+- `config_flow.py`: Lines 22-73 - Added `parse_build_number()` function
+- `config_flow.py`: Lines 97-107 - Updated `get_supervisor_info()` to parse BUILD before returning
+
+**Firmware Detection Logic:**
+- BUILD < 61840: Old firmware (uses legacy dl_cgi endpoint, no authentication)
+- BUILD >= 61840: New firmware (uses pypvs library with authentication)
+
+**User Impact:**
+- PVS5 systems with new firmware can now install the integration successfully
+- Firmware detection works correctly regardless of BUILD format variations
+- Better error messages when BUILD format is unexpected
+- No impact on existing PVS6 installations
+
+**Issues Addressed:**
+- Discussion #44 - Fixed installation failure on PVS5 new firmware
+
+---
+
 ## [v2025.12.3] - 12-15-2025
 
 ### Bug Fix: Multi-Module Battery Systems Not Detected (Issue #42)

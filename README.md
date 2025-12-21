@@ -19,6 +19,14 @@
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
 
+**PVS5 Firmware Version Formats:**
+SunPower uses different version formats for PVS5 vs PVS6. The integration automatically parses all formats:
+- **PVS5 new firmware**: `"2025.11, Build 5412"` → extracts BUILD `5412`
+- **PVS5 dotted format**: `"0.0.25.5412"` → extracts BUILD `5412`
+- **PVS6 format**: `"2025.10.20.61846"` → extracts BUILD `61846`
+
+The BUILD number determines which API method to use (not the version string). If you're experiencing setup issues, check your PVS firmware at: `http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
+
 ### Battery systems are working! (Tested on new firmware)
 
 If you're on new firmware and have a battery system you should be able to use this integration now.

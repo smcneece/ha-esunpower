@@ -19,6 +19,60 @@ _LOGGER = logging.getLogger(__name__)
 # Removed duplicate - using const.py values
 
 
+def parse_build_number(build_raw):
+    """Parse BUILD number from various firmware version formats
+
+    Handles formats like:
+    - "2025.11, Build 5412" → 5412 (PVS5 new format)
+    - "61846" → 61846 (PVS6 string format)
+    - 61846 → 61846 (PVS6 int format)
+    - "0.0.25.5412" → 5412 (PVS5 dotted format)
+
+    Args:
+        build_raw: Raw BUILD field from supervisor/info (string or int)
+
+    Returns:
+        int: Numeric build number, or None if unparseable
+    """
+    if build_raw is None:
+        return None
+
+    try:
+        # If already an integer, return it
+        if isinstance(build_raw, int):
+            return build_raw
+
+        # Convert to string for parsing
+        build_str = str(build_raw).strip()
+
+        # Format: "2025.11, Build 5412" - extract number after "Build"
+        if "Build" in build_str or "build" in build_str:
+            import re
+            match = re.search(r'[Bb]uild\s+(\d+)', build_str)
+            if match:
+                return int(match.group(1))
+
+        # Format: "0.0.25.5412" - extract last segment
+        if '.' in build_str:
+            parts = build_str.split('.')
+            # Try last part first (most likely to be build number)
+            for part in reversed(parts):
+                try:
+                    build_num = int(part)
+                    # Sanity check: build numbers are typically 4-5 digits
+                    if build_num >= 1000:
+                        return build_num
+                except ValueError:
+                    continue
+
+        # Format: "61846" - plain number string
+        return int(build_str)
+
+    except (ValueError, AttributeError, TypeError) as e:
+        _LOGGER.warning("Failed to parse BUILD '%s': %s", build_raw, e)
+        return None
+
+
 async def get_supervisor_info(host):
     """Auto-detect PVS serial and firmware build from supervisor/info endpoint
 
@@ -38,11 +92,18 @@ async def get_supervisor_info(host):
                     supervisor = data.get("supervisor", {})
 
                     serial = supervisor.get("SERIAL")
-                    build = supervisor.get("BUILD")
+                    build_raw = supervisor.get("BUILD")
 
-                    if serial and build:
+                    if serial and build_raw:
+                        # Parse BUILD to handle different firmware formats
+                        build = parse_build_number(build_raw)
+                        if build is None:
+                            _LOGGER.warning("⚠️ Could not parse BUILD from '%s', will try legacy detection", build_raw)
+                            return None, None, None, f"Unparseable BUILD format: {build_raw}"
+
                         last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
-                        _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s, Last5=%s", serial, build, last5)
+                        _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s (raw: %s), Last5=%s",
+                                    serial, build, build_raw, last5)
                         return serial, build, last5, None
                     else:
                         return None, None, None, "supervisor/info missing SERIAL or BUILD"
