@@ -1,12 +1,8 @@
 # Enhanced SunPower: The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
 
-## ⚠️ IMPORTANT: Release Notice
+## v2026.03.1 - Removed pypvs Dependency
 
-**This release contains new battery control features (from v2025.11.3) but was released publicly to fix critical migration bugs (Issues #33 & #34).**
-
-- **Migration fix implemented**: State class compatibility with krbaker restored
-- ⚠️ **Battery control**: Select entities for battery mode/reserve - in early testing but working great so far!  
-- **Recommendation**: Non-battery users can update safely. Battery users please report any issues with battery controls, and monitor your system closely.
+This release removes the `pypvs` external library and fixes a bug where inverters would not repopulate after a nighttime Home Assistant restart. No configuration changes required. See [CHANGELOG](docs/CHANGELOG.md) for details.
 
 ---
 
@@ -14,7 +10,7 @@
 
 **The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions.** Automatically detects and adapts to your system:
 - **PVS5 & PVS6 Hardware**: Full support for both hardware generations
-- **Firmware BUILD 61840+**: Uses official SunStrong `pypvs` library with LocalAPI authentication
+- **Firmware BUILD 61840+**: Uses direct varserver LocalAPI with authentication (no external library required)
 - **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
 - **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
 - **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
@@ -56,7 +52,7 @@ If you're on new firmware and have a battery system you should be able to use th
 ## What Makes This Enhanced?
 
 **Core Improvements:**
-- **Battery Control (NEW, Beta Testing)**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
+- **Battery Control**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
 - **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage, configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
@@ -70,11 +66,6 @@ If you're on new firmware and have a battery system you should be able to use th
 - **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns
 - **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
 
-## Important Notes & Breaking Changes
-
-
-**Disclaimers:**
-- Extensively tested on a 30-panel SunPower system **without batteries**. Battery system users welcome to test and provide feedback. We have also had several users with battery systems test on old and new firmwares. 
 
 ## Installation
 
@@ -87,11 +78,11 @@ If you're on new firmware and have a battery system you should be able to use th
 
 **IMPORTANT - New Firmware Users (BUILD 61840+):**
 
-If you have new firmware, **DO NOT use Raspberry Pi bridges/proxies**. Connect directly to your PVS WAN port:
-- New firmware requires HTTPS (port 443) for authentication; bridges don't support this
-- Use PVS WAN port IP (check your router's DHCP leases for "PVS" or "SunPower" device)
-- LAN port (172.27.153.1) still has DHCP server; requires VLAN isolation if used
-- Bridges were only needed for old firmware; new firmware has built-in authentication
+New firmware connects directly to your PVS over your home network - no Raspberry Pi bridge or proxy needed. The PVS has built-in WiFi; just connect it to your home network and use that IP:
+- **WiFi WAN (Recommended)**: Check your router's DHCP leases for "PVS" or "SunPower" device; reserve the IP so it doesn't change
+- **LAN port (Alternative)**: Fixed IP `172.27.153.1`, requires VLAN isolation (LAN port runs its own DHCP)
+- **Ethernet WAN (Do not use)**: We've seen issues using wired WAN port where it works for a bit, then stops. So use Wifi, or isolate the LAN port of the PVS Ethernet connection. (Isolated VLAN off router or managed switch)
+- **Raspberry Pi bridges/proxies**: Not needed and won't work - new firmware uses HTTPS (port 443) which most bridges don't support
 
 ---
 
@@ -482,16 +473,26 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 ### PVS Port Selection
 
 **New Firmware (BUILD 61840+):**
-- **WAN Port (Recommended)**: Use the PVS WAN port IP address (gets DHCP, typically `192.168.1.x or 192.168.0.x`)
-  - Easier to discover via your router's DHCP client list
+- **WiFi WAN (Recommended)**: PVS connects to your WiFi network, gets DHCP IP (typically `192.168.1.x or 192.168.0.x`)
+  - Most reliable WAN option for monitoring
+  - Easy to discover via your router's DHCP client list
   - Authentication eliminates need for network isolation
-- **LAN Port (Alternative)**: Fixed IP `172.27.153.1` also works
-  - Requires knowing the fixed address
-  - Same authentication and features as WAN port
-- **Raspberry Pi Bridges/Proxies**: Not supported with new firmware
-  - New firmware requires HTTPS (port 443) for authentication
-  - Most bridges only forward HTTP (port 80)
-  - Use direct PVS connection instead
+  - Requires port 443 (HTTPS) access from Home Assistant to PVS
+- **LAN Port (Alternative)**: Fixed IP `172.27.153.1`
+  - Most reliable wired connection option
+  - Must be isolated on a dedicated VLAN or switch port (LAN port runs its own DHCP server)
+  - Requires static route on your router or HA host to reach the `172.27.153.0/24` subnet
+  - Same authentication and features as WAN
+- **Ethernet WAN (Not Recommended)**: USB-to-Ethernet adapter on newer PVS6 models
+  - ⚠️ Known reliability issues: intermittent connectivity drops that require PVS reboots
+  - Multiple users have reported the PVS becoming unreachable over Ethernet WAN while WiFi and LAN continue working
+  - If you must use Ethernet WAN, do NOT also have WiFi active - the PVS becomes unreliable with both interfaces on the same network
+- **Raspberry Pi Bridges/Proxies**: Not needed and not supported with new firmware
+  - The PVS has built-in WiFi - connect it to your home network and use that IP directly
+  - The RPi bridge was only required for old firmware's LAN port isolation; new firmware has no such requirement
+  - Technical reason: new firmware uses HTTPS (port 443); most bridges only forward HTTP (port 80)
+
+**Different VLANs:** The integration works across VLANs as long as routing is configured between them and port 443 is accessible from HA to the PVS.
 
 **Old Firmware (BUILD < 61840):**
 - **LAN Port Required**: Must use `172.27.153.1`
@@ -562,13 +563,13 @@ Special thanks to community contributors who have helped improve this integratio
 ## Keywords
 
 **Hardware:** SunPower PVS, SunPower PVS5, SunPower PVS6, SunStrong, SunVault, ESS Battery, Solar Inverters  
-**Software:** Home Assistant, HACS, Python, pypvs, krbaker fork  
+**Software:** Home Assistant, HACS, Python, krbaker fork
 **Features:** Solar Monitoring, Inverter Health, Battery Tracking, Flash Wear, Energy Dashboard, Mobile Notifications
 
 <!-- 
 SEO Keywords: sunpower, sunstrong, pvs, pvs6, pvs5, home assistant, hacs, solar monitoring, 
 solar panels, inverter monitoring, sunvault, battery storage, ess, energy storage system, 
-pv monitoring, renewable energy, home automation, solar integration, pypvs, solar power, 
+pv monitoring, renewable energy, home automation, solar integration, solar power,
 photovoltaic, firmware 61840, new firmware, old firmware, authentication, krbaker, krbaker fork,
 enhanced sunpower, sunpower integration, solar system monitoring, panel monitoring, inverter health,
 battery health, state of charge, state of health, flash memory, flash wear, diagnostic sensors,

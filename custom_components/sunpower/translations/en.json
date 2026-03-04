@@ -84,7 +84,7 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\nSubmit to continue to Notification & Advanced settings on the next page.",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)",

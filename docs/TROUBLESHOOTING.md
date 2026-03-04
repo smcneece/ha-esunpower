@@ -134,6 +134,8 @@
 
 ### **Hardware Power Requirements & Known Issues**
 
+> **Old Firmware Only (BUILD < 61840):** This section applies to setups where a Raspberry Pi is used as a bridge/proxy for the PVS LAN port. If you have new firmware, you connect directly over WiFi - no Raspberry Pi is needed.
+
 **CRITICAL: PVS USB Power Limitation Warning**
 
 Many users power their Raspberry Pi directly from the PVS USB ports. However, the PVS has **limited USB power capacity** that can cause **random connection drops** when exceeded:
@@ -185,16 +187,62 @@ PVS WAN Port   PVS LAN Port (172.27.153.1)
  Cloud)        └── Isolated Network → Home Assistant
 ```
 
-### Network Setup
+### WAN Port Connectivity (New Firmware)
+
+With new firmware, the PVS can be monitored over the **WAN port** using authentication.
+
+**WiFi WAN (Recommended):** Most reliable WAN option. PVS gets a DHCP IP from your router.
+
+**⚠️ Ethernet WAN (Not Recommended):** Newer PVS6 models use USB-to-Ethernet adapters for Ethernet WAN. Multiple users have reported intermittent connectivity drops that require PVS reboots to resolve. The PVS may stop responding to API requests despite being pingable. Until SunStrong addresses this, WiFi WAN or the LAN port are more reliable options.
+
+**⚠️ Do NOT use both WiFi and Ethernet for WAN simultaneously.** The PVS gets confused when both interfaces are active on the same network and may become intermittently unreachable.
+
+**If your PVS becomes unreachable:**
+1. Check that only ONE WAN interface is active (not both WiFi and Ethernet)
+2. Verify the PVS IP hasn't changed (check your router's DHCP leases)
+3. Ensure port 443 (HTTPS) is not blocked by any firewall rules
+4. Power cycle the PVS if the web service is unresponsive but ping works
+
+**Using a Different VLAN:** The integration works across VLANs as long as there's routing between them and port 443 is accessible from HA to the PVS.
+
+### LAN Port Connectivity (Alternative)
+
+The PVS LAN port (`172.27.153.1`) can still be used for monitoring. This was the only option before new firmware added authentication. The LAN port has its own DHCP and DNS server, so it **must be isolated** on a dedicated VLAN or switch port.
+
+**LAN Port Setup Requirements:**
+- Isolated VLAN port or dedicated switch connection
+- IP in the `172.27.153.x` subnet (via PVS DHCP or static assignment)
+- Static route on your router/HA host to reach the `172.27.153.0/24` subnet
+
+### Network Setup (General)
 With authentication support, network setup is simplified:
 
 - **Direct Connection**: PVS can be accessed directly using standard IP addressing
-- **Legacy Setups**: Existing VLAN or proxy configurations will continue to work
+- **Legacy VLAN/LAN Setups**: Existing VLAN configurations using the LAN port will continue to work
+- **Raspberry Pi Proxies**: Not compatible with new firmware (HTTPS requirement); use direct WiFi connection instead
 - **Simplified Troubleshooting**: Authentication eliminates most network isolation issues
 
 **For detailed network setup guidance**, see existing community resources and [@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup).
 
 **Support Scope**: Network configuration is outside the scope of this integration. We provide general guidance but recommend consulting community network guides for detailed setup assistance.
+
+## HACS Installation Issues
+
+### "Repository not found" Error When Adding to HACS
+
+**Issue**: When attempting to add the integration via HACS, you receive an error stating "Repository smcneece/ha-esunpower not found."
+
+This is a known HACS bug that affects some users and is unrelated to the integration itself. It has been reported by multiple users (Issues [#37](https://github.com/smcneece/ha-esunpower/issues/37) and [#51](https://github.com/smcneece/ha-esunpower/issues/51)).
+
+**Fix:**
+1. Remove HACS from Home Assistant
+2. Restart Home Assistant
+3. Reinstall HACS
+4. Add the repository again
+
+This resolves the issue for the majority of affected users.
+
+---
 
 ## Debug Information
 Enable debug notifications to monitor:

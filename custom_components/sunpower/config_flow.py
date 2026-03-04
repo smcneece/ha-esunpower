@@ -7,10 +7,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from pypvs.pvs import PVS
-from pypvs.exceptions import PVSError
-
 from .const import DOMAIN, DEFAULT_SUNPOWER_UPDATE_INTERVAL, MIN_SUNPOWER_UPDATE_INTERVAL
+from .varserver_client import VarserverClient
 from .sunpower import SunPowerMonitor, ConnectionException, ParseException
 from .notifications import get_mobile_devices, get_email_notification_services
 
@@ -202,35 +200,39 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         MIN_LOCALAPI_BUILD = 61840
         uses_pypvs = build >= MIN_LOCALAPI_BUILD
 
-        _LOGGER.info("🔍 PVS Firmware Detected: BUILD=%s, Method=%s, Serial=%s, Password=%s",
-                    build, "pypvs (LocalAPI)" if uses_pypvs else "dl_cgi (legacy)", serial, last5)
+        _LOGGER.info("PVS Firmware Detected: BUILD=%s, Method=%s, Serial=%s, Password=%s",
+                    build, "varserver (LocalAPI)" if uses_pypvs else "dl_cgi (legacy)", serial, last5)
 
         # Step 3: Validate the chosen method works
         if uses_pypvs:
-            # New firmware (BUILD >= 61840) - needs pypvs + password
+            # New firmware (BUILD >= 61840) - needs varserver client + password
             try:
-                _LOGGER.info("Validating new firmware (pypvs) with password...")
-                pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, user="ssm_owner", password=last5)
-                await pvs.discover()  # Must discover serial before setup/validate
-                await pvs.setup(auth_password=last5)  # Authenticate with password
-                _LOGGER.info("✅ New firmware (pypvs) validated successfully")
+                _LOGGER.info("Validating new firmware (varserver) with password...")
+                client = VarserverClient(
+                    session=async_get_clientsession(self.hass, False),
+                    host=host,
+                    password=last5
+                )
+                if not await client.authenticate():
+                    raise RuntimeError("Authentication returned False")
+                _LOGGER.info("New firmware (varserver) validated successfully")
                 return serial, True, last5, build, None
             except Exception as e:
-                _LOGGER.warning("❌ New firmware (pypvs) failed: %s - trying legacy fallback", e, exc_info=True)
+                _LOGGER.warning("New firmware (varserver) failed: %s - trying legacy fallback", e, exc_info=True)
                 # SAFETY FALLBACK: Try legacy dl_cgi even for new firmware
                 # (Some firmware versions may have buggy LocalAPI implementation)
                 try:
-                    _LOGGER.info("⚠️ Attempting legacy dl_cgi fallback for BUILD %s", build)
+                    _LOGGER.info("Attempting legacy dl_cgi fallback for BUILD %s", build)
                     monitor = SunPowerMonitor(host, auth_password=None)
                     device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
 
                     if device_data and isinstance(device_data, dict) and "devices" in device_data:
-                        _LOGGER.warning("✅ Legacy fallback succeeded for BUILD %s - firmware LocalAPI may be buggy", build)
+                        _LOGGER.warning("Legacy fallback succeeded for BUILD %s - firmware LocalAPI may be buggy", build)
                         return serial, False, last5, build, None  # Use legacy mode but keep last5 for future use
                     else:
-                        return None, None, None, None, f"pypvs failed and legacy fallback returned invalid data"
+                        return None, None, None, None, "varserver failed and legacy fallback returned invalid data"
                 except Exception as fallback_e:
-                    _LOGGER.error("❌ Both pypvs and legacy fallback failed: pypvs=%s, legacy=%s", e, fallback_e, exc_info=True)
+                    _LOGGER.error("Both varserver and legacy fallback failed: varserver=%s, legacy=%s", e, fallback_e, exc_info=True)
                     return None, None, None, None, f"New firmware failed: {str(e)} (fallback also failed: {str(fallback_e)})"
         else:
             # Old firmware (BUILD < 61840) - uses dl_cgi WITHOUT password
@@ -256,17 +258,20 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Returns:
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
-        # Try pypvs first (new firmware) - without password since we don't have serial yet
+        # Try varserver (new firmware) - get serial from supervisor info first
         try:
-            pvs = PVS(session=async_get_clientsession(self.hass, False), host=host, user="ssm_owner")
-            await pvs.discover()  # Discover serial
-            serial = pvs.serial_number
-            last5 = (serial[-5:] if serial and len(serial) >= 5 else "").upper()
-            await pvs.setup(auth_password=last5)  # Now authenticate with discovered password
-            _LOGGER.info("Legacy detection: New firmware (pypvs), serial=%s", serial)
-            return serial, True, last5, None, None
+            serial_legacy, build_legacy, last5_legacy, err_legacy = await get_supervisor_info(host)
+            if serial_legacy and last5_legacy:
+                client = VarserverClient(
+                    session=async_get_clientsession(self.hass, False),
+                    host=host,
+                    password=last5_legacy
+                )
+                if await client.authenticate():
+                    _LOGGER.info("Legacy detection: New firmware (varserver), serial=%s", serial_legacy)
+                    return serial_legacy, True, last5_legacy, build_legacy, None
         except Exception as e:
-            _LOGGER.debug("pypvs failed: %s", e)
+            _LOGGER.debug("Varserver legacy detection failed: %s", e)
 
         # Try legacy dl_cgi (old firmware)
         try:
@@ -333,7 +338,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(serial)
                     self._abort_if_unique_id_configured({})
                     _LOGGER.info("Setup: Serial=%s, Method=%s, Build=%s, Last5=%s",
-                                serial, "pypvs" if uses_pypvs else "dl_cgi", build, last5)
+                                serial, "varserver" if uses_pypvs else "dl_cgi", build, last5)
 
                     # Decide if password step is needed:
                     # - Old firmware + auto-detected: Skip password (not needed for old firmware)

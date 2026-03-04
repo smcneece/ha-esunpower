@@ -3,6 +3,45 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.1] - 03-2026
+
+### Bug Fix & Technical Improvement: Removed pypvs Dependency
+
+**Fixed: Inverters disappear after nighttime Home Assistant restart**
+- **Problem**: If HA restarted while inverters were offline (nighttime), they would never populate in the morning - requiring a second manual restart during daylight to recover
+- **Root Cause**: The `pypvs` library `probe()` function runs once at startup, finds no inverters (offline at night), sets a permanent flag, and never re-checks. Issue filed with pypvs project in January 2026 with no response in 6+ weeks
+- **Fix**: Replaced pypvs with a direct implementation of the PVS varserver HTTP API (`varserver_client.py`). The new client queries all device types on every poll cycle and handles empty responses gracefully. Inverters populate automatically at sunrise regardless of when HA last restarted
+
+**Removed: pypvs external dependency**
+- Integration no longer requires the `pypvs` library - eliminates abandoned third-party dependency
+- New `varserver_client.py` implements the varserver HTTP API directly (~380 lines): authenticate, query devices, return data in the same legacy format the rest of the integration already uses
+- All sensor data, battery controls, and entity names are unchanged
+
+**Files Modified:**
+- `varserver_client.py`: New file - direct varserver HTTP client
+- `__init__.py`: Replaced pypvs PVS object with VarserverClient
+- `select.py`: Updated battery control to use VarserverClient
+- `config_flow.py`: Replaced pypvs validation with VarserverClient authentication
+- `manifest.json`: Removed `pypvs>=0.2.7` requirement
+- `pypvs_converter.py`: Deleted - conversion now done inside VarserverClient
+
+---
+
+## [v2026.02.01] - 02-2026
+
+### Maintenance: Documentation Improvements & UI Hint Fix
+
+**UI Improvement (Issue #53):**
+- Added hint text to the Configure page so users know to submit the first page to reach Notification & Advanced settings. Previously the settings page existed but users couldn't easily find it and had to edit config files directly.
+
+**Documentation:**
+- README: Clarified Raspberry Pi bridge/proxy guidance for new firmware users - updated messaging to lead with "no bridge needed, PVS connects directly over WiFi" rather than just explaining why bridges don't work
+- README: Added IP reservation reminder to WiFi WAN connection instructions
+- TROUBLESHOOTING.md: Added "Old Firmware Only" callout to PVS USB Power section so new firmware users aren't confused by Raspberry Pi hardware guidance that doesn't apply to them
+- TROUBLESHOOTING.md: Clarified that RPi proxies are not compatible with new firmware while VLAN/LAN port setups still work
+
+---
+
 ## [v2025.12.4] - 12-21-2025
 
 ### Bug Fix: PVS5 New Firmware Installation Failure (Discussion #44)

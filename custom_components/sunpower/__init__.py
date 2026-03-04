@@ -21,12 +21,6 @@ from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
-from pypvs.pvs import PVS
-from pypvs.exceptions import PVSError
-
-# Suppress pypvs library auth retry warnings (harmless - pypvs handles retries internally)
-logging.getLogger("pypvs.pvs_fcgi").setLevel(logging.ERROR)
-
 from .const import (
     BATTERY_DEVICE_TYPE,
     DIAGNOSTIC_DEVICE_TYPE,
@@ -85,23 +79,21 @@ from .notifications import (
     safe_notify,
 )
 
-from .pypvs_converter import convert_pypvs_to_legacy
+from .varserver_client import VarserverClient
 
 _LOGGER = logging.getLogger(__name__)
 
 # Dependency diagnostic logging - check installations (one-time on load)
 try:
-    import pypvs
     import aiohttp
     import simplejson
-    _LOGGER.info("Dependencies loaded: pypvs=%s, aiohttp=%s, simplejson=%s",
-                 getattr(pypvs, '__version__', 'unknown'),
+    _LOGGER.info("Dependencies loaded: aiohttp=%s, simplejson=%s",
                  aiohttp.__version__,
                  simplejson.__version__)
 except ImportError as e:
-    _LOGGER.error("❌ Dependency import failed: %s", e)
+    _LOGGER.error("Dependency import failed: %s", e)
 except Exception as e:
-    _LOGGER.error("❌ Dependency check error: %s", e)
+    _LOGGER.error("Dependency check error: %s", e)
 
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
@@ -168,9 +160,9 @@ class SunPowerDataCache:
             'integration_start_time': time.time(),
         }
 
-        # Authentication session tracking for pypvs
+        # Authentication session tracking (legacy field - auth now tracked in VarserverClient)
         self.last_auth_time = 0
-        self.auth_refresh_interval = 600  # Re-auth every 10 minutes proactively (PVS sessions expire quickly)
+        self.auth_refresh_interval = 600
 
 
 def _determine_diagnostic_serial(hass, entry):
@@ -585,7 +577,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                         MIN_LOCALAPI_BUILD = 61840
                         if current_build and current_build >= MIN_LOCALAPI_BUILD:
-                            _LOGGER.warning("⚠️ FIRMWARE UPGRADE DETECTED: BUILD %s requires pypvs but config has uses_pypvs=False", current_build)
+                            _LOGGER.warning("FIRMWARE UPGRADE DETECTED: BUILD %s requires new firmware API but config has uses_pypvs=False", current_build)
                             _LOGGER.info("Migrating to new firmware mode...")
 
                             # Extract last5 from serial for authentication
@@ -605,13 +597,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                             uses_pypvs = True
                             firmware_build = current_build
 
-                            _LOGGER.info("✅ Migration complete: Now using pypvs with BUILD %s", current_build)
+                            _LOGGER.info("Migration complete: Now using new firmware API with BUILD %s", current_build)
         except Exception as e:
             _LOGGER.debug("Firmware upgrade check failed (not critical): %s", e)
 
     # Set polling URL based on firmware method
     if uses_pypvs:
-        polling_url = f"http://{entry.data['host']}/vars (pypvs LocalAPI)"
+        polling_url = f"https://{entry.data['host']}/vars (varserver LocalAPI)"
     else:
         polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
 
@@ -622,41 +614,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     auth_password = pvs_serial_last5 if (pvs_serial_last5 and uses_pypvs) else None
 
     if uses_pypvs:
-        _LOGGER.info("🔒 Using pypvs library for new firmware (BUILD %s) WITH authentication", firmware_build)
+        _LOGGER.info("Using varserver client for new firmware (BUILD %s) with authentication", firmware_build)
         _LOGGER.info("Auth details: host=%s, user=ssm_owner, password=%s*** (length=%d)",
                      entry.data['host'], auth_password[:2] if auth_password else "NONE",
                      len(auth_password) if auth_password else 0)
 
-        # Create PVS object with password for new firmware
+        # Create VarserverClient with password for new firmware
+        pvs_serial = entry.unique_id
+        _LOGGER.info("Using PVS serial from config: %s", pvs_serial)
         try:
-            pvs_object = PVS(
+            varserver_client = VarserverClient(
                 session=async_get_clientsession(hass, False),
                 host=entry.data['host'],
-                user="ssm_owner",
                 password=auth_password
             )
-            _LOGGER.info("✅ pypvs object created successfully (version %s)", getattr(pypvs, '__version__', 'unknown'))
-
-            # Set serial number from config flow validation (skip discovery)
-            # Discovery makes multiple rapid requests that can timeout
-            pvs_serial = entry.unique_id
-            _LOGGER.info("Using serial from config: %s (skipping discovery)", pvs_serial)
-            pvs_object._serial_number = pvs_serial  # Set directly instead of discovering
-
-            # Initialize pypvs - authenticate only (serial already set)
-            _LOGGER.info("Initializing pypvs authentication...")
-            await pvs_object.setup(auth_password=auth_password)
-            cache.last_auth_time = time.time()  # Track initial auth time
-            _LOGGER.info("✅ pypvs initialized and authenticated successfully (serial: %s)", pvs_object.serial_number)
+            if not await varserver_client.authenticate():
+                _LOGGER.warning("Initial varserver authentication failed (PVS may be offline) - coordinator will retry")
+            else:
+                _LOGGER.info("Varserver client initialized and authenticated (serial: %s)", pvs_serial)
         except Exception as e:
-            _LOGGER.warning("⚠️ Failed to initialize pypvs during setup (PVS may be temporarily offline): %s", e)
+            _LOGGER.warning("Failed to initialize varserver client during setup: %s", e)
             _LOGGER.info("Integration will continue setup - coordinator will retry authentication during first poll")
-            cache.last_auth_time = 0  # Mark as needing authentication
-            # Don't raise - let coordinator handle retry gracefully
-        sunpower_monitor = None  # Not used when using pypvs
+            varserver_client = VarserverClient(
+                session=async_get_clientsession(hass, False),
+                host=entry.data['host'],
+                password=auth_password
+            )
+        sunpower_monitor = None  # Not used when using varserver
     else:
-        _LOGGER.info("🔓 Using legacy dl_cgi for old firmware (BUILD %s) WITHOUT authentication", firmware_build)
-        pvs_object = None  # Not used when using legacy method
+        _LOGGER.info("Using legacy dl_cgi for old firmware (BUILD %s) without authentication", firmware_build)
+        varserver_client = None  # Not used when using legacy method
         sunpower_monitor = SunPowerMonitor(
             entry.data['host'],
             auth_password=None,  # Old firmware does NOT use authentication
@@ -770,179 +757,67 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Step 1: Poll PVS for fresh data
         try:
-            if pvs_object:
-                # New firmware: Use pypvs library
-                # Proactive session refresh if auth is old (prevents session expiration)
-                time_since_auth = time.time() - cache.last_auth_time
-                if auth_password and time_since_auth > cache.auth_refresh_interval:
-                    _LOGGER.debug("Proactive session refresh (last auth: %.0f seconds ago)", time_since_auth)
-                    try:
-                        await pvs_object.setup(auth_password=auth_password)
-                        cache.last_auth_time = time.time()
-                        _LOGGER.debug("✅ Proactive re-authentication successful")
-                    except Exception as refresh_error:
-                        _LOGGER.debug("Proactive re-auth failed (will retry on error): %s", refresh_error)
-                        # Don't fail the poll, just log and continue
-
-                _LOGGER.debug("Polling PVS using pypvs (new firmware)")
-
-                # Check if sun is below horizon (nighttime) to conditionally suppress errors
-                # Only suppress "Login to the PVS failed" when inverters are expected to be offline
-                sun_elevation = None
-                sun_entity = hass.states.get("sun.sun")
-                if sun_entity and sun_entity.attributes:
-                    sun_elevation = sun_entity.attributes.get("elevation")
-
-                is_nighttime = sun_elevation is not None and sun_elevation < 0
-
-                # Only apply filter at night when inverters are expected to be offline
-                # This prevents hiding legitimate auth issues during daylight hours
-                if is_nighttime:
-                    import logging
-
-                    class DeviceLoginFilter(logging.Filter):
-                        """Filter out expected device login failures when sun is below horizon"""
-                        def filter(self, record):
-                            # Suppress "Login to the PVS failed" from device updaters at night
-                            # Note: This is a pypvs library issue - it throws login errors when
-                            # inverters are offline, even though PVS is accessible and auth works
-                            if "Login to the PVS failed" in record.getMessage():
-                                return False
-                            return True
-
-                    pypvs_inverter_logger = logging.getLogger("pypvs.updaters.production_inverters")
-                    pypvs_meter_logger = logging.getLogger("pypvs.updaters.meter")
-                    login_filter = DeviceLoginFilter()
-                    pypvs_inverter_logger.addFilter(login_filter)
-                    pypvs_meter_logger.addFilter(login_filter)
-                    _LOGGER.debug("Applied nighttime device login filter (sun elevation: %.1f°)", sun_elevation)
-
-                try:
-                    pvs_data = await pvs_object.update()
-
-                    # Debug logging for Issue #39: Log what pypvs actually returns
-                    # This helps diagnose stuck inverter issues by showing if pypvs returns empty data
-                    if pvs_data and hasattr(pvs_data, 'inverters'):
-                        inverter_count = len(pvs_data.inverters) if pvs_data.inverters else 0
-                        _LOGGER.info("pypvs returned %d inverters, %d meters, gateway=%s",
-                                    inverter_count,
-                                    len(pvs_data.meters) if hasattr(pvs_data, 'meters') and pvs_data.meters else 0,
-                                    'present' if hasattr(pvs_data, 'gateway') and pvs_data.gateway else 'missing')
-                        if inverter_count == 0 and not is_nighttime:
-                            _LOGGER.warning("⚠️ pypvs returned 0 inverters during daytime (sun elevation: %.1f°) - possible pypvs issue",
-                                          sun_elevation if sun_elevation is not None else 0)
-                    else:
-                        _LOGGER.warning("pypvs returned data with no 'inverters' attribute - possible pypvs library issue")
-                finally:
-                    if is_nighttime:
-                        pypvs_inverter_logger.removeFilter(login_filter)
-                        pypvs_meter_logger.removeFilter(login_filter)
-                # Query flash wear percentage (not in pypvs PVSGateway model yet)
-                flashwear_pct = 0
-                try:
-                    flashwear_hex = await pvs_object.getVarserverVar('/sys/pvs/flashwear_type_b')
-                    # Convert hex to percentage: 0x01 = 10%, 0x09 = 90%
-                    if flashwear_hex:
-                        if isinstance(flashwear_hex, str) and flashwear_hex.startswith('0x'):
-                            flashwear_pct = int(flashwear_hex, 16) * 10
-                        else:
-                            flashwear_pct = int(flashwear_hex) * 10
-                        _LOGGER.debug('Flash wear: %d%%', flashwear_pct)
-                except Exception as e:
-                    _LOGGER.debug('Could not fetch flashwear_type_b: %s', e)
-                # Convert pypvs PVSData object to legacy dl_cgi format
-                # Pass PVS serial from pvs_object for virtual device creation
-                fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number, flashwear_percent=flashwear_pct)
+            if varserver_client:
+                # New firmware: Use direct varserver client
+                _LOGGER.debug("Polling PVS using varserver client (new firmware)")
+                fresh_data = await varserver_client.get_all_data(pvs_serial=pvs_serial)
             else:
                 # Old firmware: Use legacy dl_cgi
                 _LOGGER.debug("Polling PVS using dl_cgi (old firmware)")
                 fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_polling_interval, cache, hass, entry)
             # Note: fresh_data can be None if PVS is unhealthy/backoff - this is normal, use cache
         except Exception as e:
-            # Check if this is an authentication error and attempt automatic re-auth
-            # Note: pypvs updaters may throw various exception types, not just PVSError
-            # IMPORTANT: Only new firmware (pypvs) uses authentication - old firmware never does
+            # IMPORTANT: Only new firmware uses authentication - old firmware never does
             error_str = str(e).lower()
-            is_auth_error = False
 
-            # Only check for auth errors if using pypvs (new firmware)
-            # Old firmware: ALL errors are poll failures, never auth issues
-            if pvs_object:
+            if varserver_client:
                 # New firmware - check for auth-related errors
                 is_auth_error = any(keyword in error_str for keyword in [
                     '401', '403', 'auth', 'unauthorized', 'forbidden',
-                    'login to the pvs failed', 'login failed', 'authentication failed'
+                    'login failed', 'authentication failed'
                 ])
-            else:
-                # Old firmware - log 403/auth errors as regular poll failures
-                if '403' in error_str or 'forbidden' in error_str:
-                    _LOGGER.warning("Old firmware error (PVS busy/temp issue, not auth): %s", e)
-
-            if is_auth_error and pvs_object and auth_password:
-                _LOGGER.warning("⚠️ Authentication error detected during polling: %s", e)
-                _LOGGER.info("Attempting automatic re-authentication (re-setup)...")
-                try:
-                    # Re-initialize pypvs session - setup only (serial already set)
-                    await pvs_object.setup(auth_password=auth_password)
-                    cache.last_auth_time = time.time()  # Update auth timestamp
-                    _LOGGER.info("✅ Re-authentication successful (serial: %s), retrying poll...", pvs_object.serial_number)
-
-                    # Retry the poll after successful re-auth
-                    pvs_data = await pvs_object.update()
-
-                    # Re-fetch flash wear data
-                    flashwear_pct = 0
+                if is_auth_error and auth_password:
+                    _LOGGER.warning("Authentication error during polling: %s", e)
+                    _LOGGER.info("Attempting automatic re-authentication...")
                     try:
-                        flashwear_hex = await pvs_object.getVarserverVar('/sys/pvs/flashwear_type_b')
-                        if flashwear_hex:
-                            if isinstance(flashwear_hex, str) and flashwear_hex.startswith('0x'):
-                                flashwear_pct = int(flashwear_hex, 16) * 10
-                            else:
-                                flashwear_pct = int(flashwear_hex) * 10
-                    except Exception as e:
-                        _LOGGER.debug("Could not fetch flash wear data (optional): %s", e)
-                        pass  # Flash wear is optional
-
-                    fresh_data = convert_pypvs_to_legacy(pvs_data, pvs_serial=pvs_object.serial_number, flashwear_percent=flashwear_pct)
-                    _LOGGER.info("✅ Poll retry after re-auth successful")
-
-                except Exception as retry_error:
-                    _LOGGER.error("❌ Re-authentication or poll retry failed: %s", retry_error)
+                        if await varserver_client.authenticate():
+                            _LOGGER.info("Re-authentication successful, retrying poll...")
+                            fresh_data = await varserver_client.get_all_data(pvs_serial=pvs_serial)
+                            _LOGGER.info("Poll retry after re-auth successful")
+                        else:
+                            raise RuntimeError("Re-authentication returned False")
+                    except Exception as retry_error:
+                        _LOGGER.error("Re-authentication or poll retry failed: %s", retry_error)
+                        cache.diagnostic_stats['failed_polls'] += 1
+                        cache.diagnostic_stats['consecutive_failures'] += 1
+                        fresh_data = None
+                        await hass.services.async_call(
+                            "persistent_notification",
+                            "create",
+                            {
+                                "title": "PVS Authentication Failure",
+                                "message": f"Automatic re-authentication failed: {retry_error}<br><br>Check PVS password configuration (last 5 of serial).",
+                                "notification_id": f"sunpower_auth_failure_{entry.entry_id}"
+                            }
+                        )
+                else:
+                    if not auth_password:
+                        _LOGGER.error("New firmware polling error (no auth configured): %s", e)
+                    else:
+                        _LOGGER.error("New firmware polling error: %s", e)
                     cache.diagnostic_stats['failed_polls'] += 1
                     cache.diagnostic_stats['consecutive_failures'] += 1
                     fresh_data = None
-
-                    # Send critical notification for persistent auth failures
-                    await hass.services.async_call(
-                        "persistent_notification",
-                        "create",
-                        {
-                            "title": "🔐 PVS Authentication Failure",
-                            "message": f"Automatic re-authentication failed: {retry_error}<br><br>Check PVS password configuration (last 5 of serial).",
-                            "notification_id": f"sunpower_auth_failure_{entry.entry_id}"
-                        }
-                    )
             else:
-                # Non-auth error or can't retry - just log and fail
-                if not pvs_object:
-                    # Old firmware error - never an auth issue
-                    _LOGGER.error("Old firmware polling error (network/PVS issue): %s", e)
-                    if '403' in error_str or 'forbidden' in error_str:
-                        _LOGGER.warning("⚠️ Old firmware 403 error - possible network/hardware issue")
-                        _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
-                elif not auth_password:
-                    _LOGGER.error("New firmware polling error (no auth configured): %s", e)
-                    _LOGGER.error("This may be an authentication error but no PVS serial is configured")
-                else:
-                    _LOGGER.error("New firmware polling error (non-auth): %s", e)
-
+                # Old firmware error - never an auth issue
+                _LOGGER.error("Old firmware polling error (network/PVS issue): %s", e)
+                if '403' in error_str or 'forbidden' in error_str:
+                    _LOGGER.warning("Old firmware 403 error - possible network/hardware issue")
+                    _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
                 cache.diagnostic_stats['failed_polls'] += 1
                 cache.diagnostic_stats['consecutive_failures'] += 1
                 fresh_data = None
-
-                # For legacy method, send additional error notifications
-                if not pvs_object:
-                    await _handle_polling_error(hass, entry, cache, host_ip, e)
+                await _handle_polling_error(hass, entry, cache, host_ip, e)
 
         # Step 2: Save cache if we got fresh data - preserve missing devices
         if fresh_data:
@@ -1033,7 +908,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             # Battery processing (if detected from cache OR fresh data)
             # Only poll separate ESS endpoint for old firmware (legacy dl_cgi)
-            # New firmware (pypvs) already includes ESS data in main response
+            # New firmware already includes ESS data in main varserver response
             if has_battery and sunpower_monitor:
                 try:
                     _LOGGER.debug("Polling ESS endpoint for battery data (legacy dl_cgi)")
@@ -1060,15 +935,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
                     # Don't re-raise - continue with PVS data
             elif has_battery and not sunpower_monitor:
-                _LOGGER.debug("Battery detected with new firmware (pypvs) - ESS data already included in main response")
+                _LOGGER.debug("Battery detected with new firmware - ESS data already included in main varserver response")
 
                 # Poll battery configuration for select entity current states
-                # Only works with new firmware (pypvs)
-                if pvs_object:
+                # Only works with new firmware (varserver)
+                if varserver_client:
                     try:
                         battery_config = {}
 
-                        # control_mode is already in ESS status data as "operational_mode"
+                        # control_mode is already in ESS status data as "op_mode"
                         # Extract it from the already-polled ESS data to avoid extra API call
                         ess_device = data.get("Energy Storage System", {})
                         if ess_device:
@@ -1078,14 +953,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                                     battery_config["control_mode"] = op_mode
                                     break
 
-                        # min_customer_soc is NOT in ESS status, must poll separately
+                        # min_customer_soc is NOT in ESS status data, must poll separately
                         _LOGGER.debug("Polling battery minimum reserve (min_customer_soc)")
-                        min_soc_response = await pvs_object.getVarserver("/vars", params={"name": "/ess/config/dcm/control_param/min_customer_soc"})
-
-                        if min_soc_response and "values" in min_soc_response:
-                            values = min_soc_response["values"]
-                            if values and len(values) > 0:
-                                battery_config["min_customer_soc"] = values[0].get("value")
+                        min_soc = await varserver_client.get_var(
+                            "/ess/config/dcm/control_param/min_customer_soc"
+                        )
+                        if min_soc is not None:
+                            battery_config["min_customer_soc"] = min_soc
 
                         if battery_config:
                             data["battery_config"] = battery_config
@@ -1187,7 +1061,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         SUNPOWER_OBJECT: sunpower_monitor,
         SUNPOWER_COORDINATOR: coordinator,
-        "pvs_object": pvs_object,  # Store pypvs object for battery control (select platform)
+        "varserver_client": varserver_client,  # Store client for battery control (select platform)
         "_cache": cache,  # Make cache accessible for diagnostics
     }
 
