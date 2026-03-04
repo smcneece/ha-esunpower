@@ -1,8 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: Troubleshooting Guide
-    url: https://github.com/smcneece/ha-esunpower/blob/main/TROUBLESHOOTING.md
+    url: https://github.com/smcneece/ha-esunpower/blob/main/docs/TROUBLESHOOTING.md
     about: Check the troubleshooting guide before opening an issue
+  - name: General Discussion / Questions
+    url: https://github.com/smcneece/ha-esunpower/discussions/new?category=general
+    about: General questions, help, and community discussion
+  - name: Feature Request / Ideas
+    url: https://github.com/smcneece/ha-esunpower/discussions/new?category=ideas
+    about: Suggest a new feature or improvement
   - name: Energy Dashboard Help
     url: https://www.home-assistant.io/docs/energy/
     about: Home Assistant Energy Dashboard documentation

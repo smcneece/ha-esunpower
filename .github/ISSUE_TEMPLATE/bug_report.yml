@@ -8,10 +8,13 @@ body:
       value: |
         Thanks for reporting a bug! Just need a few quick details to help diagnose the issue.
 
+        **Not sure if it's a bug?** General questions and feature requests belong in [Discussions](https://github.com/smcneece/ha-esunpower/discussions) -- not Issues.
+
         **Before filing a bug report, please:**
-        1. ✅ **Reboot your PVS** - Power cycle the PVS and wait 2-3 minutes for it to fully restart
-        2. ✅ **Restart Home Assistant** - Settings → System → Restart
-        3. ✅ **Check if the issue persists** - Many issues resolve after a fresh restart
+        1. ✅ Check the [Troubleshooting Guide](https://github.com/smcneece/ha-esunpower/blob/main/docs/TROUBLESHOOTING.md) -- your issue may already be documented
+        2. ✅ **Reboot your PVS** - Power cycle the PVS and wait 2-3 minutes for it to fully restart
+        3. ✅ **Restart Home Assistant** - Settings → System → Restart
+        4. ✅ **Check if the issue persists** - Many issues resolve after a fresh restart
 
         If the problem continues after rebooting, please provide the details below:
 
@@ -21,79 +24,10 @@ body:
       label: Integration Version
       description: What version are you running?
       options:
-        - v2026.3.1 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.12.4 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.12.3 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.12.2 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.12.1 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.10 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.9 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.8 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.7 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.6 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.5 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.4 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.3 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.2 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.11.1 (latest)
-        - v2025.10.7 or older
-        - Not sure
-      options:
-        - v2025.10.20 (latest)
-        - v2025.10.19
-        - v2025.10.18
-        - v2025.10.17
-        - v2025.10.16
-        - v2025.10.15
-        - v2025.10.14
-        - v2025.10.13
-        - v2025.10.12
-        - v2025.10.11
-        - v2025.10.10
-        - v2025.10.9
-        - v2025.10.8
+        - v2026.03.1 (latest)
+        - v2025.12.4
+        - v2025.12.3
+        - v2025.11.x
         - v2025.10.7 or older
         - Not sure
     validations:

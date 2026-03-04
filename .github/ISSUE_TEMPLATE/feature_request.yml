@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have an idea for a new feature? Let us know!
+        > **Heads up:** Feature requests and ideas are better suited to [Discussions → Ideas](https://github.com/smcneece/ha-esunpower/discussions/new?category=ideas) where the community can vote and comment. If you'd still like to file this as a tracked issue, go ahead below.
 
   - type: textarea
     id: feature-description

@@ -1,0 +1,48 @@
+title: "[Feature Request]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Feature requests and ideas are welcome here.
+
+        If you have found a bug rather than a feature gap, please [open an Issue](https://github.com/smcneece/ha-esunpower/issues/new/choose) instead.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the feature or improvement
+      description: What would you like to see added or changed?
+      placeholder: A clear description of what you want and why it would be useful...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: pvs-model
+    attributes:
+      label: Does this apply to a specific PVS model?
+      options:
+        - Both / All models
+        - PVS5 only
+        - PVS6 only
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: battery-system
+    attributes:
+      label: Is this battery-related?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context (optional)
+      description: Any other details, screenshots, or examples that would help explain the request
+    validations:
+      required: false

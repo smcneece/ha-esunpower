@@ -1,0 +1,35 @@
+title: "[Discussion]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for starting a discussion! This is the right place for general questions, help requests, and community conversation.
+
+        If you have found a bug, please [open an Issue](https://github.com/smcneece/ha-esunpower/issues/new/choose) instead so it can be tracked properly.
+
+        Before posting, check the [Troubleshooting Guide](https://github.com/smcneece/ha-esunpower/blob/main/docs/TROUBLESHOOTING.md) -- your question may already be answered there.
+
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration Version (if relevant)
+      placeholder: "e.g., v2026.03.1"
+
+  - type: dropdown
+    id: pvs-model
+    attributes:
+      label: PVS Model (if relevant)
+      options:
+        - Not applicable
+        - PVS5
+        - PVS6
+        - Not sure
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to discuss?
+      placeholder: Describe your question or topic...
+    validations:
+      required: true
