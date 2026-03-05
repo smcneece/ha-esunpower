@@ -19,6 +19,7 @@ BATTERY_MODE_MAP = {
     "Self Supply": "SELF_CONSUMPTION",
     "Cost Savings": "ENERGY_ARBITRAGE",
     "Emergency Reserve": "BACKUP_ONLY",
+    "Tariff Optimizer": "TARIFF_OPTIMIZER",
 }
 
 # Reverse mapping: API value -> Friendly name
@@ -26,8 +27,8 @@ BATTERY_MODE_REVERSE = {v: k for k, v in BATTERY_MODE_MAP.items()}
 
 # Minimum reserve percentage options
 RESERVE_PERCENTAGE_OPTIONS = [
-    "10%", "20%", "30%", "40%", "50%",
-    "60%", "70%", "80%", "90%", "100%"
+    "5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%",
+    "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"
 ]
 
 

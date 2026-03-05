@@ -3,6 +3,23 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.2] - 03-2026
+
+### Bug Fix: Battery Control Improvements
+
+**Fixed: TARIFF_OPTIMIZER mode displaying as blank**
+- Some battery systems use a `TARIFF_OPTIMIZER` operating mode not previously in the integration mode list, causing the Battery Control Mode dropdown to show blank
+- Added "Tariff Optimizer" as a selectable mode
+
+**Fixed: Reserve percentage dropdown missing values**
+- Battery Reserve Percentage dropdown previously only offered 10%% increments; values like 25%% caused the dropdown to show blank
+- Expanded to 5%% increments from 5%% through 100%%
+
+**Files Modified:**
+- `select.py`: Added TARIFF_OPTIMIZER to BATTERY_MODE_MAP; expanded RESERVE_PERCENTAGE_OPTIONS to 5%% increments
+
+---
+
 ## [v2026.03.1] - 03-2026
 
 ### Bug Fix & Technical Improvement: Removed pypvs Dependency
