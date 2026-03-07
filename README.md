@@ -1,6 +1,6 @@
 # Enhanced SunPower: The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
 
-## v2026.03.1 - Removed pypvs Dependency (Currently in Pre-release testing if you want it manually install)
+## v2026.03.1 - Removed pypvs Dependency
 
 This release removes the `pypvs` external library and fixes a bug where inverters would not repopulate after a nighttime Home Assistant restart. No configuration changes required. See [CHANGELOG](docs/CHANGELOG.md) for details.
 
