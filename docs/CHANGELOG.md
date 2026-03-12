@@ -3,6 +3,20 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.3] - 03-2026
+
+### Bug Fix: Virtual Production Meter Sunrise Spike
+
+**Fixed: Virtual production meter reporting incorrect lifetime value at sunrise**
+- **Problem**: At sunrise, PVS inverters do not all come online simultaneously -- they report in to the PVS one by one over several poll cycles. The virtual production meter aggregates lifetime kWh from all inverters, so early morning polls produced a partial sum much lower than the actual lifetime total. When the last inverters came online, the meter appeared to jump by tens of thousands of kWh
+- **Impact**: Any utility meter helper using the virtual production meter as its source would record this jump as a massive daily production spike, corrupting daily statistics and requiring manual SQLite cleanup to fix
+- **Fix**: The integration now fills in any missing inverters from cache on every poll (not just when all inverters are absent). Missing inverters contribute their last known lifetime kWh while their real-time power values are zeroed. As each inverter comes online, its fresh data replaces the cached value. The virtual meter sum remains stable through the entire sunrise startup sequence
+
+**Files Modified:**
+- `__init__.py`: Extended cache merge logic to restore individual missing inverters on every poll, not only when all inverters are absent
+
+---
+
 ## [v2026.03.2] - 03-2026
 
 ### Bug Fix: Battery Control Improvements

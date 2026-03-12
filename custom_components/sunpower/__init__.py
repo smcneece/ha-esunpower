@@ -857,17 +857,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         fresh_device_types = {dev.get('DEVICE_TYPE') for dev in fresh_data.get('devices', [])}
                         cached_devices = cached_data.get('devices', [])
                         
-                        # Preserve inverters if missing from fresh data (night-time)
-                        if 'Inverter' not in fresh_device_types:
-                            cached_inverters = [dev for dev in cached_devices
-                                               if dev.get('DEVICE_TYPE') == 'Inverter'
-                                               and dev.get('SERIAL') not in fresh_serials]
-                            if cached_inverters:
-                                # Sanitize cached inverters to zero out power values
-                                sanitized_inverters = [_sanitize_cached_inverter(inv) for inv in cached_inverters]
-                                fresh_data['devices'].extend(sanitized_inverters)
-                                _LOGGER.debug("Restored %d inverters from cache with power values zeroed (offline at night)",
-                                            len(sanitized_inverters))
+                        # Restore any missing inverters from cache (night-time OR sunrise partial data)
+                        # At sunrise, PVS returns inverters one-by-one as they wake up. Without this,
+                        # the virtual meter sums only the inverters present in that poll, creating a
+                        # large apparent jump when the last inverter comes online. Filling missing
+                        # inverters with cached lifetime values (power zeroed) keeps the sum stable.
+                        cached_inverters = [dev for dev in cached_devices
+                                           if dev.get('DEVICE_TYPE') == 'Inverter'
+                                           and dev.get('SERIAL') not in fresh_serials]
+                        if cached_inverters:
+                            # Sanitize: zero power values, preserve lifetime kWh
+                            sanitized_inverters = [_sanitize_cached_inverter(inv) for inv in cached_inverters]
+                            fresh_data['devices'].extend(sanitized_inverters)
+                            _LOGGER.debug("Restored %d missing inverters from cache (power zeroed, lifetime preserved)",
+                                        len(sanitized_inverters))
                         
                         # Preserve power meters if missing
                         if 'Power Meter' not in fresh_device_types:

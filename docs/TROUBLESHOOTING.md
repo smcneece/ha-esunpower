@@ -88,6 +88,26 @@
 3. **Check Notifications**: Look for battery detection warnings
 4. **ESS Communication**: Battery data requires separate ESS API endpoint
 
+### PVS6 eMMC Flash Wear and Write Exhaustion
+
+The PVS6 uses soldered NAND flash (eMMC) for storage. Early firmware versions wrote log files excessively to flash, exhausting the device's finite write cycles in months rather than years. Current firmware (BUILD 61846+) addresses this with a RAMdisk approach that keeps frequently-changed data in memory rather than writing to flash.
+
+**Check your flash wear status** using the integration's Flash Wear sensor (Settings -> Devices & Services -> Enhanced SunPower -> PVS device). The value shows estimated lifetime consumed as a percentage.
+
+**Thresholds:**
+- Below 50%: Normal, no action needed
+- 50-79%: Monitor regularly
+- 80%+: Critical -- SunPower blocks firmware updates at this level. Consider the USB boot workaround (see community resources) to extend device life
+
+**Symptoms of severe flash exhaustion:**
+- PVS shows a rotating rainbow LED pattern (cycling yellow/green/red at multi-second intervals)
+- PVS becomes unresponsive but Ethernet indicators remain active
+- Random reboots or intermittent connectivity
+
+**Prevention:** Keep the integration's flash memory alert threshold set below 80% so you get notified before reaching the critical level.
+
+**Reference:** [PVS6 eMMC Write Exhaustion community notes](https://gist.github.com/koleson/5c719620039e0282976a8263c068e85c#emmc-write-exhaustion-issues)
+
 ### Energy Dashboard - Missing Grid Import/Export Sensors
 
 **Issue**: "KWh To Grid" and "KWh To Home" sensors not available for Energy Dashboard configuration
