@@ -1,4 +1,6 @@
-# Enhanced SunPower: The most feature-rich and best supported Home Assistant integration for your SunPower/SunStrong PVS
+# Enhanced SunPower: Home Assistant Integration for SunPower PVS6 / PVS5 Solar Monitoring
+
+Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
 ## v2026.03.1 - Removed pypvs Dependency
 
