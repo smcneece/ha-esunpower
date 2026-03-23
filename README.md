@@ -2,9 +2,9 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
-## v2026.03.1 - Removed pypvs Dependency
+## v2026.03.4 - PVS5 Setup Fix, Sunrise Meter Spike Fix, Battery Control Improvements
 
-This release removes the `pypvs` external library and fixes a bug where inverters would not repopulate after a nighttime Home Assistant restart. No configuration changes required. See [CHANGELOG](docs/CHANGELOG.md) for details.
+This release fixes PVS5 systems failing to set up, virtual production meter spikes at sunrise causing utility meter corruption, and battery control dropdown issues. No configuration changes required. See [CHANGELOG](docs/CHANGELOG.md) for details.
 
 ---
 
