@@ -3,6 +3,21 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.4] - 03-2026
+
+### Bug Fix: PVS5 Setup Failure
+
+**Fixed: PVS5 systems could not be added to Home Assistant**
+- **Problem**: PVS5 firmware does not include a standalone `BUILD` field in the supervisor/info response. The build number is embedded in the `SWVER` string (e.g. `"2025.11, Build 5412"`). The integration looked only for a standalone `BUILD` field, found nothing, and fell back to legacy dl_cgi mode which returned a 403 error since PVS5 new firmware requires authentication. Setup failed entirely.
+- **Fix 1**: `get_supervisor_info()` now falls back to parsing the `SWVER` field when no standalone `BUILD` field is present. The existing `parse_build_number()` function already handled this format; it just was not being called with SWVER as input.
+- **Fix 2**: PVS5 is now correctly identified as new firmware (varserver) regardless of build number. The 61840 build threshold only applies to PVS6 hardware. Any PVS5 with a detected build number is treated as new firmware.
+- **Fix 3**: The 60-second polling minimum for old firmware no longer applies to PVS5, which uses new firmware and should follow the 10-second minimum.
+
+**Files Modified:**
+- `config_flow.py`: `get_supervisor_info()` falls back to SWVER for BUILD, returns model; `_validate_pvs()` and options flow treat PVS5 as new firmware; `_adjust_polling_for_old_firmware()` skips enforcement when `uses_pypvs` is True
+
+---
+
 ## [v2026.03.3] - 03-2026
 
 ### Bug Fix: Virtual Production Meter Sunrise Spike

@@ -72,10 +72,14 @@ def parse_build_number(build_raw):
 
 
 async def get_supervisor_info(host):
-    """Auto-detect PVS serial and firmware build from supervisor/info endpoint
+    """Auto-detect PVS serial, firmware build, and model from supervisor/info endpoint
 
     Returns:
-        Tuple of (serial, build, last5, error_message)
+        Tuple of (serial, build, last5, model, error_message)
+
+    Note: PVS5 firmware does not include a standalone BUILD field. BUILD is embedded
+    in the SWVER string (e.g. "2025.11, Build 5412"). This function falls back to
+    parsing SWVER when BUILD is absent.
     """
     import aiohttp
 
@@ -90,27 +94,31 @@ async def get_supervisor_info(host):
                     supervisor = data.get("supervisor", {})
 
                     serial = supervisor.get("SERIAL")
-                    build_raw = supervisor.get("BUILD")
+                    model = supervisor.get("MODEL", "")
+
+                    # Prefer standalone BUILD field; fall back to SWVER for PVS5
+                    build_raw = supervisor.get("BUILD") or supervisor.get("SWVER")
 
                     if serial and build_raw:
-                        # Parse BUILD to handle different firmware formats
+                        # Parse BUILD to handle different firmware formats including
+                        # PVS5 SWVER format: "2025.11, Build 5412"
                         build = parse_build_number(build_raw)
                         if build is None:
-                            _LOGGER.warning("⚠️ Could not parse BUILD from '%s', will try legacy detection", build_raw)
-                            return None, None, None, f"Unparseable BUILD format: {build_raw}"
+                            _LOGGER.warning("Could not parse BUILD from '%s', will try legacy detection", build_raw)
+                            return None, None, None, model, f"Unparseable BUILD format: {build_raw}"
 
                         last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
-                        _LOGGER.info("✅ supervisor/info: SERIAL=%s, BUILD=%s (raw: %s), Last5=%s",
-                                    serial, build, build_raw, last5)
-                        return serial, build, last5, None
+                        _LOGGER.info("supervisor/info: SERIAL=%s, BUILD=%s (raw: %s), MODEL=%s, Last5=%s",
+                                    serial, build, build_raw, model, last5)
+                        return serial, build, last5, model, None
                     else:
-                        return None, None, None, "supervisor/info missing SERIAL or BUILD"
+                        return None, None, None, model, "supervisor/info missing SERIAL or BUILD"
                 else:
-                    return None, None, None, f"supervisor/info HTTP {response.status}"
+                    return None, None, None, "", f"supervisor/info HTTP {response.status}"
 
     except Exception as e:
         _LOGGER.warning("supervisor/info request failed: %s", e, exc_info=True)
-        return None, None, None, str(e)
+        return None, None, None, "", str(e)
 
 
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -162,13 +170,15 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.debug("Battery detection failed during setup: %s", e)
 
     def _adjust_polling_for_old_firmware(self):
-        """Enforce 60s minimum for old firmware (BUILD < 61840)"""
+        """Enforce 60s minimum for old firmware (BUILD < 61840, PVS6 only)"""
         try:
             firmware_build = self._basic_config.get("firmware_build")
+            uses_pypvs = self._basic_config.get("uses_pypvs", False)
             polling_interval = self._basic_config["polling_interval"]
 
-            # Old firmware needs 60s minimum for hardware protection
-            if firmware_build and firmware_build < 61840 and polling_interval < 60:
+            # Old firmware needs 60s minimum for hardware protection.
+            # Skip if uses_pypvs is True (new firmware including all PVS5 builds).
+            if firmware_build and not uses_pypvs and firmware_build < 61840 and polling_interval < 60:
                 old_interval = polling_interval
                 self._basic_config["polling_interval"] = 60
                 _LOGGER.info("Adjusted polling from %ds to 60s for old firmware BUILD %s (hardware protection)",
@@ -189,16 +199,19 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
         # Step 1: Get supervisor info for auto-detection
-        serial, build, last5, error = await get_supervisor_info(host)
+        serial, build, last5, model, error = await get_supervisor_info(host)
 
         if error or build is None:
             _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error or "build is None")
             # Fallback to legacy detection without BUILD number
             return await self._validate_pvs_legacy(host)
 
-        # Step 2: Determine firmware type based on BUILD number (PR #127 approach)
+        # Step 2: Determine firmware type based on BUILD number and model.
+        # PVS5 uses a different build number scale (5xxx vs PVS6 61xxx) so the
+        # 61840 threshold only applies to PVS6. Any PVS5 with a parseable build
+        # is new firmware using varserver.
         MIN_LOCALAPI_BUILD = 61840
-        uses_pypvs = build >= MIN_LOCALAPI_BUILD
+        uses_pypvs = build >= MIN_LOCALAPI_BUILD or model.upper() == "PVS5"
 
         _LOGGER.info("PVS Firmware Detected: BUILD=%s, Method=%s, Serial=%s, Password=%s",
                     build, "varserver (LocalAPI)" if uses_pypvs else "dl_cgi (legacy)", serial, last5)
@@ -260,7 +273,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         # Try varserver (new firmware) - get serial from supervisor info first
         try:
-            serial_legacy, build_legacy, last5_legacy, err_legacy = await get_supervisor_info(host)
+            serial_legacy, build_legacy, last5_legacy, model_legacy, err_legacy = await get_supervisor_info(host)
             if serial_legacy and last5_legacy:
                 client = VarserverClient(
                     session=async_get_clientsession(self.hass, False),
@@ -615,14 +628,14 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             if not errors:
                 # Auto-detect firmware info (critical for existing integrations missing firmware_build)
                 host = user_input["host"]
-                serial, build, last5, error = await get_supervisor_info(host)
+                serial, build, last5, model, error = await get_supervisor_info(host)
 
                 if build:
                     MIN_LOCALAPI_BUILD = 61840
-                    uses_pypvs = build >= MIN_LOCALAPI_BUILD
+                    uses_pypvs = build >= MIN_LOCALAPI_BUILD or model.upper() == "PVS5"
                     user_input["firmware_build"] = build
                     user_input["uses_pypvs"] = uses_pypvs
-                    _LOGGER.info("Options: Auto-detected firmware BUILD %s, uses_pypvs=%s", build, uses_pypvs)
+                    _LOGGER.info("Options: Auto-detected firmware BUILD %s, MODEL=%s, uses_pypvs=%s", build, model, uses_pypvs)
 
                     # New firmware requires password - prevent blank serial from overwriting existing
                     if uses_pypvs and not pvs_serial_last5:
