@@ -3,6 +3,20 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.5] - 03-2026
+
+### Bug Fix: Memory Leak in IP-Based PVS Virtual Meter Naming
+
+**Fixed: Home Assistant crashes after ~31 hours of uptime when PVS uses an IP address as its serial**
+- **Problem**: When a PVS device reports an IP address as its serial number (common in some network configurations), `generate_safe_virtual_serial()` fell back to constructing the virtual meter entity name using `int(time.time())` as a suffix. Because this function is called on every poll cycle (~75 seconds), each poll created a brand-new HA entity with a unique name. HA's entity and device registries grew without bound, and long-term statistics rows accumulated in the SQLite database. After ~31 hours of operation this had produced 7,839 unique phantom device entries and 62,704 phantom entity entries; memory consumption reached 6.3 GB and Home Assistant terminated with a segmentation fault (exit code 139 / SIGSEGV).
+- **Impact**: Any installation where the PVS is addressed by IP (rather than a hardware serial) was silently leaking memory on every poll and would eventually crash Home Assistant. The registries and statistics database required manual cleanup to recover.
+- **Fix**: Replaced `int(time.time())` with a fixed `_virtual` suffix. The virtual meter serial is now `virtual_production_meter_meter_virtual` — stable across restarts and poll cycles — so HA maps all updates to the same entity rather than creating a new one each time.
+
+**Files Modified:**
+- `data_processor.py`: `generate_safe_virtual_serial()` uses a fixed `_virtual` suffix instead of `int(time.time())`
+
+---
+
 ## [v2026.03.4] - 03-2026
 
 ### Bug Fix: PVS5 Setup Failure
