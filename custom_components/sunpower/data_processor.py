@@ -46,18 +46,12 @@ def is_ip_address(serial):
 
 
 def generate_safe_virtual_serial(base_name, device_type):
-    """Generate a safe serial name that won't create zombies"""
-    import time
-    timestamp = int(time.time())
-    
-    # Create unique, non-IP serial names
-    safe_serial = f"{base_name}_{device_type.lower()}_{timestamp}"
-    
-    # Double-check it's not accidentally an IP
-    if is_ip_address(safe_serial):
-        # Extremely unlikely, but add extra suffix if needed
-        safe_serial = f"safe_{safe_serial}_virtual"
-    
+    """Generate a stable serial name for IP-based PVS devices.
+
+    Uses a fixed suffix instead of time.time() to avoid creating a new
+    entity on every poll cycle, which leaks memory and eventually crashes HA.
+    """
+    safe_serial = f"{base_name}_{device_type.lower()}_virtual"
     return safe_serial
 
 

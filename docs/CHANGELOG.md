@@ -3,6 +3,22 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.03.5] - 03-2026
+
+### Bug Fix: Memory Leak Crash for IP-Serial PVS Devices
+
+**Fixed: Home Assistant crashes after ~31 hours when PVS serial is an IP address**
+- **Problem**: When a PVS reports an IP address as its serial number, `generate_safe_virtual_serial()` used `int(time.time())` as a suffix, creating a brand-new HA entity on every poll cycle. Over time the entity registry, device registry, and statistics database grew without bound. One affected user accumulated 7,839 phantom devices, 62,704 phantom entities, and 6.3 GB of RAM usage before Home Assistant crashed with a segmentation fault.
+- **Fix**: Replaced `int(time.time())` with a fixed `_virtual` suffix. The virtual meter serial is now `virtual_production_meter_meter_virtual`, stable across restarts and poll cycles.
+- **Recovery**: Users who hit this bug will have orphaned timestamp-named entities remaining after the update. These can be removed via the HA entity registry UI or by stopping HA and cleaning the registry manually.
+
+**Files Modified:**
+- `data_processor.py`: `generate_safe_virtual_serial()` uses a fixed `_virtual` suffix
+
+**Contributor:** [@joshchiou](https://github.com/joshchiou) - PR #64
+
+---
+
 ## [v2026.03.4] - 03-2026
 
 ### Bug Fix: PVS5 Setup Failure

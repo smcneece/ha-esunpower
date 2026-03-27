@@ -556,9 +556,11 @@ This integration is not affiliated with or endorsed by SunPower or SunStrong Cor
 
 Special thanks to community contributors who have helped improve this integration:
 
-- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)  
-**Max Roberts** - For helping get basic battery functionality working  
-**Ian Jones** - For helping beta test battery control features  
+- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)
+- **[@joshchiou](https://github.com/joshchiou)** - Fixed memory leak crash caused by timestamp-based virtual meter naming for IP-serial PVS devices (PR #64)
+
+**Max Roberts** - For helping get basic battery functionality working
+**Ian Jones** - For helping beta test battery control features
 
 ---
 
