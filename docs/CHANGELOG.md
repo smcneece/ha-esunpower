@@ -3,6 +3,19 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.04.2] - 04-2026
+
+### Bug Fix: Startup Crash on Some PVS Firmware Versions
+
+**Fixed: Integration fails to load when PVS does not expose `/sys/pvs/flashwear_type_b`**
+- **Problem**: Some PVS firmware versions do not have the `flashwear_type_b` varserver variable. Rather than returning a "no data" response, the PVS hangs on the request indefinitely. The integration had no per-request timeout, so it waited forever until Home Assistant's bootstrap stage 2 timeout cancelled the entire setup. `asyncio.CancelledError` is a `BaseException` (not `Exception`), so the existing `except Exception` block did not catch it, and the cancellation propagated up crashing the integration load.
+- **Fix**: Added a 15-second `aiohttp.ClientTimeout` to every varserver POST and auth GET request. A non-responsive PVS variable now fails cleanly after 15 seconds rather than hanging indefinitely.
+
+**Files Modified:**
+- `varserver_client.py`: Added `aiohttp.ClientTimeout(total=15)` to all HTTP requests; added explicit `asyncio.TimeoutError` handler in `_post_vars`
+
+---
+
 ## [v2026.04.1] - 04-2026
 
 ### Battery Mode Investigation: Two New Sensors + Control Mode Fix (Needs Verification)

@@ -51,9 +51,9 @@ automation:
           title: "Battery Mode Changed"
           message: "Switched back to Self Supply mode (peak hours ended)"
 
-  # Emergency: Switch to Emergency Reserve if severe weather forecast
+  # Emergency: Switch to Reserve mode if severe weather forecast
   # (Requires weather integration with alerts)
-  - alias: "Battery: Emergency Reserve on Severe Weather"
+  - alias: "Battery: Reserve Mode on Severe Weather"
     description: "Preserve battery for backup power during severe weather"
     trigger:
       - platform: state
@@ -64,7 +64,7 @@ automation:
         target:
           entity_id: select.battery_control_mode
         data:
-          option: "Emergency Reserve"
+          option: "Reserve"
       - service: select.select_option
         target:
           entity_id: select.battery_reserve_percentage
@@ -72,11 +72,11 @@ automation:
           option: "80%"
       - service: notify.mobile_app_your_phone
         data:
-          title: "⚠️ Battery Emergency Mode"
-          message: "Battery set to Emergency Reserve (80%) due to severe weather alert"
+          title: "⚠️ Battery Reserve Mode"
+          message: "Battery set to Reserve (80%) due to severe weather alert"
 
-  # Return from Emergency Reserve after weather clears
-  - alias: "Battery: Return from Emergency Reserve"
+  # Return from Reserve mode after weather clears
+  - alias: "Battery: Return from Reserve Mode"
     description: "Resume normal operation after severe weather passes"
     trigger:
       - platform: state
@@ -88,7 +88,7 @@ automation:
     condition:
       - condition: state
         entity_id: select.battery_control_mode
-        state: "Emergency Reserve"
+        state: "Reserve"
     action:
       - service: select.select_option
         target:

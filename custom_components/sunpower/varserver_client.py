@@ -11,9 +11,12 @@ Why this exists:
 - Eliminates an abandoned external dependency.
 """
 
+import asyncio
 import base64
 import logging
 from datetime import datetime, timezone
+
+import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +75,8 @@ class VarserverClient:
 
         try:
             async with self._session.get(
-                url, headers=headers, ssl=False
+                url, headers=headers, ssl=False,
+                timeout=aiohttp.ClientTimeout(total=15)
             ) as response:
                 if response.status != 200:
                     _LOGGER.error(
@@ -115,7 +119,8 @@ class VarserverClient:
         self._session.cookie_jar.clear()
         try:
             async with self._session.post(
-                url, cookies=self._cookies, data=payload_str, ssl=False
+                url, cookies=self._cookies, data=payload_str, ssl=False,
+                timeout=aiohttp.ClientTimeout(total=15)
             ) as response:
                 if response.status == 400:
                     # Varserver returns 400 when no devices exist for the
@@ -138,6 +143,7 @@ class VarserverClient:
                             cookies=self._cookies,
                             data=payload_str,
                             ssl=False,
+                            timeout=aiohttp.ClientTimeout(total=15),
                         ) as retry:
                             if retry.status != 200:
                                 _LOGGER.error(
@@ -158,6 +164,9 @@ class VarserverClient:
                 return self._parse_response(
                     await response.json(content_type=None)
                 )
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Varserver POST timed out (15s) for %s", list(params.values()))
+            return {}
         except Exception as e:
             _LOGGER.error("Varserver POST error: %s", e)
             return {}
