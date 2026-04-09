@@ -3,6 +3,39 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.04.1] - 04-2026
+
+### Battery Mode Investigation: Two New Sensors + Control Mode Fix (Needs Verification)
+
+**Context**: User reports revealed that the PVS varserver has two separate battery mode fields: `opMode` (real-time operational state) and `control_mode` (user-configured mode). The battery firmware automatically switches `opMode` to TARIFF_OPTIMIZER at SOC limits (reserve floor and 100% charge) as a normal limit-protection behavior. Previously the integration was reading `opMode` and using it for the Battery Control Mode select entity, which may have been incorrect.
+
+**Changes:**
+- **Battery Control Mode select**: Now reads `control_mode` from the varserver config path `/ess/config/dcm/mode_param/control_mode` directly, rather than using `opMode` from ESS telemetry. Per API documentation these are separate fields. Whether they differ in practice is unconfirmed pending user testing with actual hardware.
+- **New sensor: ESS Configured Mode**: Read-only sensor showing the polled `control_mode` value. Compare this against ESS Operating Mode to see if they differ.
+- **New sensor: ESS Operating Mode**: Previously defined but hidden (diagnostic category). Now visible by default. Shows real-time `opMode` from ESS telemetry.
+
+**Goal**: With both sensors visible, users with SunVault systems can report whether `control_mode` and `opMode` ever differ, which will confirm whether the original code was wrong or intentional.
+
+**Battery Mode Labels Updated to Match SunStrong App**
+- User reports confirmed the varserver mode `TARIFF_OPTIMIZER` corresponds to the SunStrong "Reserve" mode, not a user-selectable "Tariff Optimizer" option. SunStrong only exposes three modes: Self Supply, Cost Savings, and Reserve.
+- Renamed "Tariff Optimizer" to "Reserve" in the Battery Control Mode select entity.
+- Removed "Emergency Reserve" (BACKUP_ONLY) as it does not appear to be a real user-facing mode in any known firmware version.
+- **Breaking change**: Any HA automations using `option: "Tariff Optimizer"` or `option: "Emergency Reserve"` must be updated to `option: "Reserve"`.
+
+**Auth Failure Log Level**
+- Changed varserver auth failure log messages from ERROR to WARNING since the coordinator retries automatically. Reduces alarming red entries in HA logs during transient connectivity issues at startup.
+
+**Bug Fix: False Firmware-Upgrade Notification**
+- When the PVS varserver temporarily omits the firmware version from its response (which can happen during nightly PVS operations such as cloud sync or internal service restarts), the integration was defaulting the missing value to the string `"Unknown"` instead of blank. The firmware change detector then saw `"2025.10.20.61846" -> "Unknown"` as a real upgrade and sent a notification. Since `"Unknown"` is a non-empty string, the guard that was supposed to suppress empty values had no effect. Fixed by defaulting the missing value to an empty string so the guard works correctly and no false notification fires.
+
+**Files Modified:**
+- `__init__.py`: Battery config polls `control_mode` from varserver config path; stores value in ESS device dicts for sensor exposure
+- `battery_handler.py`: Added `ESS_CONFIGURED_MODE` sensor; `ESS_OP_MODE` moved out of diagnostic category
+- `select.py`: Mode labels updated to match SunStrong app; BACKUP_ONLY removed
+- `varserver_client.py`: Auth failure log level changed from ERROR to WARNING; SWVER default changed from `"Unknown"` to `""` to prevent false firmware-upgrade notifications
+
+---
+
 ## [v2026.03.5] - 03-2026
 
 ### Bug Fix: Memory Leak Crash for IP-Serial PVS Devices

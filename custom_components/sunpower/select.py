@@ -15,11 +15,13 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 # Battery mode mapping: Friendly name -> API value
+# Labels match SunStrong app modes exactly based on user reports.
+# TARIFF_OPTIMIZER is what the varserver uses for the "Reserve" mode.
+# BACKUP_ONLY does not appear to be a real user-facing mode and has been removed.
 BATTERY_MODE_MAP = {
     "Self Supply": "SELF_CONSUMPTION",
     "Cost Savings": "ENERGY_ARBITRAGE",
-    "Emergency Reserve": "BACKUP_ONLY",
-    "Tariff Optimizer": "TARIFF_OPTIMIZER",
+    "Reserve": "TARIFF_OPTIMIZER",
 }
 
 # Reverse mapping: API value -> Friendly name

@@ -399,7 +399,14 @@ SUNVAULT_SENSORS = {
                 "icon": "mdi:cog",
                 "device": None,
                 "state": None,
-                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
+            "ESS_CONFIGURED_MODE": {
+                "field": "configured_mode",
+                "title": "{SUN_VAULT}ESS {index}Configured Mode",
+                "unit": None,
+                "icon": "mdi:cog-outline",
+                "device": None,
+                "state": None,
             },
             "ESS_CHARGE_LIMIT": {
                 "field": "chrg_limit_pmax_kw",

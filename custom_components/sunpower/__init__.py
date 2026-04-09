@@ -946,17 +946,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     try:
                         battery_config = {}
 
-                        # control_mode is already in ESS status data as "op_mode"
-                        # Extract it from the already-polled ESS data to avoid extra API call
-                        ess_device = data.get("Energy Storage System", {})
-                        if ess_device:
-                            for serial, device in ess_device.items():
-                                op_mode = device.get("op_mode")
-                                if op_mode:
-                                    battery_config["control_mode"] = op_mode
-                                    break
+                        # Poll configured control_mode from varserver config path.
+                        # Note: op_mode (real-time operational state) is a separate field
+                        # already in the ESS device dict and exposed via the ESS_OP_MODE sensor.
+                        # These are different: control_mode is what the user configured,
+                        # op_mode is what the battery firmware is currently doing.
+                        _LOGGER.debug("Polling battery control mode (control_mode)")
+                        control_mode = await varserver_client.get_var(
+                            "/ess/config/dcm/mode_param/control_mode"
+                        )
+                        if control_mode:
+                            battery_config["control_mode"] = control_mode
+                            # Also store in ESS device dicts so it can be exposed as a sensor
+                            # alongside op_mode, letting users compare configured vs operational mode
+                            for ess_type in ("Energy Storage System", "ESS", "SunVault"):
+                                ess_devices = data.get(ess_type, {})
+                                for device in ess_devices.values():
+                                    device["configured_mode"] = control_mode
 
-                        # min_customer_soc is NOT in ESS status data, must poll separately
+                        # min_customer_soc must also be polled separately
                         _LOGGER.debug("Polling battery minimum reserve (min_customer_soc)")
                         min_soc = await varserver_client.get_var(
                             "/ess/config/dcm/control_param/min_customer_soc"

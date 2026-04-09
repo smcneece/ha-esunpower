@@ -85,7 +85,7 @@ class VarserverClient:
                 )
                 return True
         except Exception as e:
-            _LOGGER.error("Varserver auth request failed: %s", e)
+            _LOGGER.warning("Varserver auth request failed: %s", e)
             return False
 
     def _parse_response(self, data: dict) -> dict:
@@ -105,7 +105,7 @@ class VarserverClient:
         """
         if self._cookies is None:
             if not await self.authenticate():
-                _LOGGER.error("Cannot query vars - authentication failed")
+                _LOGGER.warning("Cannot query vars - authentication failed, will retry next poll")
                 return {}
 
         url = f"https://{self._host}/vars"
@@ -309,7 +309,7 @@ class VarserverClient:
             "DEVICE_TYPE": "PVS",
             "SERIAL": pvs_serial,
             "MODEL": model,
-            "SWVER": info.get("/sys/info/sw_rev", "Unknown"),
+            "SWVER": info.get("/sys/info/sw_rev", ""),
             "HWVER": hw_ver,
             "STATE": "working",
             "STATEDESCR": "Working",

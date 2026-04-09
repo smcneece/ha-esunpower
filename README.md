@@ -2,9 +2,11 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
-## v2026.03.4 - PVS5 Setup Fix, Sunrise Meter Spike Fix, Battery Control Improvements
+## v2026.04.1 - Battery Mode Fix + New Sensors + Log Cleanup
 
-This release fixes PVS5 systems failing to set up, virtual production meter spikes at sunrise causing utility meter corruption, and battery control dropdown issues. No configuration changes required. See [CHANGELOG](docs/CHANGELOG.md) for details.
+This release fixes battery mode labels to match the SunStrong app, adds two new battery sensors (ESS Configured Mode and ESS Operating Mode), fixes a false firmware-upgrade notification triggered when the PVS temporarily omits its version from the varserver response, and reduces alarming ERROR log entries during startup to WARNING. See [CHANGELOG](docs/CHANGELOG.md) for details.
+
+**Breaking change for battery users**: The "Tariff Optimizer" and "Emergency Reserve" mode options have been renamed/removed. Use "Reserve" instead. Update any automations that reference those old option names.
 
 ---
 
@@ -256,8 +258,8 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - `select.battery_control_mode` - Switch between operating modes
   - **Self Supply**: Use battery to offset home consumption (default)
   - **Cost Savings**: Charge during off-peak, discharge during peak hours (TOU optimization)
-  - **Emergency Reserve**: Preserve battery for backup power only
-- `select.battery_reserve_percentage` - Set minimum battery reserve (10%-100%)
+  - **Reserve**: Preserve battery for backup power only
+- `select.battery_reserve_percentage` - Set minimum battery reserve (5%-100%)
 
 **Example TOU Automation:**
 ```yaml
@@ -279,6 +281,8 @@ automation:
 ```
 
 **More automation examples:** [docs/battery_tou_automation_example.yaml](docs/battery_tou_automation_example.yaml)
+
+**Note:** Mode changes are sent to the PVS immediately when you change the selector in HA. However, the PVS varserver updates its status data every few minutes, so there will be a short lag before HA reflects the new state. This is normal behavior from the PVS itself, not the integration.
 
 **Beta Testing:**
 - ✅ Code complete and safety audited
