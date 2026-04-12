@@ -3,6 +3,20 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.04.3] - 04-2026
+
+### Bug Fix: "Reserve" Battery Mode Incorrectly Mapped
+
+**Fixed: Battery Control Mode dropdown shows "unknown" when battery is in Reserve mode**
+- **Problem**: In v2026.04.1, the "Reserve" option in Battery Control Mode was incorrectly mapped to the varserver value `TARIFF_OPTIMIZER`. The correct varserver value for Reserve is `BACKUP_ONLY`. This meant selecting "Reserve" from the dropdown was writing the wrong value to the PVS, and a battery already in `BACKUP_ONLY` mode would show as "unknown" in the dropdown.
+- **Fix**: Corrected the mapping so "Reserve" writes and reads `BACKUP_ONLY`. `TARIFF_OPTIMIZER` is a firmware-internal holding state only, not a user-selectable mode.
+- **Note**: This is a second breaking change to battery automations in quick succession. Any automation using `option: "Reserve"` from v2026.04.1 was already writing the wrong value. After upgrading to v2026.04.3, the "Reserve" option will work correctly.
+
+**Files Modified:**
+- `select.py`: Fixed `BATTERY_MODE_MAP` - "Reserve" now maps to `BACKUP_ONLY` instead of `TARIFF_OPTIMIZER`
+
+---
+
 ## [v2026.04.2] - 04-2026
 
 ### Bug Fix: Startup Crash on Some PVS Firmware Versions

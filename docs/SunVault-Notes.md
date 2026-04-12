@@ -52,19 +52,21 @@ From the PVS6 public variable docs:
 **Key distinction**: `control_mode` is the configured mode. `opMode` is what the battery firmware is actually doing right now. They can differ.
 
 ### TARIFF_OPTIMIZER is Automatic Firmware Behavior
-Confirmed by multiple users (jeffvrba, calvinshih90, issue #65):
-- When SOC drops to the reserve threshold, firmware automatically sets `control_mode` to TARIFF_OPTIMIZER
-- When SOC hits 100%, firmware automatically sets `control_mode` to TARIFF_OPTIMIZER
-- It is a "battery is at a limit, nothing to do right now" holding state
-- The battery restores the previous mode once conditions change
-- **Seeing TARIFF_OPTIMIZER in HA does not mean you set it.** It is normal firmware behavior.
-- TARIFF_OPTIMIZER does not appear as a user option in the SunStrong app for most users
+Confirmed by dlp688 screenshots (issue #65, April 9 2026) - now definitively understood:
+- TARIFF_OPTIMIZER appears in `opMode` (ESS Operating Mode), NOT in `control_mode` (ESS Configured Mode)
+- When SOC drops to the reserve threshold or hits 100%, firmware sets `opMode` to TARIFF_OPTIMIZER
+- `control_mode` stays as whatever the user configured (e.g. SELF_CONSUMPTION) - it does not change
+- It is a "battery is at a limit, nothing to do right now" holding state in the operational layer
+- The firmware restores normal opMode once conditions change
+- **Seeing TARIFF_OPTIMIZER in ESS Operating Mode is normal.** It just means the battery is at an SOC limit.
+- TARIFF_OPTIMIZER does not appear as a user option in the SunStrong app
 
-### Two-Layer Mode Display
-- SunStrong shows the user-configured mode (what you chose in the app)
-- Our integration reads `control_mode` from the varserver, which is what the battery firmware is currently doing
-- When firmware overrides the mode at SOC limits, HA shows the override while SunStrong still shows your configured mode
-- Both are correct. They are showing different things. This is not a bug.
+### Two-Layer Mode Display (Confirmed)
+Confirmed with side-by-side sensor screenshots from dlp688:
+- `control_mode` (ESS Configured Mode sensor) = what the user has set. Follows HA selector changes. Updates every few minutes via varserver poll.
+- `opMode` (ESS Operating Mode sensor) = what the battery firmware is actually doing right now. Often TARIFF_OPTIMIZER when battery is at SOC limits.
+- The old integration used `opMode` for the Battery Control Mode selector display - this made it look broken because it always showed TARIFF_OPTIMIZER. Fixed in v2026.04.1.
+- SunStrong app shows `control_mode` (configured), same as our ESS Configured Mode sensor. This is why SunStrong looked correct while our old selector looked wrong.
 
 ### Reserve Percentage
 - Stored as a float 0.0-1.0 at `/ess/config/dcm/control_param/min_customer_soc`
@@ -87,9 +89,9 @@ From general knowledge (verify against current SunPower/SunStrong docs):
 | varserver value | Our HA label | SunStrong label | Confidence |
 |----------------|--------------|-----------------|------------|
 | SELF_CONSUMPTION | Self Supply | Self Supply | High |
-| ENERGY_ARBITRAGE | Cost Savings | Cost Savings (?) | Medium - may have changed |
-| BACKUP_ONLY | Emergency Reserve | Reserve (?) | Low - not confirmed |
-| TARIFF_OPTIMIZER | Tariff Optimizer | Not user-selectable | High that it is firmware-internal |
+| ENERGY_ARBITRAGE | Cost Savings | Cost Savings | Medium |
+| BACKUP_ONLY | Reserve | Reserve | High - confirmed calvinshih90 April 2026 |
+| TARIFF_OPTIMIZER | (not user-selectable) | Not shown | High - firmware-internal holding state only |
 | STANDBY | (unmapped) | Unknown | Unknown |
 
 dlp688 raised a valid point: ENERGY_ARBITRAGE might now map to what SunStrong calls "Self Supply" and TARIFF_OPTIMIZER might have replaced ENERGY_ARBITRAGE in recent firmware. The renaming may have happened between firmware versions. Our current labels may be wrong.
@@ -108,12 +110,10 @@ dlp688 raised a valid point: ENERGY_ARBITRAGE might now map to what SunStrong ca
 - **Home Assistant is a better TOU solution** because you control your own schedule and can update it yourself
 
 ### HA Mode Changes vs SunStrong Cloud
-- We write mode changes to the varserver immediately when you change the selector in HA
-- Whether the SunStrong cloud overrides our changes is unclear
-- dlp688 reported no visible effect in SunStrong when setting mode via HA
-- Could be the two-layer display issue (SunStrong shows configured mode, we show operational mode)
-- Could mean our writes are being ignored or overridden
-- Needs more testing from users
+- Mode writes via HA selector confirmed working (dlp688, April 9 2026) - ESS Configured Mode sensor tracked changes between SELF_CONSUMPTION and ENERGY_ARBITRAGE from HA toggle
+- dlp688's earlier report of "no effect" was the ~5 minute varserver update lag, not a failed write
+- Whether the SunStrong cloud overrides HA-initiated mode changes is still unclear
+- Both HA and SunStrong write to the same `control_mode` varserver path, so whichever writes last wins
 
 ### Periodic Mode Cycling (~12 hour pattern)
 - Some users observed mode switching between values roughly every 12 hours for ~25 minutes
@@ -140,12 +140,16 @@ Users with Schneider Electric or other non-SunVault batteries connected to PVS m
 
 ## What We Need From Users With Battery Systems
 
-1. Set "Emergency Reserve" in HA, wait a few minutes, check SunStrong. Does it show "Reserve"? This would confirm or deny our BACKUP_ONLY mapping.
-2. In Cost Savings mode overnight with no solar: does the battery actually charge from the grid?
-3. What does `opMode` report during normal operation vs at SOC limits?
-4. After changing mode in HA, does battery behavior actually change (not just the display)?
-5. Does mode behavior differ between firmware builds?
-6. Do users with third-party batteries (Schneider etc.) see the same modes?
+1. In Cost Savings mode overnight with no solar: does the battery actually charge from the grid?
+2. After changing mode in HA to Cost Savings, does battery behavior actually change (not just the display)?
+3. Does mode behavior differ between firmware builds?
+4. Do users with third-party batteries (Schneider etc.) see the same modes?
+5. What does `opMode` show during normal daytime operation when SOC is not at a limit? (Confirmed TARIFF_OPTIMIZER at SOC limits - need confirmation of what it shows mid-range)
+
+**Resolved questions:**
+- opMode at SOC limits = TARIFF_OPTIMIZER (confirmed dlp688, April 9 2026)
+- HA mode writes work and control_mode updates correctly (confirmed dlp688, April 9 2026)
+- BACKUP_ONLY = "Reserve" in SunStrong (confirmed calvinshih90, April 12 2026). It IS a real user-facing mode. Our v2026.04.1 incorrectly mapped "Reserve" to TARIFF_OPTIMIZER instead of BACKUP_ONLY. Fixed in v2026.04.3.
 
 ---
 

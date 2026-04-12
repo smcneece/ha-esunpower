@@ -16,12 +16,12 @@ _LOGGER = logging.getLogger(__name__)
 
 # Battery mode mapping: Friendly name -> API value
 # Labels match SunStrong app modes exactly based on user reports.
-# TARIFF_OPTIMIZER is what the varserver uses for the "Reserve" mode.
-# BACKUP_ONLY does not appear to be a real user-facing mode and has been removed.
+# BACKUP_ONLY = "Reserve" in SunStrong (confirmed calvinshih90, April 2026).
+# TARIFF_OPTIMIZER is a firmware-internal holding state at SOC limits, not user-selectable.
 BATTERY_MODE_MAP = {
     "Self Supply": "SELF_CONSUMPTION",
     "Cost Savings": "ENERGY_ARBITRAGE",
-    "Reserve": "TARIFF_OPTIMIZER",
+    "Reserve": "BACKUP_ONLY",
 }
 
 # Reverse mapping: API value -> Friendly name

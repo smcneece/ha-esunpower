@@ -2,11 +2,11 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
-## v2026.04.2 - Startup Crash Fix + Battery Mode Fix + New Sensors
+## v2026.04.3 - Reserve Battery Mode Fix + Startup Crash Fix + New Sensors
 
-This release fixes a startup crash affecting some PVS firmware versions (no per-request HTTP timeout caused HA bootstrap to time out), fixes battery mode labels to match the SunStrong app, adds two new battery sensors (ESS Configured Mode and ESS Operating Mode), and fixes a false firmware-upgrade notification. See [CHANGELOG](docs/CHANGELOG.md) for details.
+This release fixes the "Reserve" battery mode option which was writing the wrong value to the PVS in v2026.04.1/v2026.04.2, fixes a startup crash affecting some PVS firmware versions, adds two new battery sensors (ESS Configured Mode and ESS Operating Mode), and fixes a false firmware-upgrade notification. See [CHANGELOG](docs/CHANGELOG.md) for details.
 
-**Breaking change for battery users**: The "Tariff Optimizer" and "Emergency Reserve" mode options have been renamed/removed. Use "Reserve" instead. Update any automations that reference those old option names.
+**Breaking change for battery users upgrading from v2026.03.x**: The "Tariff Optimizer" and "Emergency Reserve" mode options have been renamed/removed. Use "Reserve" instead. Update any automations that reference those old option names.
 
 ---
 
