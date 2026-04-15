@@ -146,6 +146,8 @@ HACS requires integrations to be registered in the home-assistant/brands reposit
    - Select mobile device for critical alerts
    - Configure email notifications
 
+> **Missing sensors after setup?** If you don't see consumption or grid import/export sensors, your installer may not have installed or provisioned the CT clamps in your electrical panel. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for diagnosis steps and workarounds.
+
 ### Configuration Options
 
 | Setting | Description | Default | Recommended |
@@ -359,66 +361,39 @@ notify:
 
 ### Energy Dashboard Integration
 
-**Enhanced SunPower Integration** provides comprehensive data for Home Assistant's Energy Dashboard. After installation and configuration, you can then configure your Energy Dashboard. Allow the integration to run for a few hours to generate statistics.
+Allow the integration to run for a few hours after setup before configuring the Energy Dashboard, so statistics have time to accumulate.
 
-**Entity Naming:** The integration shows proper inverter identification (e.g., "Inverter E001221370442207 Lifetime Power") for easy energy dashboard setup.
+**Step 1:** In the HA sidebar, click **Energy**.
 
-**Understanding Your Meters:**
-- **P Meter (Production)**: Tracks solar energy exported to grid, one direction only
-- **C Meter (Consumption, CT clamps)**: Tracks bidirectional grid flow (import FROM grid AND export TO grid)
+**Step 2:** Click the **pencil icon** in the top right corner to open the Energy configuration.
 
-**Setting Up Solar Production:**
+**Step 3: Add grid connection**
 
-**Recommended: Individual Inverters (Most Accurate)**
-- Add each `sensor.sunpower_inverter_*_lifetime_power` separately
-- Provides per-panel visibility and troubleshooting
-- More resilient during integration migrations
-- Takes a few minutes to add all inverters but worth it
+Click **Add grid connection** and set:
+- **Energy imported from grid**: select `KWh To Home` (listed under Solar System - Power Meter ...c)
+- **Energy exported to grid**: select `KWh To Grid` (same device)
 
-**Alternative: Production Meter**
-- **Production Meter**: `sensor.power_meter_*p_lifetime_power`
-- **Virtual Production Meter**: `sensor.virtual_production_meter_*_lifetime_power` (when no physical P meter)
-- Shows total solar production as single summed value
+> **Important:** Make sure you select sensors from the **`...c` meter** (consumption meter), not the `...p` meter. The `p` meter does not have bidirectional grid sensors and will not work correctly for the Energy Dashboard.
 
-![Solar Production Setup](images/production.png)
+![Grid Connection Setup](images/grid-setup.png)
 
-**Setting Up Grid Consumption:**
+These sensors come from the consumption meter (CT clamps in your electrical panel). If they are not in the dropdown, see the [troubleshooting guide](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors).
 
-**⚠️ IMPORTANT: Use the 'c' meter sensors (CT clamps), NOT the 'p' meter!**
+**Step 4: Add solar production**
 
-- **Grid consumption**: `sensor.power_meter_*c_kwh_to_home`
-- **Return to grid**: `sensor.power_meter_*c_kwh_to_grid`
-
-**Why the C meter?** Only the C meter (consumption meter with CT clamps) provides the bidirectional sensors needed for grid import/export tracking. The P meter only tracks solar production going one direction to the grid.
-
-**⚠️ TROUBLESHOOTING: Grid sensors not available?**
-- **Missing consumption meter entirely**: CT clamps may not be installed OR not provisioned in PVS settings; contact installer
-- **CT clamps present but not working**: Installer may need to provision/enable them in PVS configuration
-- **PVS5 limitation**: Some PVS5 systems only report net consumption, not separate import/export; see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for detailed troubleshooting
-- **Alternative**: Use utility smart meter integration for most accurate grid tracking
-
-![Consumption Setup](images/consumption.png)
-
-**Solar Panel Configuration:**
-For individual panel monitoring, add each inverter's lifetime power sensor:
+Scroll down and click **Add solar production**. In the "Configure solar panels" dialog:
+- **Solar production energy**: search for "Lifetime Power" and select the inverter (e.g., "Lifetime Power - Solar System - Inverter E0..."). Add each inverter as a separate entry for per-panel visibility.
+- **Solar production power**: optional, leave blank.
 
 ![Solar Panel Setup](images/solar_panel_setup.png)
 
-![Energy Dashboard Solar Production](images/energy_dash_solar_production.png)
+**Battery storage (SunVault / ESS systems only):**
 
-**Setting Up Home Battery Storage (Battery Systems Only):**
+In the Energy configuration, click **Add battery system** and set:
+- **Energy going in to battery**: `sensor.sunpower_ess_<serial>_pos_lte_kwh` (ESS Positive Lifetime Energy)
+- **Energy coming out of battery**: `sensor.sunpower_ess_<serial>_neg_lte_kwh` (ESS Negative Lifetime Energy)
 
-If you have a SunVault or ESS battery system, configure battery monitoring in the Energy Dashboard:
-
-**Energy going in to the battery (charging):**
-- `sensor.sunpower_ess_{serial}_pos_lte_kwh`
-- Displayed as: "ESS {serial} Positive Lifetime Energy"
-
-**Energy coming out of the battery (discharging):**
-- `sensor.sunpower_ess_{serial}_neg_lte_kwh`
-- Displayed as: "ESS {serial} Negative Lifetime Energy"
-
-These sensors track the total energy flow through your battery system over its lifetime, providing accurate charging/discharging history for the Energy Dashboard.
+**Grid sensors not available?** See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for CT clamp, provisioning, and PVS5 firmware limitation scenarios.
 
 ### Monitoring Approach Recommendations
 
