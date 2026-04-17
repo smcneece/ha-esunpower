@@ -7,7 +7,14 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, DEFAULT_SUNPOWER_UPDATE_INTERVAL, MIN_SUNPOWER_UPDATE_INTERVAL
+from .const import (
+    CONF_ENABLE_LIVE_DATA,
+    CONF_LIVE_DATA_THRESHOLD,
+    DEFAULT_LIVE_DATA_THRESHOLD,
+    DEFAULT_SUNPOWER_UPDATE_INTERVAL,
+    DOMAIN,
+    MIN_SUNPOWER_UPDATE_INTERVAL,
+)
 from .varserver_client import VarserverClient
 from .sunpower import SunPowerMonitor, ConnectionException, ParseException
 from .notifications import get_mobile_devices, get_email_notification_services
@@ -642,8 +649,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                         errors["pvs_serial_last5"] = "Password required for new firmware (last 5 chars of serial)"
 
             if not errors:
-                # Store basic config and proceed to notifications (skip solar page)
+                # Store basic config and route based on firmware
                 self._basic_config = user_input.copy()
+                uses_pypvs = user_input.get("uses_pypvs", self.config_entry.data.get("uses_pypvs", False))
+                if uses_pypvs:
+                    return await self.async_step_live_data()
                 return await self.async_step_notifications()
 
         # Get current values from either options or data (fallback)
@@ -704,6 +714,34 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="solar",
             data_schema=schema,
             errors=errors
+        )
+
+    async def async_step_live_data(self, user_input=None):
+        """Handle WebSocket live data options (new firmware only)."""
+        if user_input is not None:
+            self._basic_config.update(user_input)
+            return await self.async_step_notifications()
+
+        current_enable = self.config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
+        current_threshold = self.config_entry.options.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+
+        schema = vol.Schema({
+            vol.Required(CONF_ENABLE_LIVE_DATA, default=current_enable): selector.BooleanSelector(),
+            vol.Required(CONF_LIVE_DATA_THRESHOLD, default=current_threshold): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0.01,
+                    max=1.0,
+                    step=0.01,
+                    unit_of_measurement="kW",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="live_data",
+            data_schema=schema,
+            errors={},
         )
 
     async def async_step_notifications(self, user_input=None):
@@ -773,7 +811,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
                 "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
             }
-            
+
+            # Persist live data options (new firmware only; safe to include for old firmware too)
+            options[CONF_ENABLE_LIVE_DATA] = complete_config.get(CONF_ENABLE_LIVE_DATA, False)
+            options[CONF_LIVE_DATA_THRESHOLD] = complete_config.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+
             return self.async_create_entry(title="", data=options)
 
         # Get available mobile devices

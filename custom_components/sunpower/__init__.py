@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     BATTERY_DEVICE_TYPE,
+    CONF_ENABLE_LIVE_DATA,
     DIAGNOSTIC_DEVICE_TYPE,
     DOMAIN,
     ESS_DEVICE_TYPE,
@@ -80,6 +81,7 @@ from .notifications import (
 )
 
 from .varserver_client import VarserverClient
+from .pvs_websocket import PVSWebSocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -543,6 +545,138 @@ def _sanitize_cached_inverter(inverter_data: dict) -> dict:
     # - SERIAL/MODEL/DESCR: Device identification
 
     return sanitized
+
+
+class SunPowerCoordinator(DataUpdateCoordinator):
+    """DataUpdateCoordinator extended with WebSocket live data support."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        logger,
+        *,
+        name: str,
+        update_method,
+        update_interval,
+        request_refresh_debouncer=None,
+        varserver_client=None,
+        entry=None,
+        uses_pypvs: bool = False,
+    ) -> None:
+        super().__init__(
+            hass,
+            logger,
+            name=name,
+            update_method=update_method,
+            update_interval=update_interval,
+            request_refresh_debouncer=request_refresh_debouncer,
+        )
+        self._varserver_client = varserver_client
+        self._entry = entry
+        self._uses_pypvs = uses_pypvs
+        self._websocket: PVSWebSocket | None = None
+        self._live_data_listeners: dict[str, list] = {}
+        self._remove_ws_listener = None
+        self._remove_ws_state_listener = None
+
+    @property
+    def live_data(self):
+        """Return current live data from WebSocket, or None if not connected."""
+        if self._websocket is None:
+            return None
+        return self._websocket.live_data
+
+    @property
+    def websocket_connected(self) -> bool:
+        """Return True if WebSocket is currently connected."""
+        if self._websocket is None:
+            return False
+        return self._websocket.is_connected
+
+    def _async_setup_live_data_tracker(self) -> None:
+        """Set up WebSocket live data if enabled in options (new firmware only)."""
+        if not self._uses_pypvs or self._varserver_client is None:
+            return
+
+        if not self._entry.options.get(CONF_ENABLE_LIVE_DATA, False):
+            _LOGGER.debug("Live data WebSocket disabled in options")
+            return
+
+        host = self._entry.data.get("host", "")
+        self._websocket = PVSWebSocket(
+            host=host,
+            enable_callback=self._varserver_client.enable_telemetry_websocket,
+        )
+
+        self._remove_ws_listener = self._websocket.add_listener(
+            self._handle_live_data_update
+        )
+        self._remove_ws_state_listener = self._websocket.add_state_listener(
+            self._handle_websocket_state_change
+        )
+
+        self.hass.async_create_task(self._async_start_websocket())
+        _LOGGER.info("Live data WebSocket tracker set up for %s", host)
+
+    async def _async_start_websocket(self) -> None:
+        """Start the WebSocket connection."""
+        if self._websocket is not None:
+            await self._websocket.connect()
+
+    async def _async_stop_live_data_tracking(self) -> None:
+        """Stop WebSocket and clean up all live data listeners."""
+        if self._remove_ws_listener:
+            self._remove_ws_listener()
+            self._remove_ws_listener = None
+        if self._remove_ws_state_listener:
+            self._remove_ws_state_listener()
+            self._remove_ws_state_listener = None
+        if self._websocket:
+            await self._websocket.disconnect()
+            self._websocket = None
+        self._live_data_listeners.clear()
+        _LOGGER.debug("Live data WebSocket stopped")
+
+    def async_add_live_data_listener(self, var_path: str, callback) -> callable:
+        """Register a callback for a specific live data varserver path.
+
+        Returns a function to unregister the callback.
+        """
+        self._live_data_listeners.setdefault(var_path, []).append(callback)
+
+        def remove() -> None:
+            listeners = self._live_data_listeners.get(var_path)
+            if listeners:
+                try:
+                    listeners.remove(callback)
+                except ValueError:
+                    pass
+
+        return remove
+
+    def _handle_live_data_update(self, changed_vars: set) -> None:
+        """Called by WebSocket when new data arrives; notifies registered listeners."""
+        for var_path in changed_vars:
+            for callback in list(self._live_data_listeners.get(var_path, [])):
+                try:
+                    callback()
+                except Exception as exc:
+                    _LOGGER.error("Error in live data listener for %s: %s", var_path, exc)
+
+    def _handle_websocket_state_change(self, state) -> None:
+        """Notify all live data listeners when WebSocket state changes.
+
+        This triggers async_write_ha_state() on sensors so their availability
+        updates immediately on connect/disconnect, not just when the next
+        data message arrives.
+        """
+        _LOGGER.debug("WebSocket state: %s", state.value)
+        for var_path in list(self._live_data_listeners):
+            for callback in list(self._live_data_listeners.get(var_path, [])):
+                try:
+                    callback()
+                except Exception as exc:
+                    _LOGGER.error("Error in state change callback for %s: %s", var_path, exc)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -1056,7 +1190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         raise UpdateFailed("All data sources failed: fresh polling failed and no valid cache available")
 
     # Create coordinator
-    coordinator = DataUpdateCoordinator(
+    coordinator = SunPowerCoordinator(
         hass,
         _LOGGER,
         name="Enhanced SunPower PVS",
@@ -1067,6 +1201,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             cooldown=max(30, polling_interval // 4),
             immediate=False
         ),
+        varserver_client=varserver_client,
+        entry=entry,
+        uses_pypvs=uses_pypvs,
     )
 
     hass.data[DOMAIN][entry.entry_id] = {
@@ -1080,14 +1217,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     try:
         _LOGGER.info("Attempting initial Enhanced SunPower data fetch...")
         await coordinator.async_config_entry_first_refresh()
-        
+
         notify_setup_success(hass, entry, cache)
         _LOGGER.info("Enhanced SunPower integration setup completed successfully")
-        
+
     except Exception as startup_error:
         _LOGGER.warning("Initial Enhanced SunPower data fetch failed: %s", startup_error)
         notify_setup_warning(hass, entry, cache, polling_url, polling_interval)
         _LOGGER.info("Enhanced SunPower integration continuing with polling schedule")
+
+    # Start WebSocket live data tracker (new firmware + enable_live_data only)
+    coordinator._async_setup_live_data_tracker()
 
     # Set up platforms AFTER coordinator is working
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -1099,8 +1239,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        # Clean up session resources
         entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
+
+        # Stop WebSocket live data tracking
+        coordinator = entry_data.get(SUNPOWER_COORDINATOR)
+        if isinstance(coordinator, SunPowerCoordinator):
+            await coordinator._async_stop_live_data_tracking()
+
+        # Clean up legacy monitor session (old firmware only)
         sunpower_monitor = entry_data.get(SUNPOWER_OBJECT)
         if sunpower_monitor and hasattr(sunpower_monitor, 'close'):
             await sunpower_monitor.close()

@@ -168,7 +168,7 @@ class VarserverClient:
             _LOGGER.warning("Varserver POST timed out (15s) for %s", list(params.values()))
             return {}
         except Exception as e:
-            _LOGGER.error("Varserver POST error: %s", e)
+            _LOGGER.warning("Varserver POST error: %s", e)
             return {}
 
     async def _request_var(self, name: str) -> str | None:
@@ -188,6 +188,19 @@ class VarserverClient:
         """Set a variable value. Returns True if accepted."""
         result = await self._post_vars({"set": f"{path}={value}"})
         return bool(result)
+
+    async def enable_telemetry_websocket(self) -> bool:
+        """Enable WebSocket telemetry broadcast on the PVS.
+
+        Called before each WebSocket connection attempt to ensure telemetry
+        is active. Re-authenticates first to guarantee a fresh session.
+        """
+        try:
+            await self.authenticate()
+            return await self.set_var("/sys/telemetryws/enable", "1")
+        except Exception as e:
+            _LOGGER.warning("Failed to enable telemetry websocket: %s", e)
+            return False
 
     async def _group_devices(self, match: str) -> list[dict]:
         """Query match pattern and group flat vars by device index.

@@ -3,6 +3,35 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.04.4] - 04-2026
+
+### New Feature: WebSocket Live Data (New Firmware Only)
+
+**Real-time sensor updates via PVS WebSocket on port 9002**
+- New "PVS Live Data {serial}" virtual device created when live data is enabled
+- 12 sensors covering production, net grid, site load, battery (battery-only sensors created only when battery system detected)
+- Sensors update when values change, not on poll schedule
+- Power sensors threshold-filtered (default 0.05 kW) to reduce database writes during stable conditions
+- WebSocket auto-reconnects with exponential backoff if connection drops
+- Enabled via integration options > Live Data page (new firmware only; does not appear for old firmware)
+- Data Timestamp sensor included but disabled by default
+
+> ⚠️ SD Card Warning: Real-time updates generate significantly more database writes than polling. SSD storage recommended.
+
+**Files added:** `livedata.py`, `pvs_websocket.py`
+
+**Files modified:** `__init__.py`, `sensor.py`, `config_flow.py`, `const.py`, `varserver_client.py`, `translations/en.json`
+
+### Log Level Cleanup: PVS Reboot / Connection Loss
+
+**Reduced log noise during PVS reboots and connectivity loss**
+- `pvs_websocket.py`: WebSocket connection failures during reconnect attempts downgraded from ERROR to WARNING. WebSocket heartbeat/PONG errors downgraded from WARNING to DEBUG.
+- `varserver_client.py`: Varserver POST connection errors downgraded from ERROR to WARNING.
+
+These errors are expected and self-recovering during a PVS reboot. They will now appear as WARNING instead of ERROR in the HA log.
+
+---
+
 ## [v2026.04.3] - 04-2026
 
 ### Bug Fix: "Reserve" Battery Mode Incorrectly Mapped

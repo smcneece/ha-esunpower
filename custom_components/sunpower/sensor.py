@@ -10,9 +10,14 @@ from homeassistant.const import EntityCategory
 
 from .const import (
     BATTERY_DEVICE_TYPE,
+    CONF_ENABLE_LIVE_DATA,
+    CONF_LIVE_DATA_THRESHOLD,
+    DEFAULT_LIVE_DATA_THRESHOLD,
     DOMAIN,
     ESS_DEVICE_TYPE,
     HUBPLUS_DEVICE_TYPE,
+    LIVEDATA_POWER_VAR_NAMES,
+    LIVEDATA_SENSORS,
     PVS_DEVICE_TYPE,
     SUNPOWER_COORDINATOR,
     SUNPOWER_DESCRIPTIVE_NAMES,
@@ -81,13 +86,21 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     # IMPROVED: Allow setup even without PVS data initially
     if not sunpower_data or PVS_DEVICE_TYPE not in sunpower_data:
         _LOGGER.info("PVS data not available yet - entities will be created when data arrives")
-        # Return empty list for now - entities will be added when data arrives via listener
         async_add_entities([], True)
         return
 
     # Data is available - create entities now (listener will handle future additions)
     await _create_entities(hass, config_entry, async_add_entities, coordinator,
                           do_descriptive_names, do_product_names, created_entities)
+
+    # Create WebSocket live data sensors (new firmware + enable_live_data only, created once)
+    if (config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
+            and hasattr(coordinator, "async_add_live_data_listener")
+            and not sunpower_state.get("_live_data_sensors_created")):
+        _setup_live_data_sensors(
+            hass, config_entry, async_add_entities, coordinator, sunpower_data
+        )
+        sunpower_state["_live_data_sensors_created"] = True
 
 
 async def _create_entities(hass, config_entry, async_add_entities, coordinator,
@@ -401,3 +414,143 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
             # Coordinator data might not be available yet or structure changed
             # This is normal during startup - entity will update when data arrives
             return None
+
+
+def _setup_live_data_sensors(hass, config_entry, async_add_entities, coordinator, sunpower_data):
+    """Create WebSocket live data sensor entities (called once at setup)."""
+    pvs_serial = config_entry.unique_id or "unknown"
+    threshold = config_entry.options.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+    has_battery = ESS_DEVICE_TYPE in sunpower_data
+
+    entities = []
+    for sensor_def in LIVEDATA_SENSORS:
+        if sensor_def.get("battery_only") and not has_battery:
+            continue
+        var_name = sensor_def["var_name"]
+        entities.append(
+            SunPowerLiveDataSensor(
+                coordinator=coordinator,
+                pvs_serial=pvs_serial,
+                var_name=var_name,
+                key=sensor_def["key"],
+                title=sensor_def["title"],
+                unit=sensor_def.get("unit"),
+                icon=sensor_def.get("icon"),
+                device_class=sensor_def.get("device_class"),
+                state_class=sensor_def.get("state_class"),
+                suggested_display_precision=sensor_def.get("suggested_display_precision"),
+                enabled_default=sensor_def.get("enabled_default", True),
+                entity_category=sensor_def.get("entity_category"),
+                is_power_var=var_name in LIVEDATA_POWER_VAR_NAMES,
+                threshold=threshold,
+            )
+        )
+
+    if entities:
+        _LOGGER.info("Creating %d live data sensor entities", len(entities))
+        async_add_entities(entities, False)
+
+
+class SunPowerLiveDataSensor(SensorEntity):
+    """Sensor updated by WebSocket push data instead of coordinator polls."""
+
+    def __init__(
+        self,
+        coordinator,
+        pvs_serial: str,
+        var_name: str,
+        key: str,
+        title: str,
+        unit,
+        icon: str | None,
+        device_class,
+        state_class,
+        suggested_display_precision,
+        enabled_default: bool = True,
+        entity_category=None,
+        is_power_var: bool = False,
+        threshold: float = DEFAULT_LIVE_DATA_THRESHOLD,
+    ) -> None:
+        """Initialize the live data sensor."""
+        self._coordinator = coordinator
+        self._pvs_serial = pvs_serial
+        self._var_name = var_name
+        self._key = key
+        self._title = title
+        self._attr_native_unit_of_measurement = unit
+        self._icon = icon
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+        self._attr_suggested_display_precision = suggested_display_precision
+        self._attr_entity_registry_enabled_default = enabled_default
+        self._attr_entity_category = entity_category
+        self._is_power_var = is_power_var
+        self._threshold = threshold
+        self._cached_value = None
+        self._remove_listener = None
+
+    @property
+    def unique_id(self) -> str:
+        return f"{self._pvs_serial}_livedata_{self._key}"
+
+    @property
+    def name(self) -> str:
+        return self._title
+
+    @property
+    def icon(self) -> str | None:
+        return self._icon
+
+    @property
+    def device_info(self):
+        serial_suffix = self._pvs_serial[-5:] if self._pvs_serial and len(self._pvs_serial) >= 5 else self._pvs_serial
+        return {
+            "identifiers": {(DOMAIN, f"{self._pvs_serial}_livedata")},
+            "name": f"PVS Live Data {serial_suffix}",
+            "manufacturer": "SunPower",
+            "model": "PVS Live Data",
+            "via_device": (DOMAIN, self._pvs_serial),
+        }
+
+    @property
+    def available(self) -> bool:
+        return self._coordinator.websocket_connected
+
+    @property
+    def native_value(self):
+        live_data = self._coordinator.live_data
+        if live_data is None:
+            return None
+        raw = live_data.get(self._var_name)
+        if raw is None:
+            return None
+        # SOC arrives as 0.0-1.0 from WebSocket; convert to percentage
+        if self._var_name == "/sys/livedata/soc":
+            try:
+                return round(float(raw) * 100, 2)
+            except (TypeError, ValueError):
+                return None
+        return raw
+
+    async def async_added_to_hass(self) -> None:
+        """Register WebSocket listener when added to HA."""
+        self._remove_listener = self._coordinator.async_add_live_data_listener(
+            self._var_name, self._handle_update
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister WebSocket listener when removed from HA."""
+        if self._remove_listener:
+            self._remove_listener()
+            self._remove_listener = None
+
+    def _handle_update(self) -> None:
+        """Called by coordinator when this variable's WebSocket value changes."""
+        if self._is_power_var:
+            new_value = self.native_value
+            if (new_value is not None
+                    and self._cached_value is not None
+                    and abs(new_value - self._cached_value) < self._threshold):
+                return  # Below threshold, skip state write
+            self._cached_value = new_value
+        self.async_write_ha_state()

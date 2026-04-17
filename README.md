@@ -2,11 +2,11 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
-## v2026.04.3 - Reserve Battery Mode Fix + Startup Crash Fix + New Sensors
+## v2026.04.4 - WebSocket Live Data (New Firmware)
 
-This release fixes the "Reserve" battery mode option which was writing the wrong value to the PVS in v2026.04.1/v2026.04.2, fixes a startup crash affecting some PVS firmware versions, adds two new battery sensors (ESS Configured Mode and ESS Operating Mode), and fixes a false firmware-upgrade notification. See [CHANGELOG](docs/CHANGELOG.md) for details.
+This release adds optional WebSocket live data support for new firmware users (BUILD 61840+). When enabled, a new "PVS Live Data" device appears with sensors that update in real-time as values change. See [CHANGELOG](docs/CHANGELOG.md) for full details.
 
-**Breaking change for battery users upgrading from v2026.03.x**: The "Tariff Optimizer" and "Emergency Reserve" mode options have been renamed/removed. Use "Reserve" instead. Update any automations that reference those old option names.
+**Battery users upgrading from v2026.03.x**: The "Tariff Optimizer" and "Emergency Reserve" battery mode options were renamed/removed in v2026.04.1. Use "Reserve" instead. Update any automations that reference those old option names.
 
 ---
 
@@ -56,6 +56,7 @@ If you're on new firmware and have a battery system you should be able to use th
 ## What Makes This Enhanced?
 
 **Core Improvements:**
+- **WebSocket Live Data**: Real-time sensor updates direct from the PVS WebSocket (new firmware only); sensors update as values change, not on poll schedule
 - **Battery Control**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
 - **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage, configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
@@ -146,6 +147,17 @@ HACS requires integrations to be registered in the home-assistant/brands reposit
    - Select mobile device for critical alerts
    - Configure email notifications
 
+### WebSocket Live Data (New Firmware Only)
+![Live Data Configuration](images/live-data-setup.png)
+
+After initial setup, new firmware users can enable real-time WebSocket live data via integration options (Settings > Devices & Services > Enhanced SunPower > Configure).
+
+The Live Data page appears only for new firmware installs:
+- **Enable WebSocket live data**: Subscribes to the PVS WebSocket on port 9002 for 1-second sensor updates
+- **Power change threshold**: Minimum kW change required to write a state update for power sensors (default 0.05 kW). Reduces database writes during stable conditions.
+
+> ⚠️ **SD Card Warning**: Real-time updates generate significantly more database writes than standard polling. If Home Assistant runs on an SD card, leave live data disabled or the card will wear out quickly. SSD storage is recommended.
+
 > **Missing sensors after setup?** If you don't see consumption or grid import/export sensors, your installer may not have installed or provisioned the CT clamps in your electrical panel. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for diagnosis steps and workarounds.
 
 ### Configuration Options
@@ -163,6 +175,8 @@ HACS requires integrations to be registered in the home-assistant/brands reposit
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
+| **Enable WebSocket Live Data** | Real-time 1-second updates (new firmware only) | `false` | Enable only with SSD storage |
+| **Power Change Threshold** | Min kW change to trigger state write | `0.05 kW` | Lower = more precision, more DB writes |
 
 ### 🔒 PVS Authentication (Automatic!)
 
@@ -246,6 +260,27 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - **Individual Batteries**: State of charge, voltage, current, temperature
 - **ESS System**: Environmental conditions, power meters
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
+
+### WebSocket Live Data (New Firmware, Optional)
+
+When enabled, a separate "PVS Live Data {serial}" device provides real-time sensors updated as values change from the PVS WebSocket on port 9002:
+
+| Sensor | Unit | Notes |
+|--------|------|-------|
+| Production Power | kW | Solar production, real-time |
+| Production Energy | kWh | Cumulative solar energy |
+| Net Power | kW | Grid import/export (negative = exporting) |
+| Net Energy | kWh | Cumulative net grid energy |
+| Site Load Power | kW | Total site consumption |
+| Site Load Energy | kWh | Cumulative site load energy |
+| Battery Power | kW | Battery charge/discharge (battery systems only) |
+| Battery Energy | kWh | Battery energy throughput (battery systems only) |
+| Battery State of Charge | % | Real-time SOC (battery systems only) |
+| Backup Time Remaining | min | Estimated backup duration (battery systems only) |
+| MID State | | Transfer switch state (battery systems only) |
+| Data Timestamp | | WebSocket message time (disabled by default) |
+
+Enable in integration options after setup. See [WebSocket Live Data](#websocket-live-data-new-firmware-only) section above.
 
 ### 🔋 Battery Control (NEW - Beta Testing)
 
