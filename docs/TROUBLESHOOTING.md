@@ -271,6 +271,50 @@ This resolves the issue for the majority of affected users.
 
 ---
 
+## WebSocket Live Data and SD Cards
+
+WebSocket live data sensors update every second and write to the HA database on each change. This is not suitable for SD card installs. Use an SSD.
+
+If you still want to use live data on an SD card, or simply want the real-time display without any database recording, you can exclude the live data entities from the HA recorder. Add the following to your `configuration.yaml` (replace `xxxxx` with your PVS serial last 5 digits), then restart Home Assistant. The sensors will still display current values in dashboards but will not be written to the database.
+
+**Solar only (no battery):**
+```yaml
+recorder:
+  exclude:
+    entities:
+      - sensor.pvs_live_data_xxxxx_production_power
+      - sensor.pvs_live_data_xxxxx_production_energy
+      - sensor.pvs_live_data_xxxxx_net_power
+      - sensor.pvs_live_data_xxxxx_net_energy
+      - sensor.pvs_live_data_xxxxx_site_load_power
+      - sensor.pvs_live_data_xxxxx_site_load_energy
+```
+
+**Solar with SunVault battery:**
+```yaml
+recorder:
+  exclude:
+    entities:
+      - sensor.pvs_live_data_xxxxx_production_power
+      - sensor.pvs_live_data_xxxxx_production_energy
+      - sensor.pvs_live_data_xxxxx_net_power
+      - sensor.pvs_live_data_xxxxx_net_energy
+      - sensor.pvs_live_data_xxxxx_site_load_power
+      - sensor.pvs_live_data_xxxxx_site_load_energy
+      - sensor.pvs_live_data_xxxxx_battery_power
+      - sensor.pvs_live_data_xxxxx_battery_energy
+      - sensor.pvs_live_data_xxxxx_battery_state_of_charge
+      - sensor.pvs_live_data_xxxxx_backup_time_remaining
+      - sensor.pvs_live_data_xxxxx_mid_state
+```
+
+If you have enabled the Data Timestamp sensor (disabled by default), also add:
+```
+      - sensor.pvs_live_data_xxxxx_data_timestamp
+```
+
+---
+
 ## Debug Information
 Enable debug notifications to monitor:
 - Health check attempts and results

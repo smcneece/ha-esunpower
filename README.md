@@ -33,7 +33,7 @@ If you're on new firmware and have a battery system you should be able to use th
 
 ---
 
-⚠️ CRITICAL: Migrating from krbaker? See [MIGRATION.md](docs/MIGRATION.md) for step-by-step instructions. Backup first!
+⚠️ CRITICAL: Migrating from krbaker intergration? See [MIGRATION.md](docs/MIGRATION.md) for step-by-step instructions. Backup first!
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -50,6 +50,8 @@ If you're on new firmware and have a battery system you should be able to use th
 > ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository to help other SunPower owners discover these improvements!
 > 
 > [![GitHub stars](https://img.shields.io/github/stars/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/stargazers) [![GitHub forks](https://img.shields.io/github/forks/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/network/members)
+
+> 👀 **Watch this repo** to get notified of new releases, bug fixes, and discussions. Use the Watch button at the top of the page and select "Releases" at minimum, or "All Activity" if you want to follow discussions too. The more eyes on the integration, the better it gets. User reports, battery behavior observations, firmware findings, and automation ideas from the community have shaped nearly every release. If you have a SunVault or an unusual setup, your reports are especially valuable since not everyone has hardware to test with.
 
 ![Integration Overview](images/overview.png)
 
@@ -156,7 +158,9 @@ The Live Data page appears only for new firmware installs:
 - **Enable WebSocket live data**: Subscribes to the PVS WebSocket on port 9002 for 1-second sensor updates
 - **Power change threshold**: Minimum kW change required to write a state update for power sensors (default 0.05 kW). Reduces database writes during stable conditions.
 
-> ⚠️ **SD Card Warning**: Real-time updates generate significantly more database writes than standard polling. If Home Assistant runs on an SD card, leave live data disabled or the card will wear out quickly. SSD storage is recommended.
+> ⚠️ **SD Card Warning**: Real-time updates generate significantly more database writes than standard polling. If Home Assistant runs on an SD card, leave live data disabled or the card will wear out quickly. SSD storage is strongly recommended.
+
+These sensors are designed for real-time dashboard display, not historical tracking. Since they serve no statistics purpose, even SSD users may want to exclude them from the recorder to keep the database smaller. SD card users who want to use live data should treat this exclusion as required. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#websocket-live-data-and-sd-cards) for ready-to-use `recorder.exclude` configuration for both solar-only and battery systems.
 
 > **Missing sensors after setup?** If you don't see consumption or grid import/export sensors, your installer may not have installed or provisioned the CT clamps in your electrical panel. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for diagnosis steps and workarounds.
 

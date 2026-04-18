@@ -7,6 +7,13 @@ import os
 import time
 from datetime import datetime, timedelta
 
+_INTEGRATION_VERSION = "unknown"
+try:
+    with open(os.path.join(os.path.dirname(__file__), "manifest.json")) as _mf:
+        _INTEGRATION_VERSION = json.load(_mf).get("version", "unknown")
+except Exception:
+    pass
+
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_IMPORT,
@@ -269,7 +276,7 @@ def create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data=
         "DESCR": "Enhanced SunPower Integration Diagnostics",
         "DEVICE_TYPE": DIAGNOSTIC_DEVICE_TYPE,
         "STATE": "working",
-        "SWVER": "2025.8.12",
+        "SWVER": _INTEGRATION_VERSION,
         "HWVER": "Virtual",
         "polling_interval_seconds": int(polling_interval) if polling_interval else 300,
         "poll_success_rate": round(success_rate, 1),

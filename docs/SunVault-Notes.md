@@ -7,6 +7,7 @@ Sources used:
 - PVS6 varserver public variable list (pypvs-0.2.7 docs)
 - General knowledge from training data (cutoff Aug 2025)
 - Reddit/community observations
+- Direct SunStrong support response (jeffvrba, April 2026)
 
 ---
 
@@ -97,17 +98,18 @@ From general knowledge (verify against current SunPower/SunStrong docs):
 dlp688 raised a valid point: ENERGY_ARBITRAGE might now map to what SunStrong calls "Self Supply" and TARIFF_OPTIMIZER might have replaced ENERGY_ARBITRAGE in recent firmware. The renaming may have happened between firmware versions. Our current labels may be wrong.
 
 ### Grid Charging
-- Cost Savings (ENERGY_ARBITRAGE) is the mode intended for off-peak grid charging
-- Whether it actually charges from the grid overnight (no solar) is not confirmed in our testing
-- Emergency Reserve mode may also trigger grid charging if SOC is below the reserve threshold and no solar is available
-- Some users (jeffvrba) plan to test this - we need the results
+- Cost Savings (ENERGY_ARBITRAGE) is the mode intended for off-peak grid charging, but only where the utility allows it.
+- **Grid charging is locked at commissioning**: When a SunVault is commissioned, the installer/utility locks out grid charging if the utility does not permit it. This is not a SunStrong setting and cannot be overridden in software. Disconnecting from the internet does not help. Confirmed by dlp688 (PG&E, California, April 2026) who was explicitly told grid charging was not allowed after commissioning.
+- **Outside California**: Grid charging almost certainly locked out. SunStrong also confirmed Cost Savings mode is California-only (April 2026).
+- **Practical workaround for no grid charging**: Use HA weather integrations to watch for storm alerts and automatically switch to Reserve mode 1-2 days before a storm to maximize solar charging before it hits. National Weather Service or Weather.com integrations expose alert data that can trigger automations.
 
 ### SunStrong TOU Support
-- SunStrong TOU optimization likely requires a partnership/configuration between SunPower and the specific utility
-- Probably only supports a handful of major utilities
-- TOU schedules change regularly and SunStrong almost certainly does not keep up
+- **Confirmed by SunStrong support (April 2026)**: Cost Savings mode is limited to California. Expansion to other states depends on utility rules, rate designs, and regulatory approval.
+- Cost Savings mode requires SunStrong to push TOU rate data to the PVS. Without that data, the firmware has no schedule to act on and the mode idles.
+- Users outside California cannot use Cost Savings mode for grid charging via SunStrong.
+- TOU schedules change regularly and SunStrong almost certainly does not keep up even in California
 - TOU features may be behind a paywall in the SunStrong app
-- **Home Assistant is a better TOU solution** because you control your own schedule and can update it yourself
+- **Home Assistant is a better TOU solution** because you control your own schedule and can update it yourself. Use an automation to switch modes at the right times rather than relying on Cost Savings mode to know your utility's schedule.
 
 ### HA Mode Changes vs SunStrong Cloud
 - Mode writes via HA selector confirmed working (dlp688, April 9 2026) - ESS Configured Mode sensor tracked changes between SELF_CONSUMPTION and ENERGY_ARBITRAGE from HA toggle
@@ -140,7 +142,7 @@ Users with Schneider Electric or other non-SunVault batteries connected to PVS m
 
 ## What We Need From Users With Battery Systems
 
-1. In Cost Savings mode overnight with no solar: does the battery actually charge from the grid?
+1. ~~In Cost Savings mode overnight with no solar (outside California): does the battery charge from the grid?~~ Resolved: grid charging is locked at commissioning by the utility. Cannot be overridden in software.
 2. After changing mode in HA to Cost Savings, does battery behavior actually change (not just the display)?
 3. Does mode behavior differ between firmware builds?
 4. Do users with third-party batteries (Schneider etc.) see the same modes?
@@ -161,4 +163,7 @@ Users with Schneider Electric or other non-SunVault batteries connected to PVS m
 - PVS varserver updates its status data every few minutes, so there is a lag before HA reflects the new state
 - Battery control entities only created if ESS/Battery device type detected during setup
 - If battery entities go unavailable after a PVS restart: reload the integration once the battery is fully back online
+- **Rebooting PVS6 with SunVault attached**: Do NOT use the breaker alone. The battery continues supplying DC power to the PVS6 even with breakers off. Procedure: (1) turn off the PVS6 breaker in the Hub+, (2) remove top plastic cover (2x Torx T25 screws), (3) disconnect the barrel connector at top right of the front circuit board that feeds DC from battery to PVS6, (4) wait a few seconds, reconnect. Source: https://gist.github.com/koleson/5c719620039e0282976a8263c068e85c#rebooting-a-pvs6-in-a-system-with-a-sunvault
+- **Rebooting PVS5 (no SunVault)**: Flip the breaker or unplug. Straightforward.
+- **Full SunVault system shutdown**: Press the rubber button on any battery module for 3 seconds. This powers off the batteries, Schneider inverters, and communications gateway. Use only when a full system restart is needed, not just a PVS reboot.
 - Changing the PVS IP in integration config does NOT create duplicate entities (unique IDs are hardware serial based)

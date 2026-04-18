@@ -3,6 +3,19 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.04.5
+
+### Bug Fix: Diagnostics Device Showing Wrong Version
+
+- Enhanced SunPower Diagnostics device was displaying a hardcoded firmware version string ("2025.8.12") instead of the actual installed integration version. Fixed by reading version from manifest.json at load time.
+
+### Improvement: Live Data Sensors No Longer Build Long-Term Statistics
+
+- All live data sensors had `state_class` set, causing HA to build long-term statistics for them despite the Energy Dashboard not using them. Removed `state_class` from all live data sensors to reduce recorder overhead. Display and dashboard behavior is unchanged.
+- Added TROUBLESHOOTING.md section with `recorder.exclude` config for users who want zero database writes from live data sensors (useful for SD card installs or display-only use).
+
+---
+
 ## [v2026.04.4] - 04-2026
 
 ### New Feature: WebSocket Live Data (New Firmware Only)
