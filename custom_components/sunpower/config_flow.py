@@ -78,7 +78,7 @@ def parse_build_number(build_raw):
         return None
 
 
-async def get_supervisor_info(host):
+async def get_supervisor_info(host, session):
     """Auto-detect PVS serial, firmware build, and model from supervisor/info endpoint
 
     Returns:
@@ -94,8 +94,7 @@ async def get_supervisor_info(host):
         url = f"http://{host}/cgi-bin/dl_cgi/supervisor/info"
         timeout = aiohttp.ClientTimeout(total=30)
 
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url) as response:
+        async with session.get(url, timeout=timeout) as response:
                 if response.status == 200:
                     data = await response.json()
                     supervisor = data.get("supervisor", {})
@@ -206,7 +205,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
         # Step 1: Get supervisor info for auto-detection
-        serial, build, last5, model, error = await get_supervisor_info(host)
+        serial, build, last5, model, error = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
 
         if error or build is None:
             _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error or "build is None")
@@ -280,7 +279,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         # Try varserver (new firmware) - get serial from supervisor info first
         try:
-            serial_legacy, build_legacy, last5_legacy, model_legacy, err_legacy = await get_supervisor_info(host)
+            serial_legacy, build_legacy, last5_legacy, model_legacy, err_legacy = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
             if serial_legacy and last5_legacy:
                 client = VarserverClient(
                     session=async_get_clientsession(self.hass, False),
@@ -635,7 +634,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             if not errors:
                 # Auto-detect firmware info (critical for existing integrations missing firmware_build)
                 host = user_input["host"]
-                serial, build, last5, model, error = await get_supervisor_info(host)
+                serial, build, last5, model, error = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
 
                 if build:
                     MIN_LOCALAPI_BUILD = 61840

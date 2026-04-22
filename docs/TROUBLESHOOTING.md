@@ -271,6 +271,16 @@ This resolves the issue for the majority of affected users.
 
 ---
 
+## WebSocket Live Data - Backup Time Remaining and MID State Showing Unknown
+
+Battery users may see the "Backup Time Remaining" and "MID State" live data sensors show as Unknown even when the WebSocket is connected and other sensors are updating normally. This has been observed in beta testing (April 2026) and appears to be related to whether the PVS actually broadcasts those fields in the live data stream.
+
+The WebSocket only sends fields when their values change. If the PVS never emits `backupTimeRemaining` or `midstate` in the stream (which may vary by PVS firmware version or system configuration), those sensors will remain Unknown until a value is received. Other live data sensors (production, net, site load, battery power, SOC) are not affected.
+
+This is being monitored. If you have a battery system and see these sensors update at any point, please report it in [GitHub Discussions](https://github.com/smcneece/ha-esunpower/discussions) along with your PVS firmware version. That information will help narrow down whether this is firmware-specific behavior.
+
+---
+
 ## WebSocket Live Data and SD Cards
 
 WebSocket live data sensors update every second and write to the HA database on each change. This is not suitable for SD card installs. Use an SSD.

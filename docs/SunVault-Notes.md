@@ -8,6 +8,8 @@ Sources used:
 - General knowledge from training data (cutoff Aug 2025)
 - Reddit/community observations
 - Direct SunStrong support response (jeffvrba, April 2026)
+- ItsaMeKielO PVS6/SunVault reverse engineering gist (April 2026): https://gist.github.com/koleson/5c719620039e0282976a8263c068e85c
+- Reddit r/SunPower thread on grid charging (April 2026): https://www.reddit.com/r/SunPower/comments/1sqsvqy/
 
 ---
 
@@ -33,7 +35,7 @@ Sources used:
 - New firmware (BUILD >= 61840 on PVS6, any build on PVS5) uses authenticated varserver API
 - Old firmware uses unauthenticated dl_cgi endpoint (we still support this but plan to drop it)
 - PVS has eMMC flash storage and runs an embedded Linux system
-- PVS does a nightly scheduled reboot (approximately every 23-24 hours, firmware controlled)
+- PVS units typically reboot roughly every 24 hours. Whether this is a scheduled firmware timer or a load-related watchdog/OOM crash that happens to occur on a roughly daily cycle is not confirmed. Community observation (April 2026) suggests heavy polling can cause reboots every few hours, while light polling can extend uptime well beyond 24 hours - which may mean the "nightly reboot" is not scheduled at all, just a resource limit under typical load. Treat this as speculation.
 
 ### varserver API - Battery Variables We Know About
 From the PVS6 public variable docs:
@@ -99,16 +101,19 @@ dlp688 raised a valid point: ENERGY_ARBITRAGE might now map to what SunStrong ca
 
 ### Grid Charging
 - Cost Savings (ENERGY_ARBITRAGE) is the mode intended for off-peak grid charging, but only where the utility allows it.
-- **Grid charging is locked at commissioning**: When a SunVault is commissioned, the installer/utility locks out grid charging if the utility does not permit it. This is not a SunStrong setting and cannot be overridden in software. Disconnecting from the internet does not help. Confirmed by dlp688 (PG&E, California, April 2026) who was explicitly told grid charging was not allowed after commissioning.
-- **Outside California**: Grid charging almost certainly locked out. SunStrong also confirmed Cost Savings mode is California-only (April 2026).
+- **The specific setting that controls this**: An internal PVS6 variable called "DCM ESS Charge Constraint." Values are `None` (grid charging allowed) or `PV Only` (solar charging only). This is not exposed in the SunStrong app. The exact varserver path is unknown; it can potentially be set via the SunStrong MQTT cloud API or the SunPower Pro Connect installer app. Source: ItsaMeKielO gist (April 2026).
+- **Grid charging is locked at commissioning**: When a SunVault is commissioned, the installer sets DCM ESS Charge Constraint to `PV Only` if the utility or installer policy requires it. This is why grid charging is effectively locked post-PTO for most users. Confirmed by dlp688 (PG&E, California, April 2026).
+- **Important: grid charging does NOT require grid export.** The system can be configured to charge from the grid but not discharge to the grid. This is a meaningful capability for users in states with poor net metering who want to use cheap off-peak electricity to fill their battery without selling anything back to the utility. Confirmation: SunVaultTechs (Reddit, April 2026) and ItsaMeKielO gist.
+- **Outside California**: Grid charging almost certainly locked out at commissioning for most users. SunStrong also confirmed Cost Savings mode is California-only (April 2026).
+- **Why Cost Savings is broken outside California**: After SunPower's bankruptcy, utility TOU rate data stopped populating correctly in the SunStrong cloud. Cost Savings mode needs real rate schedules to know when to charge/discharge. Without that data the mode idles. SunStrong confirmed they only maintain rate data for California currently. Source: ItsaMeKielO gist, Reddit thread April 2026.
 - **Practical workaround for no grid charging**: Use HA weather integrations to watch for storm alerts and automatically switch to Reserve mode 1-2 days before a storm to maximize solar charging before it hits. National Weather Service or Weather.com integrations expose alert data that can trigger automations.
 
 ### SunStrong TOU Support
 - **Confirmed by SunStrong support (April 2026)**: Cost Savings mode is limited to California. Expansion to other states depends on utility rules, rate designs, and regulatory approval.
-- Cost Savings mode requires SunStrong to push TOU rate data to the PVS. Without that data, the firmware has no schedule to act on and the mode idles.
+- Cost Savings mode requires SunStrong to push TOU rate data to the PVS. Without that data, the firmware has no schedule to act on and the mode idles. Rate data stopped populating correctly after SunPower's bankruptcy.
 - Users outside California cannot use Cost Savings mode for grid charging via SunStrong.
-- TOU schedules change regularly and SunStrong almost certainly does not keep up even in California
-- TOU features may be behind a paywall in the SunStrong app
+- TOU schedules change regularly and SunStrong almost certainly does not keep up even in California.
+- TOU features may be behind a paywall in the SunStrong app.
 - **Home Assistant is a better TOU solution** because you control your own schedule and can update it yourself. Use an automation to switch modes at the right times rather than relying on Cost Savings mode to know your utility's schedule.
 
 ### HA Mode Changes vs SunStrong Cloud
@@ -137,6 +142,14 @@ User dlp688 specifically observed that mode names/mappings may have changed betw
 
 ### Third-Party Battery Behavior
 Users with Schneider Electric or other non-SunVault batteries connected to PVS may see different mode names, different varserver paths, or different behavior entirely. Our integration treats all ESS device types the same way, which may not be correct.
+
+---
+
+## Open Questions - WebSocket Live Data (Battery Systems)
+
+Battery users testing live data (v2026.04.5+) have reported that "Backup Time Remaining" and "MID State" live data sensors show as Unknown even when other live data sensors update normally. The WebSocket only broadcasts fields when their values change, so if the PVS never emits `backupTimeRemaining` or `midstate` in the stream, those sensors stay Unknown indefinitely. Observed in beta testing April 2026. Unknown whether this is PVS firmware-specific or universal battery behavior.
+
+**What we need**: Battery users on live data reporting whether these sensors ever show a value, and if so, what PVS firmware version they are on.
 
 ---
 

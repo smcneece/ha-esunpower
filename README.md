@@ -2,22 +2,19 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
-## v2026.04.4 - WebSocket Live Data (New Firmware)
+## Recent Changes
 
-This release adds optional WebSocket live data support for new firmware users (BUILD 61840+). When enabled, a new "PVS Live Data" device appears with sensors that update in real-time as values change. See [CHANGELOG](docs/CHANGELOG.md) for full details.
+Recent additions include optional WebSocket live data for new firmware users (BUILD 61840+), a new "PVS Live Data" device with sensors that update in real time, and several bug fixes and reliability improvements.
 
-**Battery users upgrading from v2026.03.x**: The "Tariff Optimizer" and "Emergency Reserve" battery mode options were renamed/removed in v2026.04.1. Use "Reserve" instead. Update any automations that reference those old option names.
+> Some changes shown in this README or the changelog may be in pre-release testing and not yet in the current stable release. Check the [Releases page](https://github.com/smcneece/ha-esunpower/releases) for what is actually available to install, and the [CHANGELOG](docs/CHANGELOG.md) for the full history including unreleased work.
 
 ---
 
 ## PLEASE TAKE A FEW MINUTES TO READ: FIRMWARE COMPATIBILITY
 
-**The integration supports ALL PVS hardware (PVS5 & PVS6) and ALL firmware versions.** Automatically detects and adapts to your system:
-- **PVS5 & PVS6 Hardware**: Full support for both hardware generations
-- **Firmware BUILD 61840+**: Uses direct varserver LocalAPI with authentication (no external library required)
-- **Firmware BUILD < 61840**: Uses legacy dl_cgi endpoints
-- **Auto-Detection**: Queries PVS for firmware BUILD number and selects correct method automatically
-- **Safety Fallback**: If new firmware LocalAPI fails, automatically falls back to legacy mode
+> ⚠️ **Old Firmware Support Sunset Notice**: Support for old firmware (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) will be removed in an upcoming release. If you are on old firmware, read the section below before updating.
+
+**Primary support: new firmware (BUILD 61840+ on PVS6, BUILD 5408+ on PVS5).** The integration automatically detects your firmware and selects the correct communication method.
 
 **PVS5 Firmware Version Formats:**
 SunPower uses different version formats for PVS5 vs PVS6. The integration automatically parses all formats:
@@ -25,11 +22,31 @@ SunPower uses different version formats for PVS5 vs PVS6. The integration automa
 - **PVS5 dotted format**: `"0.0.25.5412"` → extracts BUILD `5412`
 - **PVS6 format**: `"2025.10.20.61846"` → extracts BUILD `61846`
 
-The BUILD number determines which API method to use (not the version string). If you're experiencing setup issues, check your PVS firmware at: `http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
+The BUILD number determines which API method is used (not the version string). You can check your firmware at: `http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
 
-### Battery systems are working! (Tested on new firmware)
+### How to Check Your Firmware Version
 
-If you're on new firmware and have a battery system you should be able to use this integration now.
+In Home Assistant, go to Settings, Devices and Services, Enhanced SunPower, and open the PV Supervisor device. The firmware version shown there contains your BUILD number. Alternatively check the Enhanced SunPower Diagnostics device.
+
+### Old Firmware Users: Action Required Before the Next Update
+
+If your PVS6 shows a BUILD below 61840, or your PVS5 shows a BUILD below 5408, you are on old firmware. Here is what to do now, before old firmware support is removed:
+
+**If you installed via HACS:**
+1. Go to HACS, find Enhanced SunPower, and remove it
+2. Go to the [GitHub Releases page](https://github.com/smcneece/ha-esunpower/releases) and download the last release that supports old firmware (v2026.04.6)
+3. Extract the `custom_components/sunpower` folder into your HA `custom_components` directory
+4. Restart Home Assistant
+
+Your sensors, history, and automations will be preserved. You will simply be pinned to that version and will not receive future updates via HACS. The integration will continue working indefinitely on that version.
+
+**If you installed manually:** You are already protected. Just do not update past v2026.04.6 and you will be fine.
+
+**Why is HACS a problem?** HACS always installs the latest version. If you leave it installed via HACS, a future HACS update will silently upgrade you to a version that drops old firmware support, and the integration will stop working.
+
+### Battery Systems
+
+If you are on new firmware and have a SunVault battery system, full battery monitoring and control is supported.
 
 ---
 
@@ -280,13 +297,13 @@ When enabled, a separate "PVS Live Data {serial}" device provides real-time sens
 | Battery Power | kW | Battery charge/discharge (battery systems only) |
 | Battery Energy | kWh | Battery energy throughput (battery systems only) |
 | Battery State of Charge | % | Real-time SOC (battery systems only) |
-| Backup Time Remaining | min | Estimated backup duration (battery systems only) |
-| MID State | | Transfer switch state (battery systems only) |
+| Backup Time Remaining | min | Estimated backup duration (battery systems only); may show Unknown if PVS does not broadcast this field in the live stream |
+| MID State | | Transfer switch state (battery systems only); may show Unknown if PVS does not broadcast this field in the live stream |
 | Data Timestamp | | WebSocket message time (disabled by default) |
 
 Enable in integration options after setup. See [WebSocket Live Data](#websocket-live-data-new-firmware-only) section above.
 
-### 🔋 Battery Control (NEW - Beta Testing)
+### 🔋 Battery Control
 
 **Requirements:**
 - SunVault or compatible battery system
@@ -324,11 +341,6 @@ automation:
 **More automation examples:** [docs/battery_tou_automation_example.yaml](docs/battery_tou_automation_example.yaml)
 
 **Note:** Mode changes are sent to the PVS immediately when you change the selector in HA. However, the PVS varserver updates its status data every few minutes, so there will be a short lag before HA reflects the new state. This is normal behavior from the PVS itself, not the integration.
-
-**Beta Testing:**
-- ✅ Code complete and safety audited
-- ⚠️ Real-world testing in progress
-- Want to help test? Join [Discussion #28](https://github.com/smcneece/ha-esunpower/discussions/28)
 
 ### Individual Inverter Health Monitoring
 - **24-Hour Persistent Error Tracking**: Only alerts after 24+ hours of continuous problems, eliminating false positives
@@ -514,7 +526,8 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 
 **Different VLANs:** The integration works across VLANs as long as routing is configured between them and port 443 is accessible from HA to the PVS.
 
-**Old Firmware (BUILD < 61840):**
+**Old Firmware (BUILD < 61840 on PVS6, BUILD < 5408 on PVS5):**
+> ⚠️ Old firmware support is being removed in an upcoming release. See the [Old Firmware Users](#old-firmware-users-action-required-before-the-next-update) section above.
 - **LAN Port Required**: Must use `172.27.153.1`
 - **Network Isolation Required**: PVS LAN port must be isolated (VLAN or separate network)
   - See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for VLAN setup
@@ -592,7 +605,7 @@ Special thanks to community contributors who have helped improve this integratio
 SEO Keywords: sunpower, sunstrong, pvs, pvs6, pvs5, home assistant, hacs, solar monitoring, 
 solar panels, inverter monitoring, sunvault, battery storage, ess, energy storage system, 
 pv monitoring, renewable energy, home automation, solar integration, solar power,
-photovoltaic, firmware 61840, new firmware, old firmware, authentication, krbaker, krbaker fork,
+photovoltaic, firmware 61846, new firmware, old firmware, authentication, krbaker, krbaker fork,
 enhanced sunpower, sunpower integration, solar system monitoring, panel monitoring, inverter health,
 battery health, state of charge, state of health, flash memory, flash wear, diagnostic sensors,
 night-time caching, virtual production meter, mobile alerts, email notifications, VLAN routing,

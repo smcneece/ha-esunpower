@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import logging
 import random
@@ -157,7 +158,7 @@ class PVSWebSocket:
         fast_retry_delay = 2
         backoff_delay = 5.0
         max_backoff = 300
-        stale_timeout = 90
+        stale_timeout = 180
 
         # Reuse session across reconnects
         session: aiohttp.ClientSession | None = None
@@ -220,8 +221,8 @@ class PVSWebSocket:
                                 await asyncio.sleep(30)
                                 elapsed = time.monotonic() - last_message_time
                                 if elapsed > stale_timeout:
-                                    _LOGGER.warning(
-                                        "WebSocket stale (no messages for %.0fs), closing",
+                                    _LOGGER.info(
+                                        "WebSocket stale (no messages for %.0fs), closing and reconnecting",
                                         elapsed,
                                     )
                                     await ws.close()
@@ -353,9 +354,7 @@ class PVSWebSocket:
         if raw_value is None:
             return None
         try:
-            import datetime
-
-            timestamp = int(raw_value) if isinstance(raw_value, str) else int(raw_value)
+            timestamp = int(raw_value)
             current_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
             # Detect and cache timestamp format

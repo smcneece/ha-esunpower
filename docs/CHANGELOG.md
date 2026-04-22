@@ -3,6 +3,33 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.04.6
+
+### Improvement: WebSocket Stale Detection Tuning
+
+- Increased stale timeout from 90s to 180s. During stable conditions (steady production, constant load) the PVS WebSocket may not send messages for extended periods since it only broadcasts on value changes. The 90s threshold was triggering unnecessary reconnects on stable systems.
+- Downgraded the stale timeout log message from WARNING to INFO and clarified that it is self-recovering ("closing and reconnecting").
+
+### Notice: Old Firmware Support Being Removed in Next Release
+
+Support for old firmware (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) will be removed in the next release. This is the last version to support it. Old firmware users on HACS should switch to a manual install of this version before the next update. See README for full instructions.
+
+### Bug Fix: Standalone aiohttp Sessions Created Where Shared Session Should Be Used
+
+- `config_flow.py`: Firmware detection function (`get_supervisor_info`) was creating its own `aiohttp.ClientSession` for the supervisor/info probe at setup time. Now uses the shared HA session passed from the config flow.
+- `sunpower.py` (old firmware): `_get_ess_data_legacy` was creating a new `aiohttp.ClientSession` on every ESS poll call. Now reuses the class-level session managed by `_ensure_session()`, consistent with how the rest of the class handles HTTP.
+
+### Bug Fix: Shared HA Session Cookie Jar Being Cleared on Every Poll
+
+- `varserver_client.py` was calling `session.cookie_jar.clear()` before each varserver POST request. The session is the shared aiohttp session provided by Home Assistant, so this call was clearing cookies for all integrations on the system, not just ours. The clear was also unnecessary since cookies are passed explicitly in each request. Removed both occurrences (initial request and re-auth retry path).
+
+### Improvement: Reduced Log Spam During PVS Offline Periods
+
+- Polling errors during PVS reboots or connectivity loss now log at WARNING on the first failure, then drop to DEBUG for subsequent failures. Previously every failed poll logged at ERROR, producing hundreds of log entries during a nightly PVS reboot.
+- A single INFO recovery message is logged when the PVS comes back online, making it easy to see when connectivity restored.
+
+---
+
 ## [Unreleased] - v2026.04.5
 
 ### Bug Fix: Diagnostics Device Showing Wrong Version
@@ -126,7 +153,7 @@ These errors are expected and self-recovering during a PVS reboot. They will now
 ### Bug Fix: PVS5 Setup Failure
 
 **Fixed: PVS5 systems could not be added to Home Assistant**
-- **Problem**: PVS5 firmware does not include a standalone `BUILD` field in the supervisor/info response. The build number is embedded in the `SWVER` string (e.g. `"2025.11, Build 5412"`). The integration looked only for a standalone `BUILD` field, found nothing, and fell back to legacy dl_cgi mode which returned a 403 error since PVS5 new firmware requires authentication. Setup failed entirely.
+- **Problem**: PVS5 firmware does not include a standalone `BUILD` field in the supervisor/info response. The build number is embedded in the `SWVER` string (e.g. `"2025.11, Build 5408"`). The integration looked only for a standalone `BUILD` field, found nothing, and fell back to legacy dl_cgi mode which returned a 403 error since PVS5 new firmware requires authentication. Setup failed entirely.
 - **Fix 1**: `get_supervisor_info()` now falls back to parsing the `SWVER` field when no standalone `BUILD` field is present. The existing `parse_build_number()` function already handled this format; it just was not being called with SWVER as input.
 - **Fix 2**: PVS5 is now correctly identified as new firmware (varserver) regardless of build number. The 61840 build threshold only applies to PVS6 hardware. Any PVS5 with a detected build number is treated as new firmware.
 - **Fix 3**: The 60-second polling minimum for old firmware no longer applies to PVS5, which uses new firmware and should follow the 10-second minimum.
@@ -211,17 +238,17 @@ These errors are expected and self-recovering during a PVS reboot. They will now
 ### Bug Fix: PVS5 New Firmware Installation Failure (Discussion #44)
 
 **Fixed "invalid flow" error when installing integration on PVS5 systems with new firmware**
-- **Problem**: Users with PVS5 firmware `0.0.25.5412` (and similar) couldn't install the integration - received "invalid flow" error during setup
-- **Root Cause**: New PVS5 firmware returns BUILD in format `"2025.11, Build 5412"` (string with version prefix), breaking firmware detection logic that expected plain integer or string number
+- **Problem**: Users with PVS5 firmware `0.0.25.5408` (and similar) couldn't install the integration - received "invalid flow" error during setup
+- **Root Cause**: New PVS5 firmware returns BUILD in format `"2025.11, Build 5408"` (string with version prefix), breaking firmware detection logic that expected plain integer or string number
 - **Impact**: Integration completely unable to install on affected PVS5 systems after firmware update
 
 **The Fix:**
 - Added `parse_build_number()` function to handle multiple BUILD formats from different firmware versions
 - Supports formats:
-  - PVS5 new: `"2025.11, Build 5412"` → extracts `5412`
+  - PVS5 new: `"2025.11, Build 5408"` → extracts `5408`
   - PVS6 string: `"61846"` → converts to `61846`
   - PVS6 integer: `61846` → returns as-is
-  - PVS5 dotted: `"0.0.25.5412"` → extracts `5412`
+  - PVS5 dotted: `"0.0.25.5408"` → extracts `5408`
 - Enhanced logging shows both raw and parsed BUILD values for debugging
 - Gracefully falls back to legacy detection if BUILD format is unparseable
 

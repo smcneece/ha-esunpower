@@ -942,19 +942,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                             }
                         )
                 else:
-                    if not auth_password:
-                        _LOGGER.error("New firmware polling error (no auth configured): %s", e)
+                    is_first_failure = cache.diagnostic_stats['consecutive_failures'] == 0
+                    if is_first_failure:
+                        if not auth_password:
+                            _LOGGER.warning("New firmware polling error (no auth configured): %s", e)
+                        else:
+                            _LOGGER.warning("New firmware polling error: %s", e)
                     else:
-                        _LOGGER.error("New firmware polling error: %s", e)
+                        _LOGGER.debug("New firmware polling error (repeated): %s", e)
                     cache.diagnostic_stats['failed_polls'] += 1
                     cache.diagnostic_stats['consecutive_failures'] += 1
                     fresh_data = None
             else:
                 # Old firmware error - never an auth issue
-                _LOGGER.error("Old firmware polling error (network/PVS issue): %s", e)
-                if '403' in error_str or 'forbidden' in error_str:
-                    _LOGGER.warning("Old firmware 403 error - possible network/hardware issue")
-                    _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
+                is_first_failure = cache.diagnostic_stats['consecutive_failures'] == 0
+                if is_first_failure:
+                    _LOGGER.warning("Old firmware polling error (network/PVS issue): %s", e)
+                    if '403' in error_str or 'forbidden' in error_str:
+                        _LOGGER.warning("Old firmware 403 error - possible network/hardware issue")
+                        _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
+                else:
+                    _LOGGER.debug("Old firmware polling error (repeated): %s", e)
                 cache.diagnostic_stats['failed_polls'] += 1
                 cache.diagnostic_stats['consecutive_failures'] += 1
                 fresh_data = None
@@ -1136,6 +1144,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             # Step 6: Track successful poll with response time (BEFORE creating diagnostic device)
             response_time = time.time() - poll_start_time
+            if cache.diagnostic_stats['consecutive_failures'] > 0:
+                _LOGGER.info("PVS polling recovered after %d consecutive failure(s)", cache.diagnostic_stats['consecutive_failures'])
             cache.diagnostic_stats['successful_polls'] += 1
             cache.diagnostic_stats['consecutive_failures'] = 0
             cache.diagnostic_stats['last_success_time'] = time.time()

@@ -46,7 +46,7 @@ def _iso_to_datatime(iso_str: str) -> str:
         )
         return dt.strftime("%Y,%m,%d,%H,%M,%S")
     except Exception:
-        return datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S")
+        return datetime.now(timezone.utc).strftime("%Y,%m,%d,%H,%M,%S")
 
 
 class VarserverClient:
@@ -116,7 +116,6 @@ class VarserverClient:
         # Match pypvs payload format exactly (no & separator; always single param)
         payload_str = "".join(f"{k}={v}" for k, v in params.items())
 
-        self._session.cookie_jar.clear()
         try:
             async with self._session.post(
                 url, cookies=self._cookies, data=payload_str, ssl=False,
@@ -137,7 +136,6 @@ class VarserverClient:
                         response.status,
                     )
                     if await self.authenticate():
-                        self._session.cookie_jar.clear()
                         async with self._session.post(
                             url,
                             cookies=self._cookies,
@@ -347,7 +345,7 @@ class VarserverClient:
             "dl_skipped_scans": "0",
             "dl_scan_time": "0",
             "dl_untransmitted": "0",
-            "DATATIME": datetime.utcnow().strftime("%Y,%m,%d,%H,%M,%S"),
+            "DATATIME": datetime.now(timezone.utc).strftime("%Y,%m,%d,%H,%M,%S"),
         }
 
     async def _build_inverters(self) -> list[dict]:

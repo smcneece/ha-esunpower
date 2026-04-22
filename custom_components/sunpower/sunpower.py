@@ -261,31 +261,30 @@ class SunPowerMonitor:
     async def _get_ess_data_legacy(self):
         """Get ESS data using legacy dl_cgi endpoint"""
         url = "http://{0}/cgi-bin/dl_cgi/energy-storage-system/status".format(self.host)
-        timeout = aiohttp.ClientTimeout(total=120)
+        await self._ensure_session()
 
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                # First attempt: unauthenticated
-                async with session.get(url) as response:
-                    if response.status in [401, 403]:
-                        # Authentication required
-                        if self._auth_header:
-                            # Retry with authentication
-                            headers = {"Authorization": self._auth_header}
-                            async with session.get(url, headers=headers) as auth_response:
-                                if auth_response.status in [401, 403]:
-                                    response_text = await auth_response.text()
-                                    _LOGGER.error("ESS authentication failed: HTTP %d %s, Response: %s",
-                                                 auth_response.status, auth_response.reason, response_text[:200])
-                                    raise ConnectionException("Authentication failed for ESS endpoint - check PVS serial number")
-                                text = await auth_response.text()
-                                return simplejson.loads(text)
-                        else:
-                            raise ConnectionException("Authentication required for ESS endpoint but no PVS serial provided")
+            # First attempt: unauthenticated
+            async with self._session.get(url) as response:
+                if response.status in [401, 403]:
+                    # Authentication required
+                    if self._auth_header:
+                        # Retry with authentication
+                        headers = {"Authorization": self._auth_header}
+                        async with self._session.get(url, headers=headers) as auth_response:
+                            if auth_response.status in [401, 403]:
+                                response_text = await auth_response.text()
+                                _LOGGER.error("ESS authentication failed: HTTP %d %s, Response: %s",
+                                             auth_response.status, auth_response.reason, response_text[:200])
+                                raise ConnectionException("Authentication failed for ESS endpoint - check PVS serial number")
+                            text = await auth_response.text()
+                            return simplejson.loads(text)
                     else:
-                        # Success without authentication
-                        text = await response.text()
-                        return simplejson.loads(text)
+                        raise ConnectionException("Authentication required for ESS endpoint but no PVS serial provided")
+                else:
+                    # Success without authentication
+                    text = await response.text()
+                    return simplejson.loads(text)
         except aiohttp.ClientError as error:
             raise ConnectionException from error
         except simplejson.errors.JSONDecodeError as error:
