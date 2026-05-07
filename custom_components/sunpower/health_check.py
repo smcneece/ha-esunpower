@@ -1,103 +1,9 @@
 """SunPower PVS Health Check Module"""
 
-import asyncio
 import logging
 import time
 
 _LOGGER = logging.getLogger(__name__)
-
-
-async def tcp_connect_test(host, port=80, timeout=5):
-    """Lightweight HTTP connectivity test for PVS health check
-    Tests actual HTTP connectivity rather than just TCP connection
-    """
-    import aiohttp
-
-    try:
-        # Parse host string for embedded port
-        if ':' in host:
-            host_parts = host.split(':')
-            if len(host_parts) == 2:
-                try:
-                    parsed_port = int(host_parts[1])
-                    host = host_parts[0]
-                    port = parsed_port
-                    _LOGGER.debug("HTTP test: parsed host='%s', port=%d", host, port)
-                except ValueError:
-                    # Invalid port in string, use default
-                    _LOGGER.debug("HTTP test: invalid port in host string, using default %d", port)
-
-        # Construct URL - use port 80 default or parsed port
-        if port != 80:
-            url = f"http://{host}:{port}/"
-        else:
-            url = f"http://{host}/"
-
-        # Quick HTTP HEAD request to test connectivity
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-            async with session.head(url) as response:
-                # Any HTTP response means PVS is responding
-                _LOGGER.debug("HTTP test successful: %s returned %d", url, response.status)
-                return True
-
-    except (asyncio.TimeoutError, aiohttp.ClientError, OSError) as e:
-        _LOGGER.debug("HTTP connectivity test failed: %s", e)
-        return False
-
-
-async def smart_pvs_health_check(host, cache, hass, entry, max_retries=2, backoff_minutes=1):
-    """
-    Smart PVS health check (route functionality removed)
-    Returns: 'healthy', 'unreachable', 'backoff'
-    """
-    # Import notification functions locally to avoid circular imports
-    from .notifications import notify_pvs_health_check_attempt
-
-    current_time = time.time()  # Use regular time
-
-    # Skip health check on very first poll after HA restart
-    # PVS/network might be slow to respond during startup even though it's working
-    if not hasattr(cache, 'first_poll_done'):
-        _LOGGER.debug("PVS health check skipped - first poll after restart")
-        cache.first_poll_done = True
-        return 'healthy'
-
-    # Check if we're in backoff period
-    if current_time < cache.health_backoff_until:
-        remaining = int(cache.health_backoff_until - current_time)
-        _LOGGER.debug("PVS health check in backoff period, %d seconds remaining", remaining)
-        return 'backoff'
-
-    # Show health check attempt (DEBUG level)
-    notify_pvs_health_check_attempt(hass, entry, cache, host, max_retries)
-
-    # Get user's polling interval for adaptive timeout
-    polling_interval = max(300, entry.options.get("polling_interval", entry.data.get("polling_interval", 300)))
-    tcp_timeout = min(5.0, polling_interval // 10)
-
-    # Perform TCP connect test with retries
-    tcp_success = False
-    for attempt in range(max_retries):
-        _LOGGER.debug("PVS health check attempt %d/%d for %s (timeout: %.1fs)",
-                     attempt + 1, max_retries, host, tcp_timeout)
-
-        if await tcp_connect_test(host, timeout=tcp_timeout):
-            tcp_success = True
-            break
-
-        # Failed - wait 1 second before retry (except on last attempt)
-        if attempt < max_retries - 1:
-            await asyncio.sleep(1)
-
-    if tcp_success:
-        _LOGGER.debug("PVS health check successful after %d attempts", attempt + 1)
-        return 'healthy'
-    else:
-        # All attempts failed - enter backoff period
-        _LOGGER.warning("PVS health check failed after %d attempts, entering %d minute backoff",
-                       max_retries, backoff_minutes)
-        cache.health_backoff_until = current_time + (backoff_minutes * 60)
-        return 'unreachable'
 
 
 def initialize_inverter_tracking(cache, inverter_data):
@@ -353,20 +259,15 @@ def check_battery_system_health(hass, entry, cache, data):
 
 
 def check_flash_memory_level(hass, entry, cache, pvs_data):
-    """Check PVS flash memory levels and alert if low"""
+    """Check PVS flash memory levels and alert if usage exceeds threshold percentage."""
     from .notifications import notify_flash_memory_critical
 
-    # Get flash memory threshold
-    # For old firmware (BUILD < 61840): value is MB (default 0 = disabled)
-    # For new firmware (BUILD >= 61840): value is percentage (default 85%)
-    firmware_build = entry.data.get("firmware_build", 0) or 0
-    flash_threshold = entry.options.get("flash_memory_threshold_mb", 85 if firmware_build >= 61840 else 0)
+    flash_threshold = entry.options.get("flash_memory_threshold_mb", 85)
 
     if flash_threshold <= 0:
-        return  # Monitoring disabled
+        return
 
     for serial, data in pvs_data.items():
-        # Initialize flash memory tracking
         if not hasattr(cache, 'flash_memory_alerts'):
             cache.flash_memory_alerts = {}
 
@@ -379,52 +280,24 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
         alert_info = cache.flash_memory_alerts[serial]
         current_time = time.time()
 
-        flash_avail_kb = data.get('dl_flash_avail')
         flash_usage_pct = data.get('flash_usage_percent')
 
-        # Determine which metric to use (KB for old firmware, percentage for new)
-        if flash_avail_kb is not None:
+        if flash_usage_pct is not None:
             try:
-                flash_kb = int(flash_avail_kb)
+                flash_pct = int(flash_usage_pct)
 
-                # New firmware: Use percentage-based check (alert if usage > threshold)
-                if flash_kb == 0 and flash_usage_pct is not None:
-                    flash_pct = int(flash_usage_pct)
-
-                    # Alert if flash usage exceeds threshold percentage
-                    if flash_pct > flash_threshold:
-                        # Only alert once per 24 hours
-                        if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
-                            notify_flash_memory_critical(hass, entry, cache, serial, f"{100 - flash_pct}%", f"{100 - flash_threshold}%")
-                            alert_info['last_alert_time'] = current_time
-                            alert_info['alert_count'] += 1
-
-                            _LOGGER.warning("PVS %s flash memory critical: %d%% available (threshold: %d%%)",
-                                          serial, 100 - flash_pct, 100 - flash_threshold)
-                    else:
-                        # Reset alert tracking when below threshold
-                        alert_info['last_alert_time'] = 0
-
-                # Old firmware: Use KB-based check
-                elif flash_kb > 0:
-                    flash_mb = flash_kb / 1024  # Convert KB to MB
-
-                    # Check if below threshold
-                    if flash_mb < flash_threshold:
-                        # Only alert once per 24 hours
-                        if current_time - alert_info['last_alert_time'] > 86400:  # 24 hours
-                            notify_flash_memory_critical(hass, entry, cache, serial, flash_mb, flash_threshold)
-                            alert_info['last_alert_time'] = current_time
-                            alert_info['alert_count'] += 1
-
-                            _LOGGER.warning("PVS %s flash memory critical: %d MB remaining (threshold: %d MB)",
-                                          serial, flash_mb, flash_threshold)
-                    else:
-                        # Reset alert tracking when above threshold
-                        alert_info['last_alert_time'] = 0
+                if flash_pct > flash_threshold:
+                    if current_time - alert_info['last_alert_time'] > 86400:
+                        notify_flash_memory_critical(hass, entry, cache, serial, f"{100 - flash_pct}%", f"{100 - flash_threshold}%")
+                        alert_info['last_alert_time'] = current_time
+                        alert_info['alert_count'] += 1
+                        _LOGGER.warning("PVS %s flash memory critical: %d%% available (threshold: %d%%)",
+                                      serial, 100 - flash_pct, 100 - flash_threshold)
+                else:
+                    alert_info['last_alert_time'] = 0
 
             except (ValueError, TypeError):
-                _LOGGER.debug("Invalid flash memory value for PVS %s: %s", serial, flash_avail_kb)
+                _LOGGER.debug("Invalid flash usage value for PVS %s: %s", serial, flash_usage_pct)
 
 
 def update_diagnostic_stats(cache, success, response_time=None):

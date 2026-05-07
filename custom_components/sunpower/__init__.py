@@ -41,14 +41,7 @@ from .const import (
     PVS_DEVICE_TYPE,
     SUNPOWER_COORDINATOR,
     SUNPOWER_HOST,
-    SUNPOWER_OBJECT,
 )
-from .sunpower import (
-    ConnectionException,
-    ParseException,
-    SunPowerMonitor,
-)
-
 # Import data processing functions
 from .data_processor import (
     convert_sunpower_data,
@@ -63,7 +56,6 @@ from .health_check import (
     check_flash_wear_level,
     check_inverter_health,
     reset_inverter_health_tracking,
-    smart_pvs_health_check,
     update_diagnostic_stats,
 )
 
@@ -88,7 +80,8 @@ from .notifications import (
 )
 
 from .varserver_client import VarserverClient
-from .pvs_websocket import PVSWebSocket
+from .pvs_websocket import PVSWebSocket, ConnectionState
+from .livedata import PVSLiveData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +100,7 @@ except Exception as e:
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 
-PLATFORMS = ["sensor", "binary_sensor", "switch", "select"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number"]
 
 # Default to 300 seconds (5 minutes) for PVS safety
 DEFAULT_POLLING_INTERVAL = 300
@@ -362,76 +355,6 @@ async def load_cache_file(hass: HomeAssistant, host: str):
         return None, 0
 
 
-async def poll_pvs_with_safety(sunpower_monitor, polling_interval, cache, hass, entry):
-    """Poll PVS with safety protocols and diagnostic tracking"""
-
-    start_time = time.time()
-
-    # Smart PVS health check - but with better HTTP testing
-    try:
-        health_timeout = min(30.0, polling_interval // 4)
-        health_status = await asyncio.wait_for(
-            smart_pvs_health_check(sunpower_monitor.host, cache, hass, entry, 2, 1),
-            timeout=health_timeout
-        )
-    except asyncio.TimeoutError:
-        _LOGGER.warning("Health check timed out after %ds, PVS considered offline", health_timeout)
-        health_status = 'unreachable'
-        update_diagnostic_stats(cache, False)
-        return None
-
-    # If PVS unhealthy, don't attempt poll
-    if health_status != 'healthy':
-        if health_status == 'backoff':
-            remaining = int(cache.health_backoff_until - time.time())
-            _LOGGER.info("PVS in backoff period, %ds remaining", remaining)
-        else:
-            _LOGGER.warning("PVS health check failed, skipping poll")
-        update_diagnostic_stats(cache, False)
-        return None
-
-    # PVS is healthy, proceed with polling
-    _LOGGER.info("PVS health check passed, proceeding with poll")
-    
-    try:
-        # Poll PVS with adaptive timeout
-        pvs_timeout = min(90.0, polling_interval - 10)
-        sunpower_data = await asyncio.wait_for(
-            sunpower_monitor.device_list_async(),
-            timeout=pvs_timeout
-        )
-        
-        elapsed_time = time.time() - start_time
-        _LOGGER.info("PVS polling completed in %.2f seconds", elapsed_time)
-        
-        # Validate response
-        if not sunpower_data or not isinstance(sunpower_data, dict) or "devices" not in sunpower_data:
-            update_diagnostic_stats(cache, False, elapsed_time)
-            raise UpdateFailed("PVS returned invalid data")
-        
-        device_count = len(sunpower_data.get("devices", []))
-        if device_count == 0:
-            update_diagnostic_stats(cache, False, elapsed_time)
-            raise UpdateFailed("PVS returned no devices")
-        
-
-        # Success!
-        update_diagnostic_stats(cache, True, elapsed_time)
-        _LOGGER.info("PVS returned %d devices - poll successful", device_count)
-        return sunpower_data
-        
-    except (ParseException, ConnectionException) as error:
-        elapsed_time = time.time() - start_time
-        update_diagnostic_stats(cache, False, elapsed_time)
-        _LOGGER.error("PVS poll failed: %s", error)
-        raise UpdateFailed(f"PVS poll failed: {error}") from error
-    except Exception as error:
-        elapsed_time = time.time() - start_time
-        update_diagnostic_stats(cache, False, elapsed_time)
-        _LOGGER.error("Unexpected PVS poll error: %s", error)
-        raise UpdateFailed(f"Unexpected PVS poll error: {error}") from error
-
-
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Enhanced SunPower component."""
     hass.data.setdefault(DOMAIN, {})
@@ -493,27 +416,6 @@ async def migrate_from_krbaker_if_needed(hass: HomeAssistant, entry: ConfigEntry
 
 
 
-async def _handle_polling_error(hass, entry, cache, host_ip, error):
-    """Handle PVS polling errors with specific authentication vs general error handling.
-
-    Args:
-        hass: Home Assistant instance
-        entry: Configuration entry
-        cache: Integration cache object
-        host_ip: PVS IP address
-        error: Exception that occurred during polling
-
-    Sends appropriate notifications based on error type (auth vs network).
-    NOTE: This function is ONLY called for legacy dl_cgi method (old firmware).
-    """
-
-    # For old firmware (legacy method), authentication is NOT required
-    # So we should NOT show auth-related notifications
-    # Just show standard polling failure
-    polling_url = f"http://{host_ip}/cgi-bin/dl_cgi?Command=DeviceList"
-    notify_polling_failed(hass, entry, cache, polling_url, error)
-
-
 def _sanitize_cached_inverter(inverter_data: dict) -> dict:
     """Sanitize cached inverter data for nighttime display.
 
@@ -568,7 +470,6 @@ class SunPowerCoordinator(DataUpdateCoordinator):
         request_refresh_debouncer=None,
         varserver_client=None,
         entry=None,
-        uses_pypvs: bool = False,
     ) -> None:
         super().__init__(
             hass,
@@ -580,7 +481,6 @@ class SunPowerCoordinator(DataUpdateCoordinator):
         )
         self._varserver_client = varserver_client
         self._entry = entry
-        self._uses_pypvs = uses_pypvs
         self._websocket: PVSWebSocket | None = None
         self._live_data_listeners: dict[str, list] = {}
         self._remove_ws_listener = None
@@ -602,7 +502,7 @@ class SunPowerCoordinator(DataUpdateCoordinator):
 
     def _async_setup_live_data_tracker(self) -> None:
         """Set up WebSocket live data if enabled in options (new firmware only)."""
-        if not self._uses_pypvs or self._varserver_client is None:
+        if self._varserver_client is None:
             return
 
         if not self._entry.options.get(CONF_ENABLE_LIVE_DATA, False):
@@ -678,12 +578,39 @@ class SunPowerCoordinator(DataUpdateCoordinator):
         data message arrives.
         """
         _LOGGER.debug("WebSocket state: %s", state.value)
+        if state == ConnectionState.CONNECTED:
+            self.hass.async_create_task(self._async_seed_live_data())
         for var_path in list(self._live_data_listeners):
             for callback in list(self._live_data_listeners.get(var_path, [])):
                 try:
                     callback()
                 except Exception as exc:
                     _LOGGER.error("Error in state change callback for %s: %s", var_path, exc)
+
+    async def _async_seed_live_data(self) -> None:
+        """Seed live data sensors from varserver immediately on WebSocket connect.
+
+        Prevents sensors from showing unknown/null between connect and the first
+        PVS broadcast, which may not arrive for minutes at night when production
+        is zero and site load is stable.
+        """
+        if self._websocket is None or self._varserver_client is None:
+            return
+        try:
+            raw = await self._varserver_client.get_livedata()
+            if not raw or self._websocket is None:
+                return
+            seeded = PVSLiveData.from_varserver(raw)
+            self._websocket.seed_live_data(seeded)
+            for var_path in list(self._live_data_listeners):
+                for callback in list(self._live_data_listeners.get(var_path, [])):
+                    try:
+                        callback()
+                    except Exception as exc:
+                        _LOGGER.error("Error in seed callback for %s: %s", var_path, exc)
+            _LOGGER.debug("Live data seeded from varserver on WebSocket connect")
+        except Exception as exc:
+            _LOGGER.debug("Could not seed live data on connect: %s", exc)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -699,96 +626,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Migrate from krbaker format if needed
     await migrate_from_krbaker_if_needed(hass, entry)
 
-    # Check if we should use pypvs (new firmware) or legacy dl_cgi (old firmware)
-    uses_pypvs = entry.data.get("uses_pypvs", False)
     firmware_build = entry.data.get("firmware_build")
 
-    # FIRMWARE UPGRADE MIGRATION: Detect if PVS firmware was upgraded to 61840+
-    if not uses_pypvs:
-        _LOGGER.info("Checking if PVS firmware was upgraded...")
-        try:
-            # Query supervisor/info for current BUILD
-            import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"http://{entry.data['host']}/cgi-bin/dl_cgi/supervisor/info", timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        supervisor = await resp.json()
-                        current_build = supervisor.get("BUILD")
-                        current_serial = supervisor.get("SERIAL")
+    polling_url = f"https://{entry.data['host']}/vars (varserver LocalAPI)"
 
-                        MIN_LOCALAPI_BUILD = 61840
-                        if current_build and current_build >= MIN_LOCALAPI_BUILD:
-                            _LOGGER.warning("FIRMWARE UPGRADE DETECTED: BUILD %s requires new firmware API but config has uses_pypvs=False", current_build)
-                            _LOGGER.info("Migrating to new firmware mode...")
-
-                            # Extract last5 from serial for authentication
-                            last5 = (current_serial[-5:] if current_serial and len(current_serial) >= 5 else "").upper()
-
-                            # Update config entry
-                            new_data = dict(entry.data)
-                            new_data["uses_pypvs"] = True
-                            new_data["firmware_build"] = current_build
-                            if not new_data.get("pvs_serial_last5"):
-                                new_data["pvs_serial_last5"] = last5
-                                _LOGGER.info("Auto-detected serial last5: %s", last5)
-
-                            hass.config_entries.async_update_entry(entry, data=new_data)
-
-                            # Update local variables
-                            uses_pypvs = True
-                            firmware_build = current_build
-
-                            _LOGGER.info("Migration complete: Now using new firmware API with BUILD %s", current_build)
-        except Exception as e:
-            _LOGGER.debug("Firmware upgrade check failed (not critical): %s", e)
-
-    # Set polling URL based on firmware method
-    if uses_pypvs:
-        polling_url = f"https://{entry.data['host']}/vars (varserver LocalAPI)"
-    else:
-        polling_url = f"http://{entry.data['host']}/cgi-bin/dl_cgi?Command=DeviceList"
-
-    # Get authentication details - ONLY use password for new firmware (BUILD >= 61840)
-    # Check both entry.data (initial setup) and entry.options (reconfigure) for serial
     pvs_serial_last5 = entry.options.get("pvs_serial_last5") or entry.data.get("pvs_serial_last5", "")
     pvs_serial_last5 = pvs_serial_last5.strip() if pvs_serial_last5 else ""
-    auth_password = pvs_serial_last5 if (pvs_serial_last5 and uses_pypvs) else None
+    auth_password = pvs_serial_last5 if pvs_serial_last5 else None
 
-    if uses_pypvs:
-        _LOGGER.info("Using varserver client for new firmware (BUILD %s) with authentication", firmware_build)
-        _LOGGER.info("Auth details: host=%s, user=ssm_owner, password=%s*** (length=%d)",
-                     entry.data['host'], auth_password[:2] if auth_password else "NONE",
-                     len(auth_password) if auth_password else 0)
+    _LOGGER.info("Using varserver client (BUILD %s) with authentication", firmware_build)
+    _LOGGER.info("Auth details: host=%s, user=ssm_owner, password=%s*** (length=%d)",
+                 entry.data['host'], auth_password[:2] if auth_password else "NONE",
+                 len(auth_password) if auth_password else 0)
 
-        # Create VarserverClient with password for new firmware
-        pvs_serial = entry.unique_id
-        _LOGGER.info("Using PVS serial from config: %s", pvs_serial)
-        try:
-            varserver_client = VarserverClient(
-                session=async_get_clientsession(hass, False),
-                host=entry.data['host'],
-                password=auth_password
-            )
-            if not await varserver_client.authenticate():
-                _LOGGER.warning("Initial varserver authentication failed (PVS may be offline) - coordinator will retry")
-            else:
-                _LOGGER.info("Varserver client initialized and authenticated (serial: %s)", pvs_serial)
-        except Exception as e:
-            _LOGGER.warning("Failed to initialize varserver client during setup: %s", e)
-            _LOGGER.info("Integration will continue setup - coordinator will retry authentication during first poll")
-            varserver_client = VarserverClient(
-                session=async_get_clientsession(hass, False),
-                host=entry.data['host'],
-                password=auth_password
-            )
-        sunpower_monitor = None  # Not used when using varserver
-    else:
-        _LOGGER.info("Using legacy dl_cgi for old firmware (BUILD %s) without authentication", firmware_build)
-        varserver_client = None  # Not used when using legacy method
-        sunpower_monitor = SunPowerMonitor(
-            entry.data['host'],
-            auth_password=None,  # Old firmware does NOT use authentication
-            pvs_serial=entry.unique_id
+    pvs_serial = entry.unique_id
+    _LOGGER.info("Using PVS serial from config: %s", pvs_serial)
+    try:
+        varserver_client = VarserverClient(
+            session=async_get_clientsession(hass, False),
+            host=entry.data['host'],
+            password=auth_password
+        )
+        if not await varserver_client.authenticate():
+            _LOGGER.warning("Initial varserver authentication failed (PVS may be offline) - coordinator will retry")
+        else:
+            _LOGGER.info("Varserver client initialized and authenticated (serial: %s)", pvs_serial)
+    except Exception as e:
+        _LOGGER.warning("Failed to initialize varserver client during setup: %s", e)
+        _LOGGER.info("Integration will continue setup - coordinator will retry authentication during first poll")
+        varserver_client = VarserverClient(
+            session=async_get_clientsession(hass, False),
+            host=entry.data['host'],
+            password=auth_password
         )
 
     # Simple polling interval - adjustments happen in config flow after battery detection
@@ -898,14 +767,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         # Step 1: Poll PVS for fresh data
         try:
-            if varserver_client:
-                # New firmware: Use direct varserver client
-                _LOGGER.debug("Polling PVS using varserver client (new firmware)")
-                fresh_data = await varserver_client.get_all_data(pvs_serial=pvs_serial)
-            else:
-                # Old firmware: Use legacy dl_cgi
-                _LOGGER.debug("Polling PVS using dl_cgi (old firmware)")
-                fresh_data = await poll_pvs_with_safety(sunpower_monitor, current_polling_interval, cache, hass, entry)
+            _LOGGER.debug("Polling PVS using varserver client")
+            fresh_data = await varserver_client.get_all_data(pvs_serial=pvs_serial)
             # Note: fresh_data can be None if PVS is unhealthy/backoff - this is normal, use cache
         except Exception as e:
             # IMPORTANT: Only new firmware uses authentication - old firmware never does
@@ -953,20 +816,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     cache.diagnostic_stats['failed_polls'] += 1
                     cache.diagnostic_stats['consecutive_failures'] += 1
                     fresh_data = None
-            else:
-                # Old firmware error - never an auth issue
-                is_first_failure = cache.diagnostic_stats['consecutive_failures'] == 0
-                if is_first_failure:
-                    _LOGGER.warning("Old firmware polling error (network/PVS issue): %s", e)
-                    if '403' in error_str or 'forbidden' in error_str:
-                        _LOGGER.warning("Old firmware 403 error - possible network/hardware issue")
-                        _LOGGER.warning("   Try restarting your Raspberry Pi (if using proxy) and/or PVS")
-                else:
-                    _LOGGER.debug("Old firmware polling error (repeated): %s", e)
-                cache.diagnostic_stats['failed_polls'] += 1
-                cache.diagnostic_stats['consecutive_failures'] += 1
-                fresh_data = None
-                await _handle_polling_error(hass, entry, cache, host_ip, e)
 
         # Step 2: Save cache if we got fresh data - preserve missing devices
         if fresh_data:
@@ -1059,35 +908,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 cache.battery_detected_once = True
 
             # Battery processing (if detected from cache OR fresh data)
-            # Only poll separate ESS endpoint for old firmware (legacy dl_cgi)
-            # New firmware already includes ESS data in main varserver response
-            if has_battery and sunpower_monitor:
-                try:
-                    _LOGGER.debug("Polling ESS endpoint for battery data (legacy dl_cgi)")
-                    old_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
-                    ess_data = await sunpower_monitor.energy_storage_system_status_async()
-
-                    if ess_data:
-                        _LOGGER.debug("ESS endpoint returned data - converting to battery entities")
-                        data = convert_ess_data(ess_data, data)
-                        new_battery_count = len(data.get(BATTERY_DEVICE_TYPE, {}))
-
-                        # Only log entity count at INFO when it changes
-                        if new_battery_count != old_battery_count:
-                            if new_battery_count == 0:
-                                _LOGGER.warning("ESS data processed but no battery entities created (was %d)", old_battery_count)
-                            else:
-                                _LOGGER.info("Battery entity count changed: %d → %d", old_battery_count, new_battery_count)
-                        else:
-                            _LOGGER.debug("ESS polling successful - %d battery entities", new_battery_count)
-                    else:
-                        _LOGGER.warning("ESS endpoint returned no data - battery entities may become unavailable")
-
-                except Exception as convert_error:
-                    _LOGGER.error("ESS data conversion failed: %s", convert_error, exc_info=True)
-                    # Don't re-raise - continue with PVS data
-            elif has_battery and not sunpower_monitor:
-                _LOGGER.debug("Battery detected with new firmware - ESS data already included in main varserver response")
+            # ESS data is already included in main varserver response for new firmware
+            if has_battery:
 
                 # Poll battery configuration for select entity current states
                 # Only works with new firmware (varserver)
@@ -1220,14 +1042,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         ),
         varserver_client=varserver_client,
         entry=entry,
-        uses_pypvs=uses_pypvs,
     )
 
     hass.data[DOMAIN][entry.entry_id] = {
-        SUNPOWER_OBJECT: sunpower_monitor,
         SUNPOWER_COORDINATOR: coordinator,
-        "varserver_client": varserver_client,  # Store client for battery control (select platform)
-        "_cache": cache,  # Make cache accessible for diagnostics
+        "varserver_client": varserver_client,
+        "_cache": cache,
     }
 
     # Initial setup - COORDINATOR FIRST, THEN PLATFORMS
@@ -1262,11 +1082,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
         coordinator = entry_data.get(SUNPOWER_COORDINATOR)
         if isinstance(coordinator, SunPowerCoordinator):
             await coordinator._async_stop_live_data_tracking()
-
-        # Clean up legacy monitor session (old firmware only)
-        sunpower_monitor = entry_data.get(SUNPOWER_OBJECT)
-        if sunpower_monitor and hasattr(sunpower_monitor, 'close'):
-            await sunpower_monitor.close()
 
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok

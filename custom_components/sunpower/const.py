@@ -116,7 +116,7 @@ SUNPOWER_SENSORS = {
                 "unit": "",
                 "icon": "mdi:network-off",
                 "device": None,
-                "state": SensorStateClass.TOTAL,  # Changed from TOTAL_INCREASING - counter can reset on PVS reboot
+                "state": SensorStateClass.TOTAL,
                 "entity_category": EntityCategory.DIAGNOSTIC,
             },
             "PVS_SKIPPED_SCANS": {

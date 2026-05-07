@@ -3,6 +3,58 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.05.2
+
+### Breaking Change: Old Firmware Support Removed
+
+Old firmware (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) is no longer supported. The integration now requires new firmware (varserver) exclusively. This removes approximately 1,400 lines of old firmware code including the entire dl_cgi client, legacy health checks, and old firmware configuration branches.
+
+**If you are on old firmware:** v2026.05.1 is the last version that supports it. See [Old Firmware Install Guide](old_firmware_install.md) for pinning instructions before updating.
+
+Files removed: `sunpower.py` (legacy dl_cgi HTTP client), `varserver.py` (unused legacy file).
+Files simplified: `__init__.py`, `config_flow.py`, `health_check.py` (major old firmware branch removal).
+
+### New: Polling Interval Control Entity
+
+A new `number.polling_interval` entity is now available under the PVS device (Config category). This lets you control the polling interval from automations or the HA UI without going into integration settings. The entity enforces the same minimum as the config flow (10s standard, 20s battery systems) and updates the coordinator immediately.
+
+### Improvement: Hardware Revision in Device Info Card
+
+Hardware revision (`HWVER`) is now shown as a separate field in the device info card rather than combined with the firmware version string. Both firmware version (`sw_version`) and hardware revision (`hw_version`) are now properly mapped to the corresponding Home Assistant device info fields.
+
+### Bug Fix: Live Data Sensors Show Unknown After WebSocket Reconnect
+
+When the WebSocket reconnects (after a PVS nightly reboot or HA restart), live data sensors now immediately show real values instead of unknown/null.
+
+Previously `PVSLiveData` was initialized with all fields as `None` on connect and sensors stayed unknown until the PVS broadcast a change. At night with zero production and stable site load the PVS may not broadcast for an extended period, leaving sensors stuck in an unknown state indefinitely.
+
+Fix: on WebSocket connect the coordinator immediately polls varserver for `/sys/livedata/*` current values and seeds the live data object before the first WebSocket message arrives.
+
+### Change: Status Notifications Now Disabled by Default
+
+General status notifications default to off for new installs. Several users reported the previous default as noisy, particularly at faster polling intervals. The setting can be re-enabled in integration options.
+
+Existing installs are not affected; this only changes the default presented during initial setup.
+
+### Improvement: Clear Error for Old Firmware Users
+
+Attempting to set up the integration on old firmware now shows a specific error message with the detected BUILD number and a link to the Old Firmware Install Guide, rather than a generic connection failure.
+
+---
+
+## [Unreleased] - v2026.04.7
+
+### Bug Fix: WebSocket Live Data Option Incorrectly Shown to PVS5 Users
+
+- `config_flow.py`: The Live Data configuration step was offered to all new firmware users including PVS5. The PVS5 firmware does not implement the WebSocket telemetry feature (`/sys/telemetryws/enable` returns 400 and port 9002 does not open on PVS5). The option is now gated on PVS6 hardware specifically (firmware build >= 61840). PVS5 users on new firmware will skip the Live Data step and go directly to Notifications during options configuration.
+
+### Bug Fix: Flash Wear Sensor Clamped at 100% and Defaults to Unavailable When Unread
+
+- `varserver_client.py`: Flash wear percentage now caps at 100% using `min(100, ...)`. eMMC "extended lifetime" values (e.g. 0x0B) would previously produce readings above 100%.
+- When the `/sys/pvs/flashwear_type_b` variable cannot be read (PVS5 may not expose it, or a fetch error occurs), the sensor now shows as unavailable instead of 0%. Zero was misleading as it implied 0% wear rather than "unknown."
+
+---
+
 ## [Unreleased] - v2026.04.6
 
 ### Improvement: WebSocket Stale Detection Tuning

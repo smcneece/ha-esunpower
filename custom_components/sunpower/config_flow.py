@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import voluptuous as vol
 
@@ -16,7 +15,6 @@ from .const import (
     MIN_SUNPOWER_UPDATE_INTERVAL,
 )
 from .varserver_client import VarserverClient
-from .sunpower import SunPowerMonitor, ConnectionException, ParseException
 from .notifications import get_mobile_devices, get_email_notification_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -141,174 +139,42 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._basic_config = {}
 
-    async def _adjust_polling_for_battery_system(self):
-        """Check for battery system and adjust polling interval if needed"""
-        try:
-            host = self._basic_config["host"]
-            polling_interval = self._basic_config["polling_interval"]
-            pvs_serial_last5 = self._basic_config.get("pvs_serial_last5")
-
-            # Only adjust if user set interval <= 20 seconds
-            if polling_interval > 20:
-                return
-
-            # Quick battery detection poll with authentication
-            sunpower_monitor = SunPowerMonitor(host, auth_password=pvs_serial_last5)
-            pvs_data = await sunpower_monitor.device_list_async()
-
-            if pvs_data:
-                # Check for battery devices in response
-                has_battery = False
-                for device in pvs_data.values():
-                    device_type = device.get("TYPE", "").lower()
-                    if any(battery_type in device_type for battery_type in ["battery", "ess", "storage", "sunvault"]):
-                        has_battery = True
-                        break
-
-                # Adjust interval if battery system detected
-                if has_battery and polling_interval < 20:
-                    old_interval = polling_interval
-                    self._basic_config["polling_interval"] = 20
-                    _LOGGER.info("Adjusted polling interval from %ds to 20s for battery system (SunStrong guidance)", old_interval)
-
-        except Exception as e:
-            # Don't fail setup if battery detection fails
-            _LOGGER.debug("Battery detection failed during setup: %s", e)
-
-    def _adjust_polling_for_old_firmware(self):
-        """Enforce 60s minimum for old firmware (BUILD < 61840, PVS6 only)"""
-        try:
-            firmware_build = self._basic_config.get("firmware_build")
-            uses_pypvs = self._basic_config.get("uses_pypvs", False)
-            polling_interval = self._basic_config["polling_interval"]
-
-            # Old firmware needs 60s minimum for hardware protection.
-            # Skip if uses_pypvs is True (new firmware including all PVS5 builds).
-            if firmware_build and not uses_pypvs and firmware_build < 61840 and polling_interval < 60:
-                old_interval = polling_interval
-                self._basic_config["polling_interval"] = 60
-                _LOGGER.info("Adjusted polling from %ds to 60s for old firmware BUILD %s (hardware protection)",
-                            old_interval, firmware_build)
-        except Exception as e:
-            _LOGGER.debug("Firmware polling adjustment failed: %s", e)
-
     async def _validate_pvs(self, host):
-        """Validate PVS connection using supervisor/info for auto-detection
-
-        Uses supervisor/info to:
-        1. Auto-detect full serial number
-        2. Extract firmware BUILD number
-        3. Determine if new firmware (BUILD >= 61840) or old firmware
-        4. Auto-extract last 5 chars of serial for password
+        """Validate PVS connection and auto-detect serial, build, and last5.
 
         Returns:
             Tuple of (serial, uses_pypvs, last5, build, error_message)
         """
-        # Step 1: Get supervisor info for auto-detection
         serial, build, last5, model, error = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
 
         if error or build is None:
-            _LOGGER.warning("supervisor/info auto-detection failed (%s), using legacy detection", error or "build is None")
-            # Fallback to legacy detection without BUILD number
-            return await self._validate_pvs_legacy(host)
+            return None, None, None, None, error or "Could not read firmware BUILD from PVS"
 
-        # Step 2: Determine firmware type based on BUILD number and model.
-        # PVS5 uses a different build number scale (5xxx vs PVS6 61xxx) so the
-        # 61840 threshold only applies to PVS6. Any PVS5 with a parseable build
-        # is new firmware using varserver.
-        MIN_LOCALAPI_BUILD = 61840
-        uses_pypvs = build >= MIN_LOCALAPI_BUILD or model.upper() == "PVS5"
+        _LOGGER.info("PVS detected: BUILD=%s, Serial=%s, Last5=%s, MODEL=%s", build, serial, last5, model)
 
-        _LOGGER.info("PVS Firmware Detected: BUILD=%s, Method=%s, Serial=%s, Password=%s",
-                    build, "varserver (LocalAPI)" if uses_pypvs else "dl_cgi (legacy)", serial, last5)
+        is_pvs5 = model == "PVS5"
+        min_build = 5408 if is_pvs5 else 61840
+        if build < min_build:
+            return None, None, None, None, (
+                f"Old firmware detected (BUILD {build}). This version of Enhanced SunPower "
+                f"requires new firmware (BUILD {min_build}+ on {model or 'PVS6'}). "
+                f"v2026.05.1 is the last version supporting old firmware. See the "
+                f"Old Firmware Install Guide in the docs for pinning instructions."
+            )
 
-        # Step 3: Validate the chosen method works
-        if uses_pypvs:
-            # New firmware (BUILD >= 61840) - needs varserver client + password
-            try:
-                _LOGGER.info("Validating new firmware (varserver) with password...")
-                client = VarserverClient(
-                    session=async_get_clientsession(self.hass, False),
-                    host=host,
-                    password=last5
-                )
-                if not await client.authenticate():
-                    raise RuntimeError("Authentication returned False")
-                _LOGGER.info("New firmware (varserver) validated successfully")
-                return serial, True, last5, build, None
-            except Exception as e:
-                _LOGGER.warning("New firmware (varserver) failed: %s - trying legacy fallback", e, exc_info=True)
-                # SAFETY FALLBACK: Try legacy dl_cgi even for new firmware
-                # (Some firmware versions may have buggy LocalAPI implementation)
-                try:
-                    _LOGGER.info("Attempting legacy dl_cgi fallback for BUILD %s", build)
-                    monitor = SunPowerMonitor(host, auth_password=None)
-                    device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
-
-                    if device_data and isinstance(device_data, dict) and "devices" in device_data:
-                        _LOGGER.warning("Legacy fallback succeeded for BUILD %s - firmware LocalAPI may be buggy", build)
-                        return serial, False, last5, build, None  # Use legacy mode but keep last5 for future use
-                    else:
-                        return None, None, None, None, "varserver failed and legacy fallback returned invalid data"
-                except Exception as fallback_e:
-                    _LOGGER.error("Both varserver and legacy fallback failed: varserver=%s, legacy=%s", e, fallback_e, exc_info=True)
-                    return None, None, None, None, f"New firmware failed: {str(e)} (fallback also failed: {str(fallback_e)})"
-        else:
-            # Old firmware (BUILD < 61840) - uses dl_cgi WITHOUT password
-            try:
-                _LOGGER.info("Validating old firmware (dl_cgi) WITHOUT password...")
-                monitor = SunPowerMonitor(host, auth_password=None)
-                device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
-
-                if device_data and isinstance(device_data, dict) and "devices" in device_data:
-                    _LOGGER.info("✅ Old firmware (dl_cgi) validated successfully")
-                    # Return last5 for pre-filling, even though it won't be used for auth
-                    return serial, False, last5, build, None
-                else:
-                    return None, None, None, None, "Old firmware returned invalid response"
-
-            except Exception as e:
-                _LOGGER.error("❌ Old firmware validation failed: %s", e, exc_info=True)
-                return None, None, None, None, f"Old firmware (dl_cgi) failed: {str(e)}"
-
-    async def _validate_pvs_legacy(self, host):
-        """Legacy validation when supervisor/info unavailable - tries both methods
-
-        Returns:
-            Tuple of (serial, uses_pypvs, last5, build, error_message)
-        """
-        # Try varserver (new firmware) - get serial from supervisor info first
         try:
-            serial_legacy, build_legacy, last5_legacy, model_legacy, err_legacy = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
-            if serial_legacy and last5_legacy:
-                client = VarserverClient(
-                    session=async_get_clientsession(self.hass, False),
-                    host=host,
-                    password=last5_legacy
-                )
-                if await client.authenticate():
-                    _LOGGER.info("Legacy detection: New firmware (varserver), serial=%s", serial_legacy)
-                    return serial_legacy, True, last5_legacy, build_legacy, None
+            client = VarserverClient(
+                session=async_get_clientsession(self.hass, False),
+                host=host,
+                password=last5
+            )
+            if not await client.authenticate():
+                raise RuntimeError("Authentication returned False")
+            _LOGGER.info("Varserver validated successfully")
+            return serial, True, last5, build, None
         except Exception as e:
-            _LOGGER.debug("Varserver legacy detection failed: %s", e)
-
-        # Try legacy dl_cgi (old firmware)
-        try:
-            monitor = SunPowerMonitor(host, auth_password=None)
-            device_data = await asyncio.wait_for(monitor.device_list_async(), timeout=30.0)
-
-            if device_data and isinstance(device_data, dict) and "devices" in device_data:
-                for device in device_data.get("devices", []):
-                    if device.get("DEVICE_TYPE") == "PVS":
-                        serial = device.get("SERIAL")
-                        last5 = (serial[-5:] if serial and len(serial) >= 5 else "").upper()
-                        _LOGGER.info("Legacy detection: Old firmware (dl_cgi), serial=%s, last5=%s", serial, last5)
-                        return serial, False, last5, None, None  # Return last5 for pre-filling
-
-        except Exception as e:
-            _LOGGER.error("Both validation methods failed: %s", e, exc_info=True)
-
-        return None, None, None, None, "Cannot connect - all methods failed"
+            _LOGGER.error("Varserver validation failed: %s", e, exc_info=True)
+            return None, None, None, None, f"Could not connect to PVS varserver: {str(e)}"
 
     async def async_step_user(self, user_input=None):
         """Handle initial connection setup - matches SunStrong pattern
@@ -345,33 +211,18 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 serial, uses_pypvs, last5, build, error_message = await self._validate_pvs(host_input)
 
                 if serial:
-                    # Store IP, polling interval, firmware method, and auto-detected values
                     self.ip_address = host_input
                     self._basic_config = user_input.copy()
-                    self._basic_config["host"] = host_input  # Use cleaned host
-                    self._basic_config["uses_pypvs"] = uses_pypvs
-                    self._basic_config["auto_detected_last5"] = last5  # Pre-fill password
+                    self._basic_config["host"] = host_input
+                    self._basic_config["uses_pypvs"] = True
+                    self._basic_config["auto_detected_last5"] = last5
                     self._basic_config["firmware_build"] = build
 
-                    # Set unique_id from serial
                     await self.async_set_unique_id(serial)
                     self._abort_if_unique_id_configured({})
-                    _LOGGER.info("Setup: Serial=%s, Method=%s, Build=%s, Last5=%s",
-                                serial, "varserver" if uses_pypvs else "dl_cgi", build, last5)
+                    _LOGGER.info("Setup: Serial=%s, Build=%s, Last5=%s", serial, build, last5)
 
-                    # Decide if password step is needed:
-                    # - Old firmware + auto-detected: Skip password (not needed for old firmware)
-                    # - New firmware OR failed detection: Ask for password (future-proof for auth changes)
-                    if not uses_pypvs and last5:
-                        # Old firmware with auto-detected serial - skip password
-                        _LOGGER.info("Old firmware detected with auto-password - skipping password step")
-                        self._basic_config["pvs_serial_last5"] = last5
-                        await self._adjust_polling_for_battery_system()
-                        self._adjust_polling_for_old_firmware()
-                        return await self.async_step_notifications()
-                    else:
-                        # New firmware OR failed detection - ask for password (future-proof)
-                        return await self.async_step_need_password()
+                    return await self.async_step_need_password()
                 else:
                     # Connection failed - show error with user-friendly guidance
                     _LOGGER.warning("Setup: PVS validation failed: %s", error_message)
@@ -429,15 +280,12 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         description_placeholders = {}
 
-        # Get auto-detected values and firmware info
         auto_detected_last5 = self._basic_config.get("auto_detected_last5", "")
-        uses_pypvs = self._basic_config.get("uses_pypvs", False)
         firmware_build = self._basic_config.get("firmware_build")
 
-        # Show firmware info to user
         description_placeholders["serial_number"] = self.unique_id or "Unknown"
         description_placeholders["firmware_build"] = str(firmware_build) if firmware_build else "Unknown"
-        description_placeholders["auth_required"] = "Yes - Password will be used" if uses_pypvs else "No - Password for future use only"
+        description_placeholders["auth_required"] = "Yes"
 
         if user_input is not None:
             # Validate password (last 5 of serial) - force uppercase to match serial format
@@ -454,11 +302,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store uppercase password in basic config
                 self._basic_config["pvs_serial_last5"] = pvs_serial_last5
 
-                # Check for battery system and old firmware, adjust polling if needed
-                await self._adjust_polling_for_battery_system()
-                self._adjust_polling_for_old_firmware()
-                _LOGGER.info("Setup: Password=%s, Will be used=%s",
-                            pvs_serial_last5, uses_pypvs)
+                _LOGGER.info("Setup: Password=%s", pvs_serial_last5)
                 return await self.async_step_notifications()
 
         # Step 2 schema: Pre-fill password with auto-detected last5
@@ -533,26 +377,13 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         email_options = {"none": "Disabled"}
         email_options.update(email_services)
 
-        # Firmware-aware flash memory threshold
-        firmware_build = self._basic_config.get("firmware_build", 0) or 0
-        if firmware_build >= 61840:
-            # New firmware: Use percentage (0-100%)
-            flash_default = 85
-            flash_max = 100
-            flash_unit = "%"
-        else:
-            # Old firmware: Use MB (0-200 MB)
-            flash_default = 0
-            flash_max = 200
-            flash_unit = "MB"
-
         # Page 3: Notifications schema
         schema = vol.Schema({
-            vol.Required("flash_memory_threshold_mb", default=flash_default): selector.NumberSelector(
+            vol.Required("flash_memory_threshold_mb", default=85): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
-                    max=flash_max,
-                    unit_of_measurement=flash_unit,
+                    max=100,
+                    unit_of_measurement="%",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
@@ -564,7 +395,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required("general_notifications", default=True): selector.BooleanSelector(),
+            vol.Required("general_notifications", default=False): selector.BooleanSelector(),
             vol.Required("deep_debug_notifications", default=False): selector.BooleanSelector(),
             vol.Required("overwrite_general_notifications", default=True): selector.BooleanSelector(),
             vol.Required("mobile_device", default="none"): selector.SelectSelector(
@@ -632,26 +463,21 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     errors["pvs_serial_last5"] = "Must contain only letters and numbers"
 
             if not errors:
-                # Auto-detect firmware info (critical for existing integrations missing firmware_build)
+                # Auto-detect firmware build for routing and persistence
                 host = user_input["host"]
                 serial, build, last5, model, error = await get_supervisor_info(host, async_get_clientsession(self.hass, False))
 
                 if build:
-                    MIN_LOCALAPI_BUILD = 61840
-                    uses_pypvs = build >= MIN_LOCALAPI_BUILD or model.upper() == "PVS5"
                     user_input["firmware_build"] = build
-                    user_input["uses_pypvs"] = uses_pypvs
-                    _LOGGER.info("Options: Auto-detected firmware BUILD %s, MODEL=%s, uses_pypvs=%s", build, model, uses_pypvs)
+                    _LOGGER.info("Options: Auto-detected firmware BUILD %s, MODEL=%s", build, model)
 
-                    # New firmware requires password - prevent blank serial from overwriting existing
-                    if uses_pypvs and not pvs_serial_last5:
-                        errors["pvs_serial_last5"] = "Password required for new firmware (last 5 chars of serial)"
+                    if not pvs_serial_last5:
+                        errors["pvs_serial_last5"] = "Password required (last 5 chars of serial)"
 
             if not errors:
-                # Store basic config and route based on firmware
                 self._basic_config = user_input.copy()
-                uses_pypvs = user_input.get("uses_pypvs", self.config_entry.data.get("uses_pypvs", False))
-                if uses_pypvs:
+                firmware_build = user_input.get("firmware_build", self.config_entry.data.get("firmware_build", 0)) or 0
+                if firmware_build >= 61840:
                     return await self.async_step_live_data()
                 return await self.async_step_notifications()
 
@@ -828,7 +654,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         email_options.update(email_services)
 
         # Get current values
-        current_general = self.config_entry.options.get("general_notifications", True)
+        current_general = self.config_entry.options.get("general_notifications", False)
         current_debug = self.config_entry.options.get("deep_debug_notifications", False)
         current_overwrite = self.config_entry.options.get("overwrite_general_notifications", True)
         current_mobile_device = self.config_entry.options.get("mobile_device", "none")
@@ -840,27 +666,16 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         if current_email_service == "none":
             current_email_recipient = ""
 
-        # Firmware-aware flash memory threshold
-        firmware_build = self.config_entry.data.get("firmware_build", 0) or 0
-        if firmware_build >= 61840:
-            # New firmware: Use percentage (0-100%)
-            flash_max = 100
-            flash_unit = "%"
-            # Convert old MB values to percentage or use default
-            if current_flash_threshold == 0 or current_flash_threshold > 100:
-                current_flash_threshold = 85
-        else:
-            # Old firmware: Use MB (0-200 MB)
-            flash_max = 200
-            flash_unit = "MB"
+        if current_flash_threshold == 0 or current_flash_threshold > 100:
+            current_flash_threshold = 85
 
         # Page 3: Notifications schema
         schema = vol.Schema({
             vol.Required("flash_memory_threshold_mb", default=current_flash_threshold): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
-                    max=flash_max,
-                    unit_of_measurement=flash_unit,
+                    max=100,
+                    unit_of_measurement="%",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),

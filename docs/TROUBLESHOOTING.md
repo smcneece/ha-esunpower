@@ -23,11 +23,10 @@
 **Bottom Line:** Faster polling gets you fresher PVS system stats, but doesn't make power readings update faster.
 
 ### PVS Not Responding
-1. **Verify IP Address**: PVS typically uses `172.27.153.1`
+1. **Verify IP Address**: Use your PVS WiFi WAN IP (check your router DHCP leases for "PVS" or "SunPower"). LAN port `172.27.153.1` is an alternative if VLAN-isolated.
 2. **Check Authentication**: Ensure PVS serial number (last 5 digits) is correct in integration settings
-3. **Monitor Health Checks**: Integration shows health check attempts in notifications
-4. **Check Backoff Status**: Integration may be in cooldown period after failures
-5. **PVS Reboot**: If persistent, power cycle the PVS (turn off breaker for 60 seconds)
+3. **Check Backoff Status**: Integration may be in cooldown period after failures
+4. **PVS Reboot**: If persistent, power cycle the PVS (turn off breaker for 60 seconds)
 
 ### 🔐 **Authentication Issues (New Firmware)**
 1. **Check Serial Number**: Verify last 5 digits of PVS serial in integration configuration
@@ -61,7 +60,7 @@
 2. **Check Integration Status**: Look for "Fresh data from PVS" notifications
 3. **Verify Health Check**: Should see "PVS Health Check" notifications in debug mode
 4. **Monitor Notifications**: Check for "PVS OFFLINE" or backoff messages
-5. **Check PVS Response**: Try manual test: `curl http://172.27.153.1/cgi-bin/dl_cgi?Command=DeviceList`
+5. **Check PVS Response**: Try manual test: `curl https://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
 
 ### Diagnostic Sensors Not Working
 1. **Check Device**: Look for "Enhanced SunPower Diagnostics" device
@@ -159,62 +158,9 @@ The PVS6 uses soldered NAND flash (eMMC) for storage. Early firmware versions wr
 
 ## Network Setup Issues
 
-### **Hardware Power Requirements & Known Issues**
+> Old firmware (RPi proxy, VLAN, LAN port isolation) network setup guidance has moved to [Old Firmware Install Guide](old_firmware_install.md).
 
-> **Old Firmware Only (BUILD < 61840):** This section applies to setups where a Raspberry Pi is used as a bridge/proxy for the PVS LAN port. If you have new firmware, you connect directly over WiFi - no Raspberry Pi is needed.
-
-**CRITICAL: PVS USB Power Limitation Warning**
-
-Many users power their Raspberry Pi directly from the PVS USB ports. However, the PVS has **limited USB power capacity** that can cause **random connection drops** when exceeded:
-
-**The Problem:**
-- **PVS USB ports** have limited power output (exact specs unknown)
-- **Dual USB-Ethernet setup** (WAN + LAN adapters) can exceed this capacity
-- **Raspberry Pi Zero 2 W** alone can draw up to **1.5A**
-- **USB-Ethernet adapters** add ~500-800mA each
-- **Combined load** can exceed PVS USB power capacity
-
-**Real-World Example:**
-*I experienced random PVS connectivity issues using **two SunPower-approved USB-Ethernet adapters** (one for WAN, one for LAN) powered from PVS USB ports. Problem completely resolved by switching PVS back to WiFi for WAN connection, leaving only one USB-Ethernet adapter for LAN polling.*
-
-**Symptoms of PVS USB Power Overload:**
-- **Random "PVS OFFLINE" alerts** despite network functioning normally
-- **Integration works fine for hours, then suddenly fails**
-- **PVS becomes completely unresponsive** requiring power cycle
-- **Both WAN and LAN connections drop randomly**
-
-**Practical Solutions:**
-
-**Recommended: Reduce USB Load**
-- **Use WiFi for PVS WAN** connection (phoning home to SunPower)
-- **Single USB-Ethernet adapter** for LAN polling only
-- **Significantly reduces** PVS USB power draw
-- **Fits within limited PVS enclosure space**
-
-**Alternative: External Pi Power**
-- **External power supply** for Raspberry Pi (don't use PVS USB for Pi power)
-- **Note**: Space constraints in PVS enclosure make this challenging
-
-**Important Notes:**
-- **No PVS logs available** - you won't see USB disconnect messages
-- **SunPower-approved hardware** can still exceed power limits in dual configuration
-- **Random failures** are the primary symptom, not permanent connection loss
-- **PVS newer models** often lack RJ45 jacks, requiring USB-Ethernet solutions
-
-### Network Architecture Overview
-```
-Internet ──┐
-           │
-     Your Router/Switch
-           │
-    ┌──────┼──────┐
-    │             │
-PVS WAN Port   PVS LAN Port (172.27.153.1)
-(SunPower      │
- Cloud)        └── Isolated Network → Home Assistant
-```
-
-### WAN Port Connectivity (New Firmware)
+### WAN Port Connectivity
 
 With new firmware, the PVS can be monitored over the **WAN port** using authentication.
 

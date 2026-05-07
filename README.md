@@ -1,56 +1,28 @@
 # Enhanced SunPower: Home Assistant Integration for SunPower PVS6 / PVS5 Solar Monitoring
 
-Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports all PVS hardware (PVS5 and PVS6), all firmware versions, SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
+Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports PVS5 and PVS6 hardware on new firmware (BUILD 5408+ on PVS5, BUILD 61840+ on PVS6), SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
 ## Recent Changes
 
-Recent additions include optional WebSocket live data for new firmware users (BUILD 61840+), a new "PVS Live Data" device with sensors that update in real time, and several bug fixes and reliability improvements.
+Old firmware support (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) has been removed. New firmware (varserver) is now required. Other recent additions include a polling interval control entity, hardware revision shown separately in the device card, optional WebSocket live data for PVS6 (BUILD 61840+), and several reliability improvements.
 
 > Some changes shown in this README or the changelog may be in pre-release testing and not yet in the current stable release. Check the [Releases page](https://github.com/smcneece/ha-esunpower/releases) for what is actually available to install, and the [CHANGELOG](docs/CHANGELOG.md) for the full history including unreleased work.
 
 ---
 
-## PLEASE TAKE A FEW MINUTES TO READ: FIRMWARE COMPATIBILITY
+## Old Firmware Notice
 
-> ⚠️ **Old Firmware Support Sunset Notice**: Support for old firmware (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) will be removed in an upcoming release. If you are on old firmware, read the section below before updating.
+> ⚠️ Old firmware support (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) has been removed as of this version. **v2026.05.1 is the last release supporting old firmware.** If you are on old firmware, see [Old Firmware Install Guide](docs/old_firmware_install.md) to pin to that version before updating.
 
-**Primary support: new firmware (BUILD 61840+ on PVS6, BUILD 5408+ on PVS5).** The integration automatically detects your firmware and selects the correct communication method.
+This integration requires new firmware (varserver):
+- **PVS6**: BUILD 61840 or higher
+- **PVS5**: BUILD 5408 or higher
 
-**PVS5 Firmware Version Formats:**
-SunPower uses different version formats for PVS5 vs PVS6. The integration automatically parses all formats:
-- **PVS5 new firmware**: `"2025.11, Build 5412"` → extracts BUILD `5412`
-- **PVS5 dotted format**: `"0.0.25.5412"` → extracts BUILD `5412`
-- **PVS6 format**: `"2025.10.20.61846"` → extracts BUILD `61846`
+You can check your firmware version in Home Assistant: Settings, Devices and Services, Enhanced SunPower, open the PV Supervisor device.
 
-The BUILD number determines which API method is used (not the version string). You can check your firmware at: `http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
-
-### How to Check Your Firmware Version
-
-In Home Assistant, go to Settings, Devices and Services, Enhanced SunPower, and open the PV Supervisor device. The firmware version shown there contains your BUILD number. Alternatively check the Enhanced SunPower Diagnostics device.
-
-### Old Firmware Users: Action Required Before the Next Update
-
-If your PVS6 shows a BUILD below 61840, or your PVS5 shows a BUILD below 5408, you are on old firmware. Here is what to do now, before old firmware support is removed:
-
-**If you installed via HACS:**
-1. Go to HACS, find Enhanced SunPower, and remove it
-2. Go to the [GitHub Releases page](https://github.com/smcneece/ha-esunpower/releases) and download the last release that supports old firmware (v2026.04.6)
-3. Extract the `custom_components/sunpower` folder into your HA `custom_components` directory
-4. Restart Home Assistant
-
-Your sensors, history, and automations will be preserved. You will simply be pinned to that version and will not receive future updates via HACS. The integration will continue working indefinitely on that version.
-
-**If you installed manually:** You are already protected. Just do not update past v2026.04.6 and you will be fine.
-
-**Why is HACS a problem?** HACS always installs the latest version. If you leave it installed via HACS, a future HACS update will silently upgrade you to a version that drops old firmware support, and the integration will stop working.
-
-### Battery Systems
-
-If you are on new firmware and have a SunVault battery system, full battery monitoring and control is supported.
+If you have a SunVault battery system, full battery monitoring and control is supported.
 
 ---
-
-⚠️ CRITICAL: Migrating from krbaker intergration? See [MIGRATION.md](docs/MIGRATION.md) for step-by-step instructions. Backup first!
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -68,21 +40,21 @@ If you are on new firmware and have a SunVault battery system, full battery moni
 > 
 > [![GitHub stars](https://img.shields.io/github/stars/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/stargazers) [![GitHub forks](https://img.shields.io/github/forks/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/network/members)
 
-> 👀 **Watch this repo** to get notified of new releases, bug fixes, and discussions. Use the Watch button at the top of the page and select "Releases" at minimum, or "All Activity" if you want to follow discussions too. The more eyes on the integration, the better it gets. User reports, battery behavior observations, firmware findings, and automation ideas from the community have shaped nearly every release. If you have a SunVault or an unusual setup, your reports are especially valuable since not everyone has hardware to test with.
+> **Watch this repo** to get notified of new releases, bug fixes, and discussions. Use the Watch button at the top of the page and select "Releases" at minimum, or "All Activity" if you want to follow discussions too. The more eyes on the integration, the better it gets. User reports, battery behavior observations, firmware findings, and automation ideas from the community have shaped nearly every release. If you have a SunVault or an unusual setup, your reports are especially valuable since not everyone has hardware to test with.
 
 ![Integration Overview](images/overview.png)
 
 ## What Makes This Enhanced?
 
 **Core Improvements:**
-- **WebSocket Live Data**: Real-time sensor updates direct from the PVS WebSocket (new firmware only); sensors update as values change, not on poll schedule
+- **WebSocket Live Data**: Real-time sensor updates direct from the PVS WebSocket; sensors update as values change, not on poll schedule (PVS6 only)
 - **Battery Control**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
 - **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage, configurable notification thresholds
 - **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
 - **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
 - **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI
 - **Diagnostic Dashboard**: 7 sensors tracking integration reliability and performance
-- **PVS Hardware Protection**: Firmware-aware throttling (10s new firmware, 60s old firmware, 20s battery), health checking, and intelligent backoff
+- **PVS Hardware Protection**: Polling minimums (10s standard, 20s battery systems), health checking, and intelligent backoff
 
 **Technical Enhancements:**
 - **Multi-Channel Notifications**: 6 separate notification streams
@@ -100,13 +72,12 @@ If you are on new firmware and have a SunVault battery system, full battery moni
 - Entities are automatically created when inverters come online at sunrise
 - You'll receive a notification when your solar system is fully discovered and monitored
 
-**IMPORTANT - New Firmware Users (BUILD 61840+):**
+**Network Connection:**
 
-New firmware connects directly to your PVS over your home network - no Raspberry Pi bridge or proxy needed. The PVS has built-in WiFi; just connect it to your home network and use that IP:
+The integration connects directly to your PVS over your home network. The PVS has built-in WiFi; connect it to your home network and use that IP:
 - **WiFi WAN (Recommended)**: Check your router's DHCP leases for "PVS" or "SunPower" device; reserve the IP so it doesn't change
 - **LAN port (Alternative)**: Fixed IP `172.27.153.1`, requires VLAN isolation (LAN port runs its own DHCP)
-- **Ethernet WAN (Do not use)**: We've seen issues using wired WAN port where it works for a bit, then stops. So use Wifi, or isolate the LAN port of the PVS Ethernet connection. (Isolated VLAN off router or managed switch)
-- **Raspberry Pi bridges/proxies**: Not needed and won't work - new firmware uses HTTPS (port 443) which most bridges don't support
+- **Ethernet WAN (Do not use)**: Known reliability issues; the PVS can get confused when both WiFi and Ethernet WAN are active simultaneously. Use WiFi WAN or the LAN port instead.
 
 ---
 
@@ -158,20 +129,20 @@ HACS requires integrations to be registered in the home-assistant/brands reposit
 1. **Page 1**: Enter PVS IP (WAN or LAN) address and polling interval
    - Integration automatically detects firmware BUILD and serial number
    - Validates connection and selects optimal communication method
-2. **Page 2**: Confirm password (auto-detected and pre-filled for new firmware)
-   - Old firmware (BUILD < 61840): Password step skipped automatically
-   - New firmware (BUILD ≥61840): Password pre-filled, just confirm
+2. **Page 2**: Confirm password (auto-detected and pre-filled from PVS serial)
 3. **Page 3**: Configure notifications and advanced settings
    - Set flash memory threshold
    - Select mobile device for critical alerts
    - Configure email notifications
 
-### WebSocket Live Data (New Firmware Only)
+### WebSocket Live Data (PVS6 New Firmware Only)
 ![Live Data Configuration](images/live-data-setup.png)
 
-After initial setup, new firmware users can enable real-time WebSocket live data via integration options (Settings > Devices & Services > Enhanced SunPower > Configure).
+After initial setup, PVS6 users on new firmware can enable real-time WebSocket live data via integration options (Settings > Devices & Services > Enhanced SunPower > Configure).
 
-The Live Data page appears only for new firmware installs:
+> **PVS5 users:** WebSocket live data is not currently supported on PVS5 hardware. The PVS5 firmware has the variable definitions but does not implement the WebSocket telemetry feature. The Live Data option will not appear for PVS5 installs. If you would like to see SunStrong add PVS5 WebSocket support, consider commenting on their open issue: https://github.com/SunStrong-Management/pvs-hass/issues/33
+
+The Live Data page appears only for PVS6 new firmware installs:
 - **Enable WebSocket live data**: Subscribes to the PVS WebSocket on port 9002 for 1-second sensor updates
 - **Power change threshold**: Minimum kW change required to write a state update for power sensors (default 0.05 kW). Reduces database writes during stable conditions.
 
@@ -186,17 +157,17 @@ These sensors are designed for real-time dashboard display, not historical track
 | Setting | Description | Default | Recommended |
 |---------|-------------|---------|-------------|
 | **Host** | PVS IP Address | N/A | WAN: `192.168.1.x` <br>LAN: `172.27.153.1` |
-| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (firmware-aware: 10s new, 60s old, 20s battery) |
+| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (10s minimum, 20s for battery systems) |
 | **PVS Password (last 5)** | Auto-detected from serial number | Auto-filled | Confirm auto-detected value (new firmware only) |
 | **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
 | **Flash Wear Threshold** | PVS flash lifetime alert (%) | 90 (90% wear) | 0 to disable, 85-95% recommended |
 | **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
 | **Email Recipient** | Override recipient address | `` | Enter send to Email address |
-| **General Notifications** | Show status updates | `true` | Enable for monitoring |
+| **General Notifications** | Show status updates | `false` | Enable for monitoring |
 | **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
 | **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
 | **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
-| **Enable WebSocket Live Data** | Real-time 1-second updates (new firmware only) | `false` | Enable only with SSD storage |
+| **Enable WebSocket Live Data** | Real-time 1-second updates (PVS6 new firmware only) | `false` | Enable only with SSD storage |
 | **Power Change Threshold** | Min kW change to trigger state write | `0.05 kW` | Lower = more precision, more DB writes |
 
 ### 🔒 PVS Authentication (Automatic!)
@@ -207,20 +178,17 @@ These sensors are designed for real-time dashboard display, not historical track
 1. Integration queries PVS for firmware BUILD number and full serial number
 2. Automatically extracts last 5 characters for authentication password
 3. Pre-fills password field in UPPERCASE format (matches serial format)
-4. For old firmware (BUILD < 61840): Skips password step entirely
-5. For new firmware (BUILD ≥61840): Shows pre-filled password for confirmation
+4. Shows pre-filled password for confirmation
 
-**Firmware-Specific Behavior:**
-- **BUILD < 61840**: No authentication required, password step skipped automatically
-- **BUILD ≥61840**: LocalAPI authentication with auto-detected password
-- **Buggy Firmware**: Automatic fallback to legacy mode if LocalAPI fails
+**Behavior:**
+- **LocalAPI authentication** with auto-detected password
 - **Failed Detection**: Manual password entry available as fallback
 
 **Manual Override (if needed):**
 If auto-detection fails, you can manually enter the last 5 characters of your PVS serial:
 - **Physical Device**: Remove PVS cover, serial on device label
 - **SunPower/SunStrong App**: Profile → System Info → Serial Number
-- **Format**: UPPERCASE letters/numbers only (e.g., "W3193" not "w3193")
+- **Format**: UPPERCASE letters/numbers only (e.g., "X7193" not "x7193")
 
 **Authentication Details:**
 - **Username**: `ssm_owner` (configured by SunStrong Management)
@@ -230,39 +198,16 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 
 ### Polling Configuration
 
-**Simplified Architecture**: Single consistent polling interval for reliable 24/7 monitoring:
+**Recommended: 300 seconds (5 minutes).** This is the right default for solar-only systems and most battery systems.
 
-**Use Cases:**
-- **Continuous monitoring**: Track both solar production and consumption throughout the day
-- **PVS hardware protection**: 300-second minimum protects against overloading
-- **Battery support**: Automatic detection and monitoring of SunVault systems
-- **Home automation**: Reliable data for automations and energy tracking
+Faster polling only updates PVS system sensors (uptime, flash usage, error counts) and possibly battery state. Inverter and power meter data updates on the PVS's own schedule regardless of how fast you poll. For real-time production and consumption data, enable WebSocket Live Data (PVS6 only) instead of aggressive polling.
 
-**Configuration:**
-- **Standard setup**: 300 seconds (5 minutes), recommended default balancing data freshness with hardware protection
-- **Faster updates (new firmware)**: 10-60 seconds for frequent data updates
-- **Conservative setup**: 600-3600 seconds for minimal PVS load
-- **Battery systems**: 20-second minimum (per SunStrong guidance for less aggressive polling)
-- **Old firmware**: 60-second minimum enforced automatically for hardware protection
+- **Solar only**: 300s is ideal. Polling faster will not give you fresher inverter or meter data.
+- **Battery systems**: 20s minimum (per SunStrong guidance). Useful for near-real-time battery state if not using WebSocket.
+- **PVS6 with WebSocket**: Leave polling at 300s and enable live data for real-time updates.
+- **Conservative**: 600-3600s for minimal system load.
 
-**SunStrong Recommendations:**
-- **Battery systems**: Use less aggressive polling intervals to reduce system load
-- **Non-battery systems**: 10-second minimum supported for future varserver compatibility
-- **Current default**: 300 seconds maintained for proven stability
-
-**Benefits:**
-- Consistent behavior: no complex day/night mode switching
-- Simpler troubleshooting: predictable polling schedule
-- Better battery support: continuous monitoring with appropriate intervals
-- Hardware protection: built-in minimums prevent system overload
-- Future-ready: prepared for varserver's faster capabilities
-
-**Performance Considerations:**
-- **Faster polling (10-60s)**: Significantly increases Home Assistant database size; 10s polling creates 30x more data than 300s polling
-- **Database growth**: With ~50 solar entities, 10s polling generates ~180,000 database entries per hour vs 600 entries with 300s polling
-- **Hardware impact**: Larger databases slow performance on Raspberry Pi systems, affect backup times, and increase storage requirements
-- **Standard polling (300s)**: Recommended default balances data freshness with manageable database size
-- **Conservative polling (600-3600s)**: Minimal database growth, ideal for basic monitoring and slower hardware
+Faster polling significantly increases your HA database size. 10s polling generates roughly 30x more data than 300s polling with no meaningful benefit for most users.
 
 ## Available Data
 
@@ -282,9 +227,9 @@ If auto-detection fails, you can manually enter the last 5 characters of your PV
 - **ESS System**: Environmental conditions, power meters
 - **Hub Plus**: Grid status, phase voltages, humidity monitoring
 
-### WebSocket Live Data (New Firmware, Optional)
+### WebSocket Live Data (PVS6 New Firmware Only, Optional)
 
-When enabled, a separate "PVS Live Data {serial}" device provides real-time sensors updated as values change from the PVS WebSocket on port 9002:
+When enabled, a separate "PVS Live Data {serial}" device provides real-time sensors updated as values change from the PVS WebSocket on port 9002. PVS5 hardware does not support this feature.
 
 | Sensor | Unit | Notes |
 |--------|------|-------|
@@ -498,7 +443,7 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 
 **Together:** Complete solar installation monitoring from grid-level accuracy down to individual panel performance, network connectivity, and panel-specific scheduling.
 
-**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals with firmware-aware minimums (10s new firmware, 60s old firmware, 20s battery systems), with a conservative 300-second default. Fast polling capabilities prepare for upcoming varserver migration while maintaining hardware protection.
+**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals (10s minimum standard, 20s for battery systems), with a conservative 300-second default.
 
 ## Network Setup
 
@@ -515,10 +460,9 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
   - Must be isolated on a dedicated VLAN or switch port (LAN port runs its own DHCP server)
   - Requires static route on your router or HA host to reach the `172.27.153.0/24` subnet
   - Same authentication and features as WAN
-- **Ethernet WAN (Not Recommended)**: USB-to-Ethernet adapter on newer PVS6 models
-  - ⚠️ Known reliability issues: intermittent connectivity drops that require PVS reboots
+- **Ethernet WAN (Not Recommended)**: Known reliability issues with intermittent connectivity drops that require PVS reboots
   - Multiple users have reported the PVS becoming unreachable over Ethernet WAN while WiFi and LAN continue working
-  - If you must use Ethernet WAN, do NOT also have WiFi active - the PVS becomes unreliable with both interfaces on the same network
+  - If you must use Ethernet WAN, do NOT also have WiFi active; the PVS becomes unreliable with both interfaces on the same network
 - **Raspberry Pi Bridges/Proxies**: Not needed and not supported with new firmware
   - The PVS has built-in WiFi - connect it to your home network and use that IP directly
   - The RPi bridge was only required for old firmware's LAN port isolation; new firmware has no such requirement
@@ -526,14 +470,9 @@ For comprehensive whole-home monitoring, I recommend dedicated current transform
 
 **Different VLANs:** The integration works across VLANs as long as routing is configured between them and port 443 is accessible from HA to the PVS.
 
-**Old Firmware (BUILD < 61840 on PVS6, BUILD < 5408 on PVS5):**
-> ⚠️ Old firmware support is being removed in an upcoming release. See the [Old Firmware Users](#old-firmware-users-action-required-before-the-next-update) section above.
-- **LAN Port Required**: Must use `172.27.153.1`
-- **Network Isolation Required**: PVS LAN port must be isolated (VLAN or separate network)
-  - See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for VLAN setup
-  - Or use Raspberry Pi proxy ([@krbaker's documentation](https://github.com/krbaker/hass-sunpower#network-setup))
+> Old firmware is no longer supported. See [Old Firmware Install Guide](docs/old_firmware_install.md) for network setup guidance if you are pinned to v2026.05.1.
 
-**Quick Test:** Check if your WAN port responds: `curl http://YOUR_PVS_WAN_IP/cgi-bin/dl_cgi/supervisor/info`
+**Quick Test:** Check if your PVS responds: `curl http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
 
 ## Troubleshooting
 

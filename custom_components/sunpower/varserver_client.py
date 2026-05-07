@@ -187,6 +187,10 @@ class VarserverClient:
         result = await self._post_vars({"set": f"{path}={value}"})
         return bool(result)
 
+    async def get_livedata(self) -> dict:
+        """Fetch current /sys/livedata/* values. Used to seed live data sensors on connect."""
+        return await self._request_vars("/sys/livedata/")
+
     async def enable_telemetry_websocket(self) -> bool:
         """Enable WebSocket telemetry broadcast on the PVS.
 
@@ -277,15 +281,15 @@ class VarserverClient:
 
     async def _build_gateway(self, pvs_serial: str) -> dict | None:
         """Build PVS gateway device dict from /sys/info vars."""
-        # Fetch flash wear percentage
-        fw_pct = 0
+        # Fetch flash wear percentage (PVS5 may not expose this var)
+        fw_pct = None
         try:
             flashwear_raw = await self._request_var("/sys/pvs/flashwear_type_b")
             if flashwear_raw:
                 if isinstance(flashwear_raw, str) and flashwear_raw.startswith("0x"):
-                    fw_pct = int(flashwear_raw, 16) * 10
+                    fw_pct = min(100, int(flashwear_raw, 16) * 10)
                 else:
-                    fw_pct = int(flashwear_raw) * 10
+                    fw_pct = min(100, int(flashwear_raw) * 10)
         except Exception as e:
             _LOGGER.debug("Could not fetch flashwear_type_b: %s", e)
 
@@ -339,7 +343,7 @@ class VarserverClient:
             "dl_flash_avail": "0",
             "ram_usage_percent": ram_val,
             "flash_usage_percent": flash_val,
-            "flashwear_percent": str(int(fw_pct)),
+            "flashwear_percent": str(fw_pct) if fw_pct is not None else None,
             "dl_err_count": "0",
             "dl_comm_err": "0",
             "dl_skipped_scans": "0",

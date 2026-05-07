@@ -94,6 +94,15 @@ class PVSWebSocket:
                 except Exception as e:
                     _LOGGER.error("Error in state callback: %s", e)
 
+    def seed_live_data(self, data: PVSLiveData) -> None:
+        """Seed live data with initial values from varserver on connect.
+
+        Prevents sensors from showing unknown/null between WebSocket connect
+        and the first broadcast message from the PVS.
+        """
+        if self._live_data is not None:
+            self._live_data = data
+
     def add_listener(self, callback: LiveDataCallback) -> Callable[[], None]:
         """Add a listener for live data updates.
 
