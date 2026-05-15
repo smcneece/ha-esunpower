@@ -3,6 +3,16 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.05.4
+
+### Bug Fix: Spurious WebSocket Reconnects at Stable Peak Production
+
+The stale connection timeout introduced in v2026.05.3 was set too aggressively at 60 seconds. At stable peak production the PVS naturally sends WebSocket messages less frequently, with quiet periods of 60-70 seconds between notifications when power output is not changing. The 60-second timeout was firing during these normal quiet periods, causing unnecessary reconnects and brief unavailable states every minute or so.
+
+Adjusted to 90 seconds, which sits between the normal quiet period (60-70 seconds) and a genuinely stale connection (150+ seconds of silence).
+
+---
+
 ## [Unreleased] - v2026.05.3
 
 ### Bug Fix: Live Data Power Sensors Showing Spikes
@@ -15,7 +25,7 @@ Power sensors now use a 10-second minimum write interval. The sensor tracks ever
 
 The PVS periodically stops sending WebSocket messages for an extended period while keeping the TCP connection open. The sensor holds its last value during the silence, creating flat segments in the history graph lasting 2-3 minutes. When stale detection reconnected, the seeded value jumped to the current production level, creating a visible step.
 
-The stale detection timeout has been reduced from 180 seconds to 60 seconds. Flat segments are now limited to roughly 1 minute in the worst case.
+The stale detection timeout has been reduced from 180 seconds to 90 seconds. Flat segments are now limited to roughly 1.5 minutes in the worst case.
 
 ### Maintenance: Stale Entity Cleanup
 

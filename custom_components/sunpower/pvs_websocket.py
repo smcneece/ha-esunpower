@@ -167,7 +167,7 @@ class PVSWebSocket:
         fast_retry_delay = 2
         backoff_delay = 5.0
         max_backoff = 300
-        stale_timeout = 60
+        stale_timeout = 90
 
         # Reuse session across reconnects
         session: aiohttp.ClientSession | None = None
