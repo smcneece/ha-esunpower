@@ -167,7 +167,7 @@ class PVSWebSocket:
         fast_retry_delay = 2
         backoff_delay = 5.0
         max_backoff = 300
-        stale_timeout = 180
+        stale_timeout = 60
 
         # Reuse session across reconnects
         session: aiohttp.ClientSession | None = None
@@ -202,7 +202,7 @@ class PVSWebSocket:
                                 "Failed to enable telemetry websocket: %s", e
                             )
 
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Attempting WebSocket connection to %s (attempt %d)",
                         websocket_url,
                         reconnect_count + 1,
@@ -230,8 +230,8 @@ class PVSWebSocket:
                                 await asyncio.sleep(30)
                                 elapsed = time.monotonic() - last_message_time
                                 if elapsed > stale_timeout:
-                                    _LOGGER.info(
-                                        "WebSocket stale (no messages for %.0fs), closing and reconnecting",
+                                    _LOGGER.debug(
+                                        "WebSocket stale (no messages for %.0fs), reconnecting",
                                         elapsed,
                                     )
                                     await ws.close()
@@ -255,7 +255,7 @@ class PVSWebSocket:
                                 aiohttp.WSMsgType.CLOSE,
                                 aiohttp.WSMsgType.CLOSED,
                             ):
-                                _LOGGER.info("WebSocket closed by server")
+                                _LOGGER.debug("WebSocket closed by server")
                                 break
 
                 except asyncio.CancelledError:
@@ -285,7 +285,7 @@ class PVSWebSocket:
                 # Calculate retry delay
                 if reconnect_count <= fast_retry_limit:
                     actual_delay = float(fast_retry_delay)
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Fast retry in %ds (attempt %d/%d)",
                         actual_delay,
                         reconnect_count,
@@ -299,8 +299,10 @@ class PVSWebSocket:
                     )
                     jitter = random.uniform(0.8, 1.2)
                     actual_delay = delay * jitter
-                    _LOGGER.info(
-                        "Reconnecting in %.1fs (exponential backoff)", actual_delay
+                    _LOGGER.warning(
+                        "WebSocket reconnect failed %d times, retrying in %.0fs",
+                        reconnect_count,
+                        actual_delay,
                     )
                     backoff_delay = min(backoff_delay * 1.5, max_backoff)
 

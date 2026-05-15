@@ -1,6 +1,7 @@
 """Support for Enhanced SunPower sensors - UPDATED IMPORTS VERSION."""
 
 import logging
+import time
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -454,6 +455,8 @@ def _setup_live_data_sensors(hass, config_entry, async_add_entities, coordinator
 class SunPowerLiveDataSensor(SensorEntity):
     """Sensor updated by WebSocket push data instead of coordinator polls."""
 
+    _POWER_WRITE_MIN_INTERVAL = 10.0
+
     def __init__(
         self,
         coordinator,
@@ -487,6 +490,7 @@ class SunPowerLiveDataSensor(SensorEntity):
         self._is_power_var = is_power_var
         self._threshold = threshold
         self._cached_value = None
+        self._last_write_time: float = 0.0
         self._remove_listener = None
 
     @property
@@ -553,4 +557,8 @@ class SunPowerLiveDataSensor(SensorEntity):
                     and abs(new_value - self._cached_value) < self._threshold):
                 return  # Below threshold, skip state write
             self._cached_value = new_value
+            now = time.monotonic()
+            if now - self._last_write_time < self._POWER_WRITE_MIN_INTERVAL:
+                return  # PVS broadcasts partial inverter sums; throttle to avoid sawtooth
+            self._last_write_time = now
         self.async_write_ha_state()

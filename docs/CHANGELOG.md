@@ -3,6 +3,26 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.05.3
+
+### Bug Fix: Live Data Power Sensors Showing Spikes
+
+Users with WebSocket live data enabled were seeing a jagged, spiky pattern on production power, site load, net power, and battery power sensors in the history graph. During active production the PVS WebSocket sends power readings every 1-2 seconds. Each update was being written directly to Home Assistant state, so rapid power fluctuations were captured at full resolution and appeared as spikes in the history graph.
+
+Power sensors now use a 10-second minimum write interval. The sensor tracks every WebSocket update internally but only pushes a new value to Home Assistant state at most once every 10 seconds, smoothing the history graph while keeping the sensor responsive.
+
+### Bug Fix: Live Data Power Sensors Showing Flat Lines
+
+The PVS periodically stops sending WebSocket messages for an extended period while keeping the TCP connection open. The sensor holds its last value during the silence, creating flat segments in the history graph lasting 2-3 minutes. When stale detection reconnected, the seeded value jumped to the current production level, creating a visible step.
+
+The stale detection timeout has been reduced from 180 seconds to 60 seconds. Flat segments are now limited to roughly 1 minute in the worst case.
+
+### Maintenance: Stale Entity Cleanup
+
+Users upgrading from older versions may see a Hardware Version entity and an Update entity under the PV Supervisor device both showing Unavailable. These are leftovers from the original integration. Hardware revision is now shown in the device info card; the firmware update endpoint no longer exists on new firmware. Both entities can be safely deleted via Settings, Devices & Services, Entities.
+
+---
+
 ## [Unreleased] - v2026.05.2
 
 ### Breaking Change: Old Firmware Support Removed

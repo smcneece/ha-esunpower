@@ -2,6 +2,8 @@
 
 Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports PVS5 and PVS6 hardware on new firmware (BUILD 5408+ on PVS5, BUILD 61840+ on PVS6), SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
 
+> **New to Home Assistant?** See the [Getting Started Guide](docs/HA_SetupDoc.md) for help choosing hardware, installing Home Assistant, setting up HACS, and getting your PVS on WiFi before coming back here for the integration install.
+
 ## Recent Changes
 
 Old firmware support (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) has been removed. New firmware (varserver) is now required. Other recent additions include a polling interval control entity, hardware revision shown separately in the device card, optional WebSocket live data for PVS6 (BUILD 61840+), and several reliability improvements.
