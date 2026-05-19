@@ -456,6 +456,7 @@ class SunPowerLiveDataSensor(SensorEntity):
     """Sensor updated by WebSocket push data instead of coordinator polls."""
 
     _POWER_WRITE_MIN_INTERVAL = 10.0
+    _HOLD_TIMEOUT = 150.0
 
     def __init__(
         self,
@@ -491,6 +492,8 @@ class SunPowerLiveDataSensor(SensorEntity):
         self._threshold = threshold
         self._cached_value = None
         self._last_write_time: float = 0.0
+        self._hold_value = None
+        self._hold_time: float = 0.0
         self._remove_listener = None
 
     @property
@@ -518,13 +521,20 @@ class SunPowerLiveDataSensor(SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self._coordinator.websocket_connected
+        if self._coordinator.websocket_connected:
+            return True
+        # Hold available for up to 150s after disconnect to absorb the 10-minute
+        # firmware session close/reconnect cycle (typically 2-30s) without
+        # showing unavailable in the history graph.
+        if self._hold_value is not None:
+            return (time.monotonic() - self._hold_time) < self._HOLD_TIMEOUT
+        return False
 
     @property
     def native_value(self):
         live_data = self._coordinator.live_data
         if live_data is None:
-            return None
+            return self._hold_value
         raw = live_data.get(self._var_name)
         if raw is None:
             return None
@@ -550,14 +560,17 @@ class SunPowerLiveDataSensor(SensorEntity):
 
     def _handle_update(self) -> None:
         """Called by coordinator when this variable's WebSocket value changes."""
+        current_value = self.native_value
+        self._hold_value = current_value
+        self._hold_time = time.monotonic()
+
         if self._is_power_var:
-            new_value = self.native_value
-            if (new_value is not None
+            if (current_value is not None
                     and self._cached_value is not None
-                    and abs(new_value - self._cached_value) < self._threshold):
+                    and abs(current_value - self._cached_value) < self._threshold):
                 return  # Below threshold, skip state write
-            self._cached_value = new_value
-            now = time.monotonic()
+            self._cached_value = current_value
+            now = self._hold_time
             if now - self._last_write_time < self._POWER_WRITE_MIN_INTERVAL:
                 return  # PVS broadcasts partial inverter sums; throttle to avoid sawtooth
             self._last_write_time = now

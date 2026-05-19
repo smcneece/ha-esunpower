@@ -3,6 +3,16 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.05.5
+
+### Bug Fix: Live Data Sensors Showing Unavailable Every 10 Minutes
+
+The PVS firmware closes the WebSocket connection every 10 minutes as a hard session limit, reconnecting within 2-6 seconds. Each cycle was recording a brief unavailable state in the history graph.
+
+Live data sensors now hold their last known value for up to 150 seconds during a disconnect. The 10-minute firmware reconnect cycles are invisible in the history graph. PVS reboots (8-10 minutes) still appear as unavailable after the 150-second hold expires.
+
+---
+
 ## [Unreleased] - v2026.05.4
 
 ### Bug Fix: Spurious WebSocket Reconnects at Stable Peak Production
