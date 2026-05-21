@@ -6,6 +6,7 @@ import time
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorStateClass,
 )
 from homeassistant.const import EntityCategory
 
@@ -13,7 +14,9 @@ from .const import (
     BATTERY_DEVICE_TYPE,
     CONF_ENABLE_LIVE_DATA,
     CONF_LIVE_DATA_THRESHOLD,
+    CONF_LIVE_DATA_WRITE_INTERVAL,
     DEFAULT_LIVE_DATA_THRESHOLD,
+    DEFAULT_LIVE_DATA_WRITE_INTERVAL,
     DOMAIN,
     ESS_DEVICE_TYPE,
     HUBPLUS_DEVICE_TYPE,
@@ -98,10 +101,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if (config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
             and hasattr(coordinator, "async_add_live_data_listener")
             and not sunpower_state.get("_live_data_sensors_created")):
-        _setup_live_data_sensors(
+        live_sensors = _setup_live_data_sensors(
             hass, config_entry, async_add_entities, coordinator, sunpower_data
         )
         sunpower_state["_live_data_sensors_created"] = True
+        sunpower_state["_live_data_sensors"] = live_sensors
 
 
 async def _create_entities(hass, config_entry, async_add_entities, coordinator,
@@ -319,6 +323,13 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
         self._my_state_class = state_class
         self._entity_category = entity_category
         self._suggested_display_precision = suggested_display_precision
+        self._last_value = None
+
+    @property
+    def available(self) -> bool:
+        if self.coordinator.last_update_success:
+            return True
+        return self._last_value is not None
 
     @property
     def native_unit_of_measurement(self):
@@ -404,23 +415,44 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
                 value = float(
                     self.coordinator.data[self._device_type][self.base_unique_id][self._field],
                 )
-                return value * 100.0
+                result = value * 100.0
+                self._last_value = result
+                return result
             except (ValueError, KeyError, TypeError, AttributeError):
-                return None
-        
-        # FIXED: Safe data access with proper error handling for all scenarios
+                return self._last_value
+
+        # Safe data access with proper error handling for all scenarios
         try:
-            return self.coordinator.data[self._device_type][self.base_unique_id].get(self._field, None)
+            value = self.coordinator.data[self._device_type][self.base_unique_id].get(self._field, None)
+            if value is None:
+                return self._last_value
+            # Outlier detection: TOTAL_INCREASING sensors (lifetime energy counters) should
+            # never drop significantly. A large drop means the PVS reported a bad value;
+            # hold the last known good value to prevent utility meter and statistics corruption.
+            if self._my_state_class == SensorStateClass.TOTAL_INCREASING and self._last_value is not None:
+                try:
+                    new_float = float(value)
+                    old_float = float(self._last_value)
+                    if old_float > 1.0 and new_float < old_float * 0.1:
+                        _LOGGER.warning(
+                            "Sensor %s: value dropped from %s to %s - possible bad PVS read, holding last known value",
+                            self.unique_id, self._last_value, value,
+                        )
+                        return self._last_value
+                except (ValueError, TypeError):
+                    pass
+            self._last_value = value
+            return value
         except (KeyError, TypeError, AttributeError):
-            # Coordinator data might not be available yet or structure changed
-            # This is normal during startup - entity will update when data arrives
-            return None
+            # Coordinator data not available yet or device missing from poll - hold last known value
+            return self._last_value
 
 
 def _setup_live_data_sensors(hass, config_entry, async_add_entities, coordinator, sunpower_data):
     """Create WebSocket live data sensor entities (called once at setup)."""
     pvs_serial = config_entry.unique_id or "unknown"
     threshold = config_entry.options.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+    write_interval = int(config_entry.options.get(CONF_LIVE_DATA_WRITE_INTERVAL, DEFAULT_LIVE_DATA_WRITE_INTERVAL))
     has_battery = ESS_DEVICE_TYPE in sunpower_data
 
     entities = []
@@ -444,19 +476,18 @@ def _setup_live_data_sensors(hass, config_entry, async_add_entities, coordinator
                 entity_category=sensor_def.get("entity_category"),
                 is_power_var=var_name in LIVEDATA_POWER_VAR_NAMES,
                 threshold=threshold,
+                write_interval=write_interval,
             )
         )
 
     if entities:
         _LOGGER.info("Creating %d live data sensor entities", len(entities))
         async_add_entities(entities, False)
+    return entities
 
 
 class SunPowerLiveDataSensor(SensorEntity):
     """Sensor updated by WebSocket push data instead of coordinator polls."""
-
-    _POWER_WRITE_MIN_INTERVAL = 10.0
-    _HOLD_TIMEOUT = 150.0
 
     def __init__(
         self,
@@ -474,6 +505,7 @@ class SunPowerLiveDataSensor(SensorEntity):
         entity_category=None,
         is_power_var: bool = False,
         threshold: float = DEFAULT_LIVE_DATA_THRESHOLD,
+        write_interval: int = DEFAULT_LIVE_DATA_WRITE_INTERVAL,
     ) -> None:
         """Initialize the live data sensor."""
         self._coordinator = coordinator
@@ -490,10 +522,10 @@ class SunPowerLiveDataSensor(SensorEntity):
         self._attr_entity_category = entity_category
         self._is_power_var = is_power_var
         self._threshold = threshold
+        self._write_interval = float(write_interval)
         self._cached_value = None
         self._last_write_time: float = 0.0
         self._hold_value = None
-        self._hold_time: float = 0.0
         self._remove_listener = None
 
     @property
@@ -523,12 +555,9 @@ class SunPowerLiveDataSensor(SensorEntity):
     def available(self) -> bool:
         if self._coordinator.websocket_connected:
             return True
-        # Hold available for up to 150s after disconnect to absorb the 10-minute
-        # firmware session close/reconnect cycle (typically 2-30s) without
-        # showing unavailable in the history graph.
-        if self._hold_value is not None:
-            return (time.monotonic() - self._hold_time) < self._HOLD_TIMEOUT
-        return False
+        # Hold last known value through reconnects, reboots, and outages.
+        # Only unavailable before the first value is ever received.
+        return self._hold_value is not None
 
     @property
     def native_value(self):
@@ -562,7 +591,6 @@ class SunPowerLiveDataSensor(SensorEntity):
         """Called by coordinator when this variable's WebSocket value changes."""
         current_value = self.native_value
         self._hold_value = current_value
-        self._hold_time = time.monotonic()
 
         if self._is_power_var:
             if (current_value is not None
@@ -570,8 +598,8 @@ class SunPowerLiveDataSensor(SensorEntity):
                     and abs(current_value - self._cached_value) < self._threshold):
                 return  # Below threshold, skip state write
             self._cached_value = current_value
-            now = self._hold_time
-            if now - self._last_write_time < self._POWER_WRITE_MIN_INTERVAL:
-                return  # PVS broadcasts partial inverter sums; throttle to avoid sawtooth
+            now = time.monotonic()
+            if now - self._last_write_time < self._write_interval:
+                return  # Throttle: limit recorder writes per user config
             self._last_write_time = now
         self.async_write_ha_state()

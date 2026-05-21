@@ -101,11 +101,13 @@
                 "description": "Configure WebSocket live data (new firmware only).\n\nThe PVS broadcasts real-time data on port 9002 every second. When enabled, sensors update as values change rather than waiting for the next poll.\n\n\u26a0\ufe0f SD Card Warning: 1-second sensor updates generate heavy database writes. Use SSD storage, not SD card.",
                 "data": {
                     "enable_live_data": "Enable WebSocket live data",
-                    "live_data_threshold": "Power change threshold"
+                    "live_data_threshold": "Power change threshold",
+                    "live_data_write_interval": "Sensor write interval"
                 },
                 "data_description": {
                     "enable_live_data": "Subscribe to PVS WebSocket for real-time sensor updates",
-                    "live_data_threshold": "Minimum kW change required to trigger a state write for power sensors. Reduces database writes at the cost of some precision."
+                    "live_data_threshold": "Minimum kW change required to trigger a state write for power sensors. Reduces database writes at the cost of some precision.",
+                    "live_data_write_interval": "How often power sensor values are written to HA (1-60 seconds). 1s gives maximum resolution. Higher values reduce recorder database growth."
                 }
             },
             "notifications": {

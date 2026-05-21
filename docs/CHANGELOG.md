@@ -3,7 +3,33 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
-## [Unreleased] - v2026.05.5
+## [Unreleased] - v2026.05.6
+
+### Improvement: Indefinite Hold-Last-Value for Live Data Sensors
+
+Live data sensors now hold their last known value indefinitely through WebSocket disconnects rather than expiring after 150 seconds. Sensors show their last value through PVS reconnects, HA restarts, and brief outages. The only time a live data sensor goes unavailable is before the very first value is received after install.
+
+This also reflects a better understanding of the PVS session cycle: the auth session expires at roughly 8 minutes, at which point the WebSocket silently stops sending and the auth cookie becomes invalid. The integration handles full re-authentication automatically. With indefinite hold, the roughly 90-second reconnect gap is completely invisible.
+
+### Improvement: Polled Sensor Hold-Last-Value and Outlier Protection
+
+All regular polled sensors (inverters, power meters, PVS) now hold their last known value when the coordinator cannot reach the PVS, rather than going unavailable. Sensors only go unavailable before the first value is ever received after install.
+
+Lifetime energy sensors (`TOTAL_INCREASING` state class) also have outlier detection: if a poll returns a value less than 10% of the last known value, the integration holds the previous value and logs a warning instead of passing the anomalous reading through. This prevents the PVS briefly reporting 0 for an inverter's lifetime energy counter from corrupting utility meter accumulations and HA statistics.
+
+### New: Live Data Write Interval Control
+
+A configurable write interval is now available for WebSocket live data power sensors (production, net power, site load, battery power). The setting controls how often sensor values are written to Home Assistant state and the recorder database.
+
+The interval can be set in two places:
+- Integration options (Live Data page): 1-60 seconds, default 1 second
+- New `number.live_data_write_interval` entity on the PVS device (Config category): same range, controllable from automations and the HA UI without entering integration settings
+
+Default is 1 second for full 1-per-second WebSocket resolution. Increase to reduce recorder database growth if you have many live data sensors enabled.
+
+---
+
+## [v2026.05.5] - 2026-05-19
 
 ### Bug Fix: Live Data Sensors Showing Unavailable Every 10 Minutes
 

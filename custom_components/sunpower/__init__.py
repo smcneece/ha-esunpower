@@ -632,6 +632,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     pvs_serial_last5 = entry.options.get("pvs_serial_last5") or entry.data.get("pvs_serial_last5", "")
     pvs_serial_last5 = pvs_serial_last5.strip() if pvs_serial_last5 else ""
+    if not pvs_serial_last5 and entry.unique_id and len(entry.unique_id) >= 5:
+        pvs_serial_last5 = entry.unique_id[-5:].upper()
+        _LOGGER.warning("pvs_serial_last5 missing from config entry, derived from serial: %s", pvs_serial_last5)
     auth_password = pvs_serial_last5 if pvs_serial_last5 else None
 
     _LOGGER.info("Using varserver client (BUILD %s) with authentication", firmware_build)

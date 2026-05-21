@@ -696,7 +696,9 @@ SUNPOWER_SENSORS = {
 # Live data WebSocket constants
 CONF_ENABLE_LIVE_DATA = "enable_live_data"
 CONF_LIVE_DATA_THRESHOLD = "live_data_threshold"
+CONF_LIVE_DATA_WRITE_INTERVAL = "live_data_write_interval"
 DEFAULT_LIVE_DATA_THRESHOLD = 0.05  # kW - minimum change to trigger a state write
+DEFAULT_LIVE_DATA_WRITE_INTERVAL = 1  # seconds between HA state writes for power sensors
 
 # Var names for power sensors - threshold filtering applies to these
 LIVEDATA_POWER_VAR_NAMES = frozenset({

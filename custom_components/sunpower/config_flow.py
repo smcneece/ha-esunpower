@@ -9,7 +9,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     CONF_ENABLE_LIVE_DATA,
     CONF_LIVE_DATA_THRESHOLD,
+    CONF_LIVE_DATA_WRITE_INTERVAL,
     DEFAULT_LIVE_DATA_THRESHOLD,
+    DEFAULT_LIVE_DATA_WRITE_INTERVAL,
     DEFAULT_SUNPOWER_UPDATE_INTERVAL,
     DOMAIN,
     MIN_SUNPOWER_UPDATE_INTERVAL,
@@ -549,6 +551,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
 
         current_enable = self.config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
         current_threshold = self.config_entry.options.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+        current_write_interval = self.config_entry.options.get(CONF_LIVE_DATA_WRITE_INTERVAL, DEFAULT_LIVE_DATA_WRITE_INTERVAL)
 
         schema = vol.Schema({
             vol.Required(CONF_ENABLE_LIVE_DATA, default=current_enable): selector.BooleanSelector(),
@@ -558,6 +561,15 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     max=1.0,
                     step=0.01,
                     unit_of_measurement="kW",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(CONF_LIVE_DATA_WRITE_INTERVAL, default=current_write_interval): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1,
+                    max=60,
+                    step=1,
+                    unit_of_measurement="s",
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
@@ -640,6 +652,7 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
             # Persist live data options (new firmware only; safe to include for old firmware too)
             options[CONF_ENABLE_LIVE_DATA] = complete_config.get(CONF_ENABLE_LIVE_DATA, False)
             options[CONF_LIVE_DATA_THRESHOLD] = complete_config.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+            options[CONF_LIVE_DATA_WRITE_INTERVAL] = int(complete_config.get(CONF_LIVE_DATA_WRITE_INTERVAL, DEFAULT_LIVE_DATA_WRITE_INTERVAL))
 
             return self.async_create_entry(title="", data=options)
 
