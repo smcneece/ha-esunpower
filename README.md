@@ -381,6 +381,8 @@ These sensors come from the consumption meter (CT clamps in your electrical pane
 
 Scroll down and click **Add solar production**. In the "Configure solar panels" dialog:
 - **Solar production energy**: search for "Lifetime Power" and select the inverter (e.g., "Lifetime Power - Solar System - Inverter E0..."). Add each inverter as a separate entry for per-panel visibility.
+
+> **Tip:** Once your inverters are in the Energy Dashboard, [Solar Sentinel](https://github.com/smcneece/solar-sentinel) can auto-discover them and give you a live color-coded per-panel dashboard with a time slider, sun arc, and production charts. No extra configuration required.
 - **Solar production power**: optional, leave blank.
 
 ![Solar Panel Setup](images/solar_panel_setup.png)
@@ -512,6 +514,11 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Disclaimer
 
 This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation. Use at your own risk. 
+
+## Companion Apps
+
+- [Solar Sentinel](https://github.com/smcneece/solar-sentinel) - Home Assistant app/add-on for visual per-panel solar monitoring. Auto-discovers inverters from the Energy Dashboard and displays a live color-coded panel grid, sun arc, time slider, and production charts. Works with any solar integration feeding the Energy Dashboard, including Enhanced SunPower.
+- [Battery Sentinel](https://github.com/smcneece/battery-sentinel) - Home Assistant app/add-on for battery device, Z-Wave node, and Zigbee device monitoring and alerts.
 
 ## Support
 
