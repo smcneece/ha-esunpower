@@ -12,7 +12,7 @@ Monitor your SunPower solar system locally from Home Assistant with no cloud dep
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
-> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) If this saves you time, consider sponsoring. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) too.
+> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) SunStrong charges $100/year for their mobile monitoring app. This integration is free, runs locally, polls more frequently, keeps your full history under your control, and adds alerts for individual panels going offline. If it saves you money, consider sponsoring. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) too.
 
 > ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository.
 >
