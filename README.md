@@ -1,30 +1,8 @@
 # Enhanced SunPower: Home Assistant Integration for SunPower PVS6 / PVS5 Solar Monitoring
 
-Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports PVS5 and PVS6 hardware on new firmware (BUILD 5408+ on PVS5, BUILD 61840+ on PVS6), SunVault battery systems, and individual inverter health tracking. Real-time data direct from your PVS supervisor over your local network.
+Monitor your SunPower solar system locally from Home Assistant with no cloud dependency. Supports PVS5 and PVS6 hardware on new firmware, SunVault battery monitoring and control, individual inverter health tracking, and optional WebSocket live data.
 
-> **New to Home Assistant?** See the [Getting Started Guide](docs/HA_SetupDoc.md) for help choosing hardware, installing Home Assistant, setting up HACS, and getting your PVS on WiFi before coming back here for the integration install.
-
-## Recent Changes
-
-Old firmware support (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) has been removed. New firmware (varserver) is now required. Other recent additions include a polling interval control entity, hardware revision shown separately in the device card, optional WebSocket live data for PVS6 (BUILD 61840+), and several reliability improvements.
-
-> Some changes shown in this README or the changelog may be in pre-release testing and not yet in the current stable release. Check the [Releases page](https://github.com/smcneece/ha-esunpower/releases) for what is actually available to install, and the [CHANGELOG](docs/CHANGELOG.md) for the full history including unreleased work.
-
----
-
-## Old Firmware Notice
-
-> ⚠️ Old firmware support (dl_cgi, BUILD below 61840 on PVS6 or below 5408 on PVS5) has been removed as of this version. **v2026.05.1 is the last release supporting old firmware.** If you are on old firmware, see [Old Firmware Install Guide](docs/old_firmware_install.md) to pin to that version before updating.
-
-This integration requires new firmware (varserver):
-- **PVS6**: BUILD 61840 or higher
-- **PVS5**: BUILD 5408 or higher
-
-You can check your firmware version in Home Assistant: Settings, Devices and Services, Enhanced SunPower, open the PV Supervisor device.
-
-If you have a SunVault battery system, full battery monitoring and control is supported.
-
----
+> **New to Home Assistant?** See the [Getting Started Guide](docs/HA_SetupDoc.md) for help choosing hardware, installing Home Assistant, setting up HACS, and getting your PVS on WiFi before coming back here.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
@@ -34,249 +12,104 @@ If you have a SunVault battery system, full battery monitoring and control is su
 [![Validate with hassfest](https://github.com/smcneece/ha-esunpower/workflows/Validate%20with%20hassfest/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hassfest.yaml)
 [![HACS Validation](https://github.com/smcneece/ha-esunpower/workflows/HACS%20Validation/badge.svg)](https://github.com/smcneece/ha-esunpower/actions/workflows/hacs.yaml)
 
-> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) <-- Why not sponsor me, even a few bucks shows you appreciate the work and gives encouragement. You can sponsor me monthly, or just a one time thing. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) while you're here. 
+> [![Sponsor](https://img.shields.io/badge/Sponsor-💖-pink)](https://github.com/sponsors/smcneece) If this saves you time, consider sponsoring. Check out my [other HA Automations & Blueprints](https://github.com/smcneece?tab=repositories) too.
 
-> **Enhanced Fork**: This is an improved version of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower) with simplified 24/7 polling, comprehensive PVS protection, individual inverter health monitoring, and authentication support.
-
-> ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository to help other SunPower owners discover these improvements!
-> 
+> ⭐ **Help Others Find This Integration!** If Enhanced SunPower is working well for you, please star this repository.
+>
 > [![GitHub stars](https://img.shields.io/github/stars/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/stargazers) [![GitHub forks](https://img.shields.io/github/forks/smcneece/ha-esunpower?style=social)](https://github.com/smcneece/ha-esunpower/network/members)
-
-> **Watch this repo** to get notified of new releases, bug fixes, and discussions. Use the Watch button at the top of the page and select "Releases" at minimum, or "All Activity" if you want to follow discussions too. The more eyes on the integration, the better it gets. User reports, battery behavior observations, firmware findings, and automation ideas from the community have shaped nearly every release. If you have a SunVault or an unusual setup, your reports are especially valuable since not everyone has hardware to test with.
 
 ![Integration Overview](images/overview.png)
 
-## What Makes This Enhanced?
+---
 
-**Core Improvements:**
-- **WebSocket Live Data**: Real-time sensor updates direct from the PVS WebSocket; sensors update as values change, not on poll schedule (PVS6 only)
-- **Battery Control**: Control SunVault battery modes and reserve percentage directly from Home Assistant; enable TOU optimization, emergency backup, or automated battery management via HA automations
-- **Flash Memory Monitoring**: Critical alerts for PVS storage & wear usage, configurable notification thresholds
-- **Simplified Polling**: Single consistent polling interval for reliable 24/7 monitoring
-- **Individual Inverter Health Monitoring**: Failure detection and recovery alerts for each panel
-- **Flexible Alert System**: Critical notifications sent directly to your phone as notifications, emails, and HA UI
-- **Diagnostic Dashboard**: 7 sensors tracking integration reliability and performance
-- **PVS Hardware Protection**: Polling minimums (10s standard, 20s battery systems), health checking, and intelligent backoff
+## Requirements
 
-**Technical Enhancements:**
-- **Multi-Channel Notifications**: 6 separate notification streams
-- **Comprehensive Battery Monitoring**: 10 dedicated ESS/battery sensors (SOC, SOH, power, temps, voltages, charge/discharge limits), more data than original or SunStrong forks
-- **Modular Architecture**: Clean, well-commented, maintainable codebase with separated concerns
-- **Production Reliability**: Battle-tested stability with comprehensive error handling and graceful degradation
+**Firmware:** New firmware (varserver) required.
+- **PVS6:** BUILD 61840 or higher
+- **PVS5:** BUILD 5408 or higher
 
+Check your firmware: Settings, Devices and Services, Enhanced SunPower, open the PV Supervisor device.
 
-## Installation
+> ⚠️ **Old firmware users:** v2026.05.1 is the last release supporting old firmware. See [Old Firmware Install Guide](docs/old_firmware_install.md) to pin before updating.
 
-### Requirements
-
-**Can now install anytime - day or night!**
-- Dynamic entity discovery allows setup even when inverters are offline (nighttime)
-- Entities are automatically created when inverters come online at sunrise
-- You'll receive a notification when your solar system is fully discovered and monitored
-
-**Network Connection:**
-
-The integration connects directly to your PVS over your home network. The PVS has built-in WiFi; connect it to your home network and use that IP:
-- **WiFi WAN (Recommended)**: Check your router's DHCP leases for "PVS" or "SunPower" device; reserve the IP so it doesn't change
-- **LAN port (Alternative)**: Fixed IP `172.27.153.1`, requires VLAN isolation (LAN port runs its own DHCP)
-- **Ethernet WAN (Do not use)**: Known reliability issues; the PVS can get confused when both WiFi and Ethernet WAN are active simultaneously. Use WiFi WAN or the LAN port instead.
+**Network:** The integration connects directly to your PVS over your local network.
+- **WiFi WAN (Recommended):** Connect PVS to your home WiFi, find the IP in your router's DHCP leases, reserve it
+- **LAN port (Alternative):** Fixed IP `172.27.153.1`, requires VLAN isolation (LAN port runs its own DHCP server)
+- **Ethernet WAN:** Not recommended - known intermittent reliability issues on PVS6
 
 ---
 
-### Install via HACS
+## Installation
 
-**Don't have HACS yet?** [Install HACS first](https://www.hacs.xyz/docs/use/); it's the easiest way to manage custom integrations.
-
-**⚠️ IMPORTANT: Use the install button below - do NOT manually add this repository to HACS custom repositories**
-
-HACS requires integrations to be registered in the home-assistant/brands repository for manual custom repository adds to work. (Well you can manually install, but it's tricky, just use the buttons below) This integration uses the direct install method instead. Also once the integration is installed you will get notified of updates just like any other HACS install. 
-
-1. **Click the install button:**
+**Can install any time of day** - dynamic entity discovery works even at night when inverters are offline.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=smcneece&repository=ha-esunpower&category=integration)
 
-2. This will open a webpage asking you to open a page in Home Assistant, click the Open Link Button.
-
-3. A window should open asking to Add custom repository, click ADD on that window.
-
-4. After a moment it should show you the integration page, with a Download button in the bottom right of screen, click that button to download, and click Download again when the new window opens asking about version.
-
-5. Click the main "Settings" link in Home Assistant Sidebar, there should be a repair listed at the top saying Restart Required, click that and click Submit and then the Finish button. If it's not there, restart anyway!
-
-6. Now to add the integration click link below, or on your main integration page in Home Assistant click Add Integration and look for the Enhanced Sunpower integration, and add it.
+1. Click the button above, then **Open Link** in the browser prompt, then **Add** in the HACS window
+2. Click **Download** (bottom right), then **Download** again on the version prompt
+3. Restart Home Assistant (Settings shows a "Restart Required" repair at the top)
+4. Add the integration:
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
-### Network Best Practices
+**During setup:** Enter your PVS IP address. Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default polling is 300 seconds; battery systems require 20s minimum.
 
-**Recommended:** Set a static DHCP reservation for your PVS IP address in your router settings.
+---
 
-- Prevents the PVS from receiving a new IP address after a DHCP lease renewal
-- Ensures the integration continues polling without interruption
-- Standard best practice for all IoT devices on your network
-- Router configuration is beyond the scope of this guide, but most routers allow reserving IPs by MAC address
+## Energy Dashboard Setup
 
-## Configuration
+You can configure the Energy Dashboard right after install. Statistics take a few hours to accumulate and populate the charts, but the sensor setup itself can be done immediately.
 
-### Basic Setup (Page 1)
-![Basic Setup Configuration](images/config_pg1.png)
+**Step 1: Open Energy configuration**
 
-### Authentication (Page 2)
-![Authentication](images/config_pg2.png)
+In the HA sidebar click **Energy**, then the **pencil icon** (top right).
 
-### Notifications & Advanced (Page 3)
-![Notifications Configuration](images/config_pg3.png)
+**Step 2: Add grid connection**
 
-### Setup Process
-1. **Page 1**: Enter PVS IP (WAN or LAN) address and polling interval
-   - Integration automatically detects firmware BUILD and serial number
-   - Validates connection and selects optimal communication method
-2. **Page 2**: Confirm password (auto-detected and pre-filled from PVS serial)
-3. **Page 3**: Configure notifications and advanced settings
-   - Set flash memory threshold
-   - Select mobile device for critical alerts
-   - Configure email notifications
+Click **Add grid connection** and set:
+- **Energy imported from grid:** select `KWh To Home` (listed under Solar System, Power Meter ...c)
+- **Energy exported to grid:** select `KWh To Grid` (same device)
 
-### WebSocket Live Data (PVS6 New Firmware Only)
-![Live Data Configuration](images/live-data-setup.png)
+> Use the **`...c` meter** (consumption meter). The `...p` meter does not have bidirectional grid sensors. If these sensors are missing, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors).
 
-After initial setup, PVS6 users on new firmware can enable real-time WebSocket live data via integration options (Settings > Devices & Services > Enhanced SunPower > Configure).
+![Grid Connection Setup](images/grid-setup.png)
 
-> **PVS5 users:** WebSocket live data is not currently supported on PVS5 hardware. The PVS5 firmware has the variable definitions but does not implement the WebSocket telemetry feature. The Live Data option will not appear for PVS5 installs. If you would like to see SunStrong add PVS5 WebSocket support, consider commenting on their open issue: https://github.com/SunStrong-Management/pvs-hass/issues/33
+**Step 3: Add solar production**
 
-The Live Data page appears only for PVS6 new firmware installs:
-- **Enable WebSocket live data**: Subscribes to the PVS WebSocket on port 9002 for 1-second sensor updates
-- **Power change threshold**: Minimum kW change required to write a state update for power sensors (default 0.05 kW). Reduces database writes during stable conditions.
+Click **Add solar production**. In the Configure solar panels dialog:
+- **Solar production energy:** search for `Lifetime Power` and select each inverter. Add each one separately for per-panel visibility in the Energy Dashboard.
+- **Solar production power:** leave blank.
 
-> ⚠️ **SD Card Warning**: Real-time updates generate significantly more database writes than standard polling. If Home Assistant runs on an SD card, leave live data disabled or the card will wear out quickly. SSD storage is strongly recommended.
+![Solar Panel Setup](images/solar_panel_setup.png)
 
-These sensors are designed for real-time dashboard display, not historical tracking. Since they serve no statistics purpose, even SSD users may want to exclude them from the recorder to keep the database smaller. SD card users who want to use live data should treat this exclusion as required. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#websocket-live-data-and-sd-cards) for ready-to-use `recorder.exclude` configuration for both solar-only and battery systems.
+> **Tip:** [Solar Sentinel](https://github.com/smcneece/solar-sentinel) auto-discovers your inverters from the Energy Dashboard and gives you a live color-coded per-panel grid with a sun arc, time slider, and production charts.
 
-> **Missing sensors after setup?** If you don't see consumption or grid import/export sensors, your installer may not have installed or provisioned the CT clamps in your electrical panel. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for diagnosis steps and workarounds.
+**Step 4: Battery system (SunVault / ESS equipped systems only)**
 
-### Configuration Options
+Click **Add battery system** and set:
+- **Energy charged into battery:** `SunVault ESS [N] Lifetime Energy Charged`
+- **Energy discharged from battery:** `SunVault ESS [N] Lifetime Energy Discharged`
+- **Power sensor type:** Two sensors, using `SunVault Power Input` and `SunVault Power Output`
 
-| Setting | Description | Default | Recommended |
-|---------|-------------|---------|-------------|
-| **Host** | PVS IP Address | N/A | WAN: `192.168.1.x` <br>LAN: `172.27.153.1` |
-| **Polling Interval** | Update frequency (seconds) | 300 | 10-3600 seconds (10s minimum, 20s for battery systems) |
-| **PVS Password (last 5)** | Auto-detected from serial number | Auto-filled | Confirm auto-detected value (new firmware only) |
-| **Flash Memory Threshold** | PVS storage alert level (MB) | 0 (disabled) | 30-50 MB for early warning |
-| **Flash Wear Threshold** | PVS flash lifetime alert (%) | 90 (90% wear) | 0 to disable, 85-95% recommended |
-| **Email Notification Service** | Email service for critical alerts | Disabled | Select email service to enable |
-| **Email Recipient** | Override recipient address | `` | Enter send to Email address |
-| **General Notifications** | Show status updates | `false` | Enable for monitoring |
-| **Debug Notifications** | Show diagnostic info | `false` | Enable for troubleshooting |
-| **Replace Status Notifications** | Reuse notifications | `false` | Enable to reduce clutter |
-| **Mobile Device** | Device for critical alerts | Disabled | Select your phone |
-| **Enable WebSocket Live Data** | Real-time 1-second updates (PVS6 new firmware only) | `false` | Enable only with SSD storage |
-| **Power Change Threshold** | Min kW change to trigger state write | `0.05 kW` | Lower = more precision, more DB writes |
+> Battery Energy Dashboard setup is not fully verified since I don't have a battery system to test against. If you have a SunVault and find the correct mapping, please share it in [Discussions](https://github.com/smcneece/ha-esunpower/discussions) so others can benefit.
 
-### 🔒 PVS Authentication (Automatic!)
+---
 
-**✨ Fully Automated:** No manual serial number entry required!
+## Battery Control
 
-**How Auto-Detection Works:**
-1. Integration queries PVS for firmware BUILD number and full serial number
-2. Automatically extracts last 5 characters for authentication password
-3. Pre-fills password field in UPPERCASE format (matches serial format)
-4. Shows pre-filled password for confirmation
+Control your SunVault battery directly from Home Assistant. Requires new firmware and a battery system.
 
-**Behavior:**
-- **LocalAPI authentication** with auto-detected password
-- **Failed Detection**: Manual password entry available as fallback
+**Select entities** (on the PVS device):
+- `Battery Control Mode` - Self Supply / Cost Savings / Reserve
+- `Battery Reserve Percentage` - 5% to 100% in 5% increments
 
-**Manual Override (if needed):**
-If auto-detection fails, you can manually enter the last 5 characters of your PVS serial:
-- **Physical Device**: Remove PVS cover, serial on device label
-- **SunPower/SunStrong App**: Profile → System Info → Serial Number
-- **Format**: UPPERCASE letters/numbers only (e.g., "X7193" not "x7193")
-
-**Authentication Details:**
-- **Username**: `ssm_owner` (configured by SunStrong Management)
-- **Password**: Last 5 characters of your PVS serial number
-- **Coverage**: Applied to both main device polling and battery system endpoints
-- **Error Handling**: Clear messages when authentication fails or serial number needed
-
-### Polling Configuration
-
-**Recommended: 300 seconds (5 minutes).** This is the right default for solar-only systems and most battery systems.
-
-Faster polling only updates PVS system sensors (uptime, flash usage, error counts) and possibly battery state. Inverter and power meter data updates on the PVS's own schedule regardless of how fast you poll. For real-time production and consumption data, enable WebSocket Live Data (PVS6 only) instead of aggressive polling.
-
-- **Solar only**: 300s is ideal. Polling faster will not give you fresher inverter or meter data.
-- **Battery systems**: 20s minimum (per SunStrong guidance). Useful for near-real-time battery state if not using WebSocket.
-- **PVS6 with WebSocket**: Leave polling at 300s and enable live data for real-time updates.
-- **Conservative**: 600-3600s for minimal system load.
-
-Faster polling significantly increases your HA database size. 10s polling generates roughly 30x more data than 300s polling with no meaningful benefit for most users.
-
-## Available Data
-
-### PVS System Monitoring
-- System load, uptime, memory usage, firmware version
-- Communication errors and scan statistics  
-- Flash storage availability with critical alerts
-- Diagnostics and health monitoring
-
-### Solar Production
-- **Inverters**: Power output, individual MPPT data, temperature monitoring
-- **Power Meters**: Energy consumption/production, voltage, frequency
-- **Virtual Meter**: Aggregated inverter data when no physical meter present
-
-### SunVault Battery System (if equipped)
-- **Individual Batteries**: State of charge, voltage, current, temperature
-- **ESS System**: Environmental conditions, power meters
-- **Hub Plus**: Grid status, phase voltages, humidity monitoring
-
-### WebSocket Live Data (PVS6 New Firmware Only, Optional)
-
-When enabled, a separate "PVS Live Data {serial}" device provides real-time sensors updated as values change from the PVS WebSocket on port 9002. PVS5 hardware does not support this feature.
-
-| Sensor | Unit | Notes |
-|--------|------|-------|
-| Production Power | kW | Solar production, real-time |
-| Production Energy | kWh | Cumulative solar energy |
-| Net Power | kW | Grid import/export (negative = exporting) |
-| Net Energy | kWh | Cumulative net grid energy |
-| Site Load Power | kW | Total site consumption |
-| Site Load Energy | kWh | Cumulative site load energy |
-| Battery Power | kW | Battery charge/discharge (battery systems only) |
-| Battery Energy | kWh | Battery energy throughput (battery systems only) |
-| Battery State of Charge | % | Real-time SOC (battery systems only) |
-| Backup Time Remaining | min | Estimated backup duration (battery systems only); may show Unknown if PVS does not broadcast this field in the live stream |
-| MID State | | Transfer switch state (battery systems only); may show Unknown if PVS does not broadcast this field in the live stream |
-| Data Timestamp | | WebSocket message time (disabled by default) |
-
-Enable in integration options after setup. See [WebSocket Live Data](#websocket-live-data-new-firmware-only) section above.
-
-### 🔋 Battery Control
-
-**Requirements:**
-- SunVault or compatible battery system
-- New firmware (BUILD >= 61840) with authentication
-- Integration configured with PVS password (auto-detected during setup)
-
-**Control your battery directly from Home Assistant:**
-
-**Select Entities:**
-- `select.battery_control_mode` - Switch between operating modes
-  - **Self Supply**: Use battery to offset home consumption (default)
-  - **Cost Savings**: Charge during off-peak, discharge during peak hours (TOU optimization)
-  - **Reserve**: Preserve battery for backup power only
-- `select.battery_reserve_percentage` - Set minimum battery reserve (5%-100%)
-
-**Example TOU Automation:**
+**Example TOU automation:**
 ```yaml
-# Switch to Cost Savings before peak hours (5pm-9pm)
 automation:
   - alias: "Battery: Cost Savings During Peak"
     trigger:
       - platform: time
         at: "15:00:00"
-    condition:
-      - condition: template
-        value_template: "{{ now().month >= 10 or now().month <= 4 }}"  # Winter only
     action:
       - service: select.select_option
         target:
@@ -285,277 +118,127 @@ automation:
           option: "Cost Savings"
 ```
 
-**More automation examples:** [docs/battery_tou_automation_example.yaml](docs/battery_tou_automation_example.yaml)
-
-**Note:** Mode changes are sent to the PVS immediately when you change the selector in HA. However, the PVS varserver updates its status data every few minutes, so there will be a short lag before HA reflects the new state. This is normal behavior from the PVS itself, not the integration.
-
-### Individual Inverter Health Monitoring
-- **24-Hour Persistent Error Tracking**: Only alerts after 24+ hours of continuous problems, eliminating false positives
-- **Batched Notifications**: Multiple inverter issues grouped into single notification instead of spam
-- **Smart Recovery Detection**: Automatic notifications when persistent issues resolve after extended periods
-- **Context-Aware Monitoring**: Understands normal inverter dormancy (nighttime STATE="error") vs actual hardware failures
-- **Gmail Rate Limit Protection**: Prevents overwhelming email services with notification floods
-
-### Diagnostic Dashboard
-- **Poll Success Rate**: Real-time percentage of successful PVS polls
-- **Total Polls**: Integration activity counter since startup
-- **Consecutive Poll Failures**: Current streak of failed PVS poll attempts for troubleshooting
-- **Last Successful Poll**: Timestamp of last successful data retrieval (e.g., "14:29 08-16-25")
-- **Average Response Time**: PVS performance monitoring
-- **Active Inverters**: Count of responding inverters
-- **PVS Uptime**: System availability tracking
-
-![Diagnostic Sensors](images/diagnostic_sensors.png)
-
-### Smart Notification System
-
-Multi-channel notification system:
-
-![Debug Notifications](images/debug_notifications.png)
-
-**Notification Channels:**
-- Setup, Polling, Health, Inverter status
-- Mobile notifications with smart fallback to persistent notifications
-- Email notifications for critical alerts (PVS offline, inverter failures, flash memory critical)
-
-#### Email Notification Setup
-
-**Prerequisites:**
-1. **Email Integration**: Set up a Home Assistant email integration (Gmail, SMTP, etc.)
-2. **Service Detection**: The integration auto-detects available email services
-
-**Configuration:**
-1. **Navigate**: Configuration → Page 3 (Notifications)
-2. **Select Service**: Choose your email service from dropdown (e.g., "Gmail" or "SMTP")
-3. **Custom Recipient** (Optional): Override default with dedicated notification address
-4. **Submit**: Email notifications are automatically enabled
-
-**Critical Alerts That Trigger Emails:**
-- ⚠️ **Flash Memory Critical**: PVS storage below threshold
-- 🔴 **PVS Offline**: System connectivity failures
-- ⚠️ **Inverter Failures**: Individual inverter offline detection
-- 🔑 **Authentication Errors**: PVS6 firmware authentication issues
-- 🔧 **Hardware Issues**: Critical system protection alerts
-
-**Example Gmail Setup:**
-```yaml
-# configuration.yaml
-notify:
-  - name: gmail_smtp
-    platform: smtp
-    server: smtp.gmail.com
-    port: 587
-    sender: your-email@gmail.com
-    username: your-email@gmail.com
-    password: your-app-password
-    recipient: homeassistant-alerts@gmail.com
-```
-
-**Best Practices:**
-- **Dedicated Account**: Use separate email for HA notifications
-- **App Passwords**: Use Gmail app passwords (not account password)
-- **Test**: Use Flash Memory Threshold = 199 MB to trigger test email
-- **Recipient Override**: Enter custom email for dedicated notification accounts
-
-### Energy Dashboard Integration
-
-Allow the integration to run for a few hours after setup before configuring the Energy Dashboard, so statistics have time to accumulate.
-
-**Step 1:** In the HA sidebar, click **Energy**.
-
-**Step 2:** Click the **pencil icon** in the top right corner to open the Energy configuration.
-
-**Step 3: Add grid connection**
-
-Click **Add grid connection** and set:
-- **Energy imported from grid**: select `KWh To Home` (listed under Solar System - Power Meter ...c)
-- **Energy exported to grid**: select `KWh To Grid` (same device)
-
-> **Important:** Make sure you select sensors from the **`...c` meter** (consumption meter), not the `...p` meter. The `p` meter does not have bidirectional grid sensors and will not work correctly for the Energy Dashboard.
-
-![Grid Connection Setup](images/grid-setup.png)
-
-These sensors come from the consumption meter (CT clamps in your electrical panel). If they are not in the dropdown, see the [troubleshooting guide](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors).
-
-**Step 4: Add solar production**
-
-Scroll down and click **Add solar production**. In the "Configure solar panels" dialog:
-- **Solar production energy**: search for "Lifetime Power" and select the inverter (e.g., "Lifetime Power - Solar System - Inverter E0..."). Add each inverter as a separate entry for per-panel visibility.
-
-> **Tip:** Once your inverters are in the Energy Dashboard, [Solar Sentinel](https://github.com/smcneece/solar-sentinel) can auto-discover them and give you a live color-coded per-panel dashboard with a time slider, sun arc, and production charts. No extra configuration required.
-- **Solar production power**: optional, leave blank.
-
-![Solar Panel Setup](images/solar_panel_setup.png)
-
-**Battery storage (SunVault / ESS systems only):**
-
-In the Energy configuration, click **Add battery system** and set:
-- **Energy going in to battery**: `sensor.sunpower_ess_<serial>_pos_lte_kwh` (ESS Positive Lifetime Energy)
-- **Energy coming out of battery**: `sensor.sunpower_ess_<serial>_neg_lte_kwh` (ESS Negative Lifetime Energy)
-
-**Grid sensors not available?** See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#energy-dashboard---missing-grid-importexport-sensors) for CT clamp, provisioning, and PVS5 firmware limitation scenarios.
-
-### Monitoring Approach Recommendations
-
-**For 24/7 Full-Time Monitoring:**
-
-**Utility Smart Meter (Best Accuracy)**
-- Direct utility company integration where available
-- Real-time production/consumption data
-- Grid-tied accuracy for billing reconciliation
-
-**Dedicated CT Energy Monitor (Recommended)**
-For comprehensive whole-home monitoring, I recommend dedicated current transformer (CT) systems:
-
-**[SEM-Meter (Smart Home Energy Meter)](https://www.amazon.com/Energy-Monitor-Circuit-Sensors-Real-Time/dp/B0D6VZQBPF?th=1)** *(Developer Tested)*
-- **Whole house**: ~$100 for main monitoring
-- **Circuit-level**: ~$129 for 16 individual circuits & mains.
-- **100% Local Operation**: No cloud dependency required
-- **Direct HA integration** via MQTT
-- **Real-time updates** (1-second intervals)
-- **Professional installation** recommended for CT clamps
-
-*This monitor is used and recommended by the integration developer for production reliability.*
-
-**Enhanced SunPower Role**
-- **Individual inverter diagnostics**: Per-panel performance monitoring
-- **PVS system health**: Firmware tracking, error detection, communication monitoring
-- **Equipment maintenance**: Temperature monitoring, MPPT analysis, inverter health tracking
-- **Solar-specific metrics**: Frequency analysis, power factor, voltage regulation
-- **System reliability**: Integration performance and diagnostic monitoring
-- **Network troubleshooting**: Connection monitoring and diagnostic capabilities
-- **Simplified polling**: Consistent 24/7 monitoring
-
-**Why Separate Monitoring Systems?**
-
-**Energy Monitor Strengths:**
-- Real-time data (1-second updates)
-- Continuous reliability (purpose-built for 24/7 operation)
-- Energy Dashboard optimized (designed for utility-scale accuracy)
-- Whole-home coverage (beyond just solar)
-
-**Enhanced SunPower Strengths:**
-- Equipment diagnostics (individual component health)
-- PVS integration (official system monitoring)
-- Environmental data (temperatures, frequencies)
-- Maintenance alerts (firmware updates, communication errors)
-- Inverter health tracking (individual panel monitoring)
-- MPPT monitoring (DC-side performance analysis)
-- Integration reliability (diagnostic dashboard monitoring)
-- Network intelligence (connection monitoring and diagnostics)
-- Simplified 24/7 polling
-
-**Together:** Complete solar installation monitoring from grid-level accuracy down to individual panel performance, network connectivity, and panel-specific scheduling.
-
-**Polling Frequency:** Enhanced SunPower supports 10-3600 second intervals (10s minimum standard, 20s for battery systems), with a conservative 300-second default.
-
-## Network Setup
-
-### PVS Port Selection
-
-**New Firmware (BUILD 61840+):**
-- **WiFi WAN (Recommended)**: PVS connects to your WiFi network, gets DHCP IP (typically `192.168.1.x or 192.168.0.x`)
-  - Most reliable WAN option for monitoring
-  - Easy to discover via your router's DHCP client list
-  - Authentication eliminates need for network isolation
-  - Requires port 443 (HTTPS) access from Home Assistant to PVS
-- **LAN Port (Alternative)**: Fixed IP `172.27.153.1`
-  - Most reliable wired connection option
-  - Must be isolated on a dedicated VLAN or switch port (LAN port runs its own DHCP server)
-  - Requires static route on your router or HA host to reach the `172.27.153.0/24` subnet
-  - Same authentication and features as WAN
-- **Ethernet WAN (Not Recommended)**: Known reliability issues with intermittent connectivity drops that require PVS reboots
-  - Multiple users have reported the PVS becoming unreachable over Ethernet WAN while WiFi and LAN continue working
-  - If you must use Ethernet WAN, do NOT also have WiFi active; the PVS becomes unreliable with both interfaces on the same network
-- **Raspberry Pi Bridges/Proxies**: Not needed and not supported with new firmware
-  - The PVS has built-in WiFi - connect it to your home network and use that IP directly
-  - The RPi bridge was only required for old firmware's LAN port isolation; new firmware has no such requirement
-  - Technical reason: new firmware uses HTTPS (port 443); most bridges only forward HTTP (port 80)
-
-**Different VLANs:** The integration works across VLANs as long as routing is configured between them and port 443 is accessible from HA to the PVS.
-
-> Old firmware is no longer supported. See [Old Firmware Install Guide](docs/old_firmware_install.md) for network setup guidance if you are pinned to v2026.05.1.
-
-**Quick Test:** Check if your PVS responds: `curl http://YOUR_PVS_IP/cgi-bin/dl_cgi/supervisor/info`
-
-## Troubleshooting
-
-**Quick Fixes:**
-- **PVS Not Responding**: Check network connectivity; verify IP address (WAN port recommended for new firmware)
-- **All Entities Unavailable**: Force browser refresh (Ctrl+F5 / Cmd+Shift+R) to clear cached files
-- **Diagnostic Sensors Not Working**: Wait for a few polling cycles; check "Enhanced SunPower Diagnostics" device
-- **Mobile Notifications Not Working**: Verify Home Assistant mobile app installed and mobile service configured
-
-**For detailed troubleshooting**: See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-
-## Contributing
-
-We welcome contributions! Please:
-1. Fork this repository
-2. Create a feature branch
-3. Test thoroughly with real PVS hardware
-4. Submit a pull request with detailed description
-
-**Development Guidelines:**
-- Test both solar-only and battery-equipped systems if possible
-- Never increase polling frequency or add PVS stress
-- Maintain backward compatibility with existing configurations
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Credits & Attribution
-
-- **Original Integration**: [@krbaker](https://github.com/krbaker) - Thank you for creating the foundation
-- **ESS/Battery Support**: [@CanisUrsa](https://github.com/CanisUrsa) - Battery system integration
-- **Enhanced Edition**: [@smcneece](https://github.com/smcneece) - Community-driven improvements for production reliability
-
-## Disclaimer
-
-This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation. Use at your own risk. 
-
-## Companion Apps
-
-- [Solar Sentinel](https://github.com/smcneece/solar-sentinel) - Home Assistant app/add-on for visual per-panel solar monitoring. Auto-discovers inverters from the Energy Dashboard and displays a live color-coded panel grid, sun arc, time slider, and production charts. Works with any solar integration feeding the Energy Dashboard, including Enhanced SunPower.
-- [Battery Sentinel](https://github.com/smcneece/battery-sentinel) - Home Assistant app/add-on for battery device, Z-Wave node, and Zigbee device monitoring and alerts.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/smcneece/ha-esunpower/discussions)  
-- **Community**: [Home Assistant Community Forum](https://community.home-assistant.io/)
-- **Changelog**: [CHANGELOG.md](docs/CHANGELOG.md)
-- **Troubleshooting**: [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- **Migration Guide**: [MIGRATION.md](docs/MIGRATION.md)
+More examples: [docs/battery_tou_automation_example.yaml](docs/battery_tou_automation_example.yaml)
 
 ---
 
+## WebSocket Live Data (PVS6 only)
+
+After initial setup, PVS6 users can enable real-time 1-second WebSocket sensor updates via integration options (Settings, Devices & Services, Enhanced SunPower, Configure).
+
+> ⚠️ **SD Card Warning:** Real-time updates generate significantly more database writes. If Home Assistant runs on an SD card, leave live data disabled or the card will wear out quickly. SSD storage is strongly recommended.
+
+Live data sensors (production power, site load, net power, battery power, SOC, backup time) update as values change rather than on the poll schedule. See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#websocket-live-data-and-sd-cards) for recorder exclusion config.
+
+**PVS5:** WebSocket live data is not supported on PVS5 hardware. The option will not appear for PVS5 installs.
+
+---
+
+## Available Data
+
+**PVS System:** Load, uptime, memory, firmware, flash storage, error counts, diagnostic health sensors
+
+**Inverters:** Power output, MPPT data, temperature, lifetime energy (per panel)
+
+**Power Meters:** Production and consumption, voltage, frequency, lifetime kWh
+
+**SunVault Battery:** State of charge, state of health, power, voltage, temperature, charge/discharge limits, operating mode
+
+**WebSocket Live (PVS6):** Production power, site load, net power, battery power, SOC, backup time - all at 1-second resolution
+
+**Diagnostic Dashboard:** Poll success rate, response time, consecutive failures, active inverter count
+
+---
+
+## Configuration Options
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| Polling Interval | 300s | 10s min (20s for battery systems). 300s recommended for most users; faster polling does not give fresher inverter data |
+| PVS Password | Auto-detected | Last 5 characters of PVS serial, pre-filled automatically |
+| Flash Memory Threshold | 0 (off) | Alert level in MB; 30-50 MB recommended for early warning |
+| Flash Wear Threshold | 90% | Alert at this wear percentage; 0 to disable |
+| Mobile Device | Disabled | Select your phone for critical alerts |
+| Email Notification | Disabled | Select HA email service for critical alerts |
+| Enable WebSocket Live Data | Off | PVS6 only; requires SSD storage |
+| Power Change Threshold | 0.05 kW | Min change to trigger live data state write |
+
+---
+
+## Troubleshooting
+
+**Quick fixes:**
+- **PVS not responding:** Verify IP address; WiFi WAN recommended for new firmware
+- **All entities unavailable:** Hard refresh browser (Ctrl+F5)
+- **Diagnostic sensors showing zeros:** Wait a few polling cycles
+- **Mobile notifications not working:** Verify HA mobile app is installed and the service is configured
+
+**Detailed guide:** [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+---
+
+## What Makes This Different
+
+Enhanced fork of [@krbaker's original SunPower integration](https://github.com/krbaker/hass-sunpower). Key improvements:
+
+- **New firmware support:** Direct varserver API with authentication (krbaker's version does not support new firmware)
+- **WebSocket live data:** 1-second real-time updates (PVS6 only)
+- **Battery control:** Read and write battery mode and reserve percentage
+- **Individual inverter health monitoring:** Per-panel failure detection and recovery alerts
+- **Hold-last-value:** Sensors hold last known value through PVS outages and WebSocket reconnects
+- **Outlier protection:** Prevents PVS data glitches from corrupting Energy Dashboard statistics
+- **Flash memory monitoring:** Critical alerts before PVS storage fills up
+- **Diagnostic dashboard:** 7 sensors tracking integration reliability
+
+---
+
+## Companion Apps
+
+- [Solar Sentinel](https://github.com/smcneece/solar-sentinel) - Visual per-panel solar monitoring. Auto-discovers inverters from the Energy Dashboard and displays a live color-coded panel grid, sun arc, time slider, and production charts.
+- [Battery Sentinel](https://github.com/smcneece/battery-sentinel) - Battery device, Z-Wave node, and Zigbee device monitoring and alerts.
+
+---
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/smcneece/ha-esunpower/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/smcneece/ha-esunpower/discussions)
+- **Changelog:** [CHANGELOG.md](docs/CHANGELOG.md)
+- **Troubleshooting:** [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+---
+
+## Credits & Attribution
+
+- **Original Integration:** [@krbaker](https://github.com/krbaker) - Thank you for creating the foundation
+- **ESS/Battery Support:** [@CanisUrsa](https://github.com/CanisUrsa) - Battery system integration
+- **Enhanced Edition:** [@smcneece](https://github.com/smcneece) - Community-driven improvements
+
 ## Contributors
 
-Special thanks to community contributors who have helped improve this integration:
+- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery (PR #18), session management and re-authentication (PR #23)
+- **[@joshchiou](https://github.com/joshchiou)** - Fixed memory leak from IP-serial virtual meter naming (PR #64)
+- **Max Roberts** - Helping get basic battery functionality working
+- **Ian Jones** - Beta testing battery control features
 
-- **[@jtooley307](https://github.com/jtooley307)** - Dynamic entity discovery for nighttime installation support (PR #18), Session management with proactive re-authentication and enhanced error handling (PR #23)
-- **[@joshchiou](https://github.com/joshchiou)** - Fixed memory leak crash caused by timestamp-based virtual meter naming for IP-serial PVS devices (PR #64)
+## License
 
-**Max Roberts** - For helping get basic battery functionality working
-**Ian Jones** - For helping beta test battery control features
+Apache License 2.0. See [LICENSE](LICENSE). This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation.
 
 ---
 
 ## Keywords
 
-**Hardware:** SunPower PVS, SunPower PVS5, SunPower PVS6, SunStrong, SunVault, ESS Battery, Solar Inverters  
-**Software:** Home Assistant, HACS, Python, krbaker fork
-**Features:** Solar Monitoring, Inverter Health, Battery Tracking, Flash Wear, Energy Dashboard, Mobile Notifications
+**Hardware:** SunPower PVS, PVS5, PVS6, SunStrong, SunVault, ESS Battery, Solar Inverters
+**Software:** Home Assistant, HACS, Python
+**Features:** Solar Monitoring, Inverter Health, Battery Tracking, Flash Wear, Energy Dashboard, WebSocket Live Data, Mobile Notifications
 
 <!-- 
 SEO Keywords: sunpower, sunstrong, pvs, pvs6, pvs5, home assistant, hacs, solar monitoring, 
 solar panels, inverter monitoring, sunvault, battery storage, ess, energy storage system, 
 pv monitoring, renewable energy, home automation, solar integration, solar power,
-photovoltaic, firmware 61846, new firmware, old firmware, authentication, krbaker, krbaker fork,
+photovoltaic, firmware 61846, new firmware, authentication, krbaker, krbaker fork,
 enhanced sunpower, sunpower integration, solar system monitoring, panel monitoring, inverter health,
 battery health, state of charge, state of health, flash memory, flash wear, diagnostic sensors,
-night-time caching, virtual production meter, mobile alerts, email notifications, VLAN routing,
-automatic route repair, health monitoring, performance tracking, energy dashboard integration
+virtual production meter, mobile alerts, email notifications, energy dashboard integration
 -->
