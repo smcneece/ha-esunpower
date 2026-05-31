@@ -53,10 +53,17 @@ async def async_get_config_entry_diagnostics(
         device_types = {}
         for device_type, devices in coordinator.data.items():
             if isinstance(devices, dict) and device_type != "_cache":
-                device_types[device_type] = {
-                    "count": len(devices),
-                    "serials": list(devices.keys()),
-                }
+                if device_type == "battery_config":
+                    # Show actual values for battery config, not just keys
+                    device_types[device_type] = {
+                        "control_mode": devices.get("control_mode", "not set"),
+                        "min_customer_soc": devices.get("min_customer_soc", "not set"),
+                    }
+                else:
+                    device_types[device_type] = {
+                        "count": len(devices),
+                        "serials": list(devices.keys()),
+                    }
         diagnostics["device_summary"] = device_types
 
     # Access cache data for detailed diagnostics

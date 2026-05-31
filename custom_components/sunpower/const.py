@@ -229,6 +229,9 @@ SUNPOWER_SENSORS = {
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
+                # DO NOT change to TOTAL_INCREASING. These sensors have been TOTAL since krbaker.
+                # Changing state_class on sensors with existing HA statistics can reset months
+                # or years of accumulated Energy Dashboard history for existing users.
                 "state": SensorStateClass.TOTAL,
             },
             "METER_KW": {
@@ -343,6 +346,7 @@ SUNPOWER_SENSORS = {
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
+                # DO NOT change to TOTAL_INCREASING. See METER_NET_KWH comment above.
                 "state": SensorStateClass.TOTAL,
             },
             "METER_TO_HOME": {
@@ -526,6 +530,7 @@ SUNPOWER_SENSORS = {
                 "unit": UnitOfEnergy.KILO_WATT_HOUR,
                 "icon": "mdi:flash",
                 "device": SensorDeviceClass.ENERGY,
+                # DO NOT change to TOTAL_INCREASING. See METER_NET_KWH comment above.
                 "state": SensorStateClass.TOTAL,
                 "suggested_display_precision": 3,
             },

@@ -3,6 +3,18 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.05.7
+
+### Bug Fix: Outlier Protection Scoped to Energy Sensors
+
+The outlier protection added in v2026.05.6 was incorrectly triggering on the PVS uptime sensor after a reboot. Uptime legitimately resets to zero on reboot, but the check was holding the pre-reboot value and logging warnings. Outlier protection is now scoped to energy sensors only (`SensorDeviceClass.ENERGY`), so uptime and other non-energy sensors that can legitimately reset are handled correctly.
+
+### Documentation: README Reorganized
+
+Energy Dashboard setup moved near the top of the README. Several long sections trimmed or removed. Battery system Energy Dashboard sensor guidance added.
+
+---
+
 ## [Unreleased] - v2026.05.6
 
 ### Improvement: Indefinite Hold-Last-Value for Live Data Sensors

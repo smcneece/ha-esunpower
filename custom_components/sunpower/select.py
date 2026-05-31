@@ -17,15 +17,19 @@ _LOGGER = logging.getLogger(__name__)
 # Battery mode mapping: Friendly name -> API value
 # Labels match SunStrong app modes exactly based on user reports.
 # BACKUP_ONLY = "Reserve" in SunStrong (confirmed calvinshih90, April 2026).
-# TARIFF_OPTIMIZER is a firmware-internal holding state at SOC limits, not user-selectable.
+# TARIFF_OPTIMIZER is a firmware-internal holding state at SOC limits, not user-selectable
+# but must be recognized for display when the PVS reports it as the current mode.
 BATTERY_MODE_MAP = {
     "Self Supply": "SELF_CONSUMPTION",
     "Cost Savings": "ENERGY_ARBITRAGE",
     "Reserve": "BACKUP_ONLY",
 }
 
-# Reverse mapping: API value -> Friendly name
+# Reverse mapping: API value -> Friendly name.
+# Includes TARIFF_OPTIMIZER for display only - firmware sets this automatically,
+# it is not listed in BATTERY_MODE_MAP so users cannot select it directly.
 BATTERY_MODE_REVERSE = {v: k for k, v in BATTERY_MODE_MAP.items()}
+BATTERY_MODE_REVERSE["TARIFF_OPTIMIZER"] = "Tariff Optimizer"
 
 # Minimum reserve percentage options
 RESERVE_PERCENTAGE_OPTIONS = [
@@ -103,7 +107,9 @@ class SunPowerBatteryModeSelect(CoordinatorEntity, SelectEntity):
         self._attr_name = "Battery Control Mode"
         self._attr_unique_id = f"{pvs_serial}_battery_control_mode"
         self._attr_icon = "mdi:battery-sync"
-        self._attr_options = list(BATTERY_MODE_MAP.keys())
+        # Include Tariff Optimizer for display when firmware sets it automatically.
+        # It is not in BATTERY_MODE_MAP so it cannot be written back via this entity.
+        self._attr_options = list(BATTERY_MODE_MAP.keys()) + ["Tariff Optimizer"]
 
     @property
     def current_option(self) -> str | None:
@@ -121,6 +127,9 @@ class SunPowerBatteryModeSelect(CoordinatorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the battery mode."""
+        if option == "Tariff Optimizer":
+            _LOGGER.warning("Tariff Optimizer is set automatically by the firmware and cannot be selected directly")
+            return
         if option not in BATTERY_MODE_MAP:
             _LOGGER.error("Invalid battery mode option: %s", option)
             return

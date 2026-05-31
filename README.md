@@ -223,7 +223,7 @@ Enhanced fork of [@krbaker's original SunPower integration](https://github.com/k
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE). This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation.
+Apache License 2.0. See [LICENSE](LICENSE). This integration is not affiliated with or endorsed by SunPower or SunStrong Corporation. Use at your own risk; no warranty is provided. That said, this integration has been running on real hardware for dozens of users without incident.
 
 ---
 

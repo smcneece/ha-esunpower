@@ -429,7 +429,7 @@ class SunPowerSensor(SunPowerEntity, SensorEntity):
             # Outlier detection: TOTAL_INCREASING sensors (lifetime energy counters) should
             # never drop significantly. A large drop means the PVS reported a bad value;
             # hold the last known good value to prevent utility meter and statistics corruption.
-            if self._my_state_class == SensorStateClass.TOTAL_INCREASING and self._last_value is not None:
+            if self._my_state_class == SensorStateClass.TOTAL_INCREASING and self._my_device_class == SensorDeviceClass.ENERGY and self._last_value is not None:
                 try:
                     new_float = float(value)
                     old_float = float(self._last_value)
