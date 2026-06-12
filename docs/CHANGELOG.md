@@ -3,6 +3,18 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.06.1
+
+### Bug Fix: Battery SOC Sensors Missing Device Class
+
+All battery state of charge and state of health sensors were missing the `battery` device class. This caused them to be excluded from the HA 2026.6 Energy Dashboard battery state of charge sensor picker, and may have affected other HA features that filter on device class.
+
+Root cause: ESS sensor definitions existed in two places. The core definitions had device class set correctly but are overridden by battery-specific definitions when a battery system is present. The battery-specific definitions were missing device class entirely. The now-unreachable duplicate core definitions have also been removed.
+
+Affected sensors: ESS Customer State of Charge, ESS State of Charge, ESS State of Health, Battery Customer State of Charge, Battery System State of Charge, SunVault Customer State of Charge, SunVault System State of Charge.
+
+---
+
 ## [Unreleased] - v2026.05.7
 
 ### Bug Fix: Outlier Protection Scoped to Energy Sensors
