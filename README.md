@@ -52,7 +52,7 @@ Check your firmware: Settings, Devices and Services, Enhanced SunPower, open the
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
-**During setup:** Enter your PVS IP address. Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default polling is 300 seconds; battery systems require 20s minimum.
+**During setup:** Enter your PVS IP address. Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default and recommended polling is 300 seconds. 
 
 ---
 
