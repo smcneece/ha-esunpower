@@ -3,6 +3,26 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.08.1
+
+### Security Fix: PVS Password Written to Home Assistant Log
+
+The PVS password (last 5 characters of the serial number) was being written to the Home Assistant log at INFO level during setup and on every integration start, including a partial value and its length. Since these log lines run during normal operation, not just when debug logging is enabled, the password was visible in the log by default.
+
+The password is no longer logged anywhere, in full or in part. Setup and authentication continue to work exactly as before, only the log output changed.
+
+If you have log files containing lines like `Setup: Password=` or `Auth details: host=... password=...`, treat the value as exposed and consider it when sharing logs for troubleshooting.
+
+### Bug Fix: Ghost Inverter Device Created from Malformed PVS Record
+
+In rare circumstances the PVS can return a device record with no serial number or "n/a" as the serial. Previously these records passed through and created a ghost device in Home Assistant (visible as "Inverter n/a" in the integration device list) and triggered a false "New Inverters Detected" notification.
+
+Serial numbers are now validated before device creation. Any record with an empty or "n/a" serial is rejected and a WARNING is logged at default log level so it is visible without enabling debug logging. The fix applies to inverters, power meters, ESS devices, and transfer switches.
+
+If you have an "Inverter n/a" device from a previous install, delete it via the three-dot menu on the device card. If HA does not allow deletion, remove and re-add the integration; your history is preserved.
+
+---
+
 ## [Unreleased] - v2026.06.1
 
 ### Bug Fix: Battery SOC Sensors Missing Device Class
