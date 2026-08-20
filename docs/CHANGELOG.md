@@ -3,6 +3,36 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.08.2
+
+### Security Hardening: PVS Serial Number No Longer Logged or Included Unredacted
+
+Following the v2026.08.1 password logging fix, a broader review found the same underlying value, the PVS serial number, still appearing in several other places. The last 5 characters of the PVS serial are the varserver authentication password, so logging or exporting the full serial is equivalent to exposing the password, even when the log line does not say "password."
+
+The full PVS serial is no longer written to the Home Assistant log. Around a dozen log lines across setup, startup, and entity creation now show a masked version (for example `ZT222885000549*****`) so the device can still be identified for troubleshooting without exposing the password portion.
+
+The flash memory and flash wear critical alerts also embedded the full serial in the alert text. Since these alerts can be pushed to a mobile device, this was the one path where the value could leave the local network entirely. Both alerts now use the masked serial as well.
+
+Diagnostics downloads (Settings, Devices & Services, Enhanced SunPower, three-dot menu, Download Diagnostics) previously included the full PVS and inverter serial numbers and the PVS's LAN IP address with no redaction, inside the raw PVS data sample and the device summary. Since diagnostics files are the standard thing to attach to a GitHub issue or support request, this was the most likely real-world exposure path. Diagnostics output is now redacted using Home Assistant's standard redaction helper before it is generated, including a device description field that repeated the same serial number as plain text under a different name.
+
+No functional change: setup, authentication, notifications, and diagnostics all work exactly as before, only the exposed values changed.
+
+### Security Hardening: Password Field Now Masked, Diagnostics No Longer Report Mobile Device Name
+
+The PVS password field (last 5 characters of the serial) was a plain text input during setup and in integration options, so it displayed in cleartext whenever the form was open. It now uses Home Assistant's standard masked password field with a show/hide toggle, matching how every other credential field in HA behaves.
+
+Diagnostics downloads also reported the exact name of your configured mobile notification device (for example `mobile_app_johns_iphone`), which can reveal a device owner's name or phone model in a file meant to be shared for troubleshooting. Diagnostics now report only whether a mobile device is configured, not which one.
+
+Separately, diagnostics previously reported "password configured" by checking a config key that was never actually used, so it always showed as not configured regardless of setup. It now checks the correct key.
+
+### Cleanup: Removed Leftover Legacy Files, Fixed Deployment Script to Prevent Recurrence
+
+Three files from the old firmware and pypvs removal work (`sunpower.py`, `varserver.py`, `pypvs_converter.py`) were still shipping in releases despite being retired months ago. They were not imported or used anywhere, dead weight rather than a functional issue, but removed for a cleaner codebase.
+
+The deployment script only ever copied files into the release, it never removed files that had been deleted from the source, so removed files could keep shipping indefinitely without anyone noticing. It now removes stale files during packaging so this can't happen again.
+
+---
+
 ## [Unreleased] - v2026.08.1
 
 ### Security Fix: PVS Password Written to Home Assistant Log

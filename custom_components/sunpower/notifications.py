@@ -5,6 +5,8 @@ import logging
 import time
 from datetime import datetime
 
+from .data_processor import mask_pvs_serial
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -383,14 +385,14 @@ def notify_batched_inverter_issues(hass, entry, cache, persistent_errors, recove
 
 def notify_flash_memory_critical(hass, entry, cache, serial, available_mb, threshold_mb):
     """ESSENTIAL: Flash memory critical alert - UI + mobile"""
-    msg = f"⚠️ PVS {serial} FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb:.0f}MB)"
+    msg = f"⚠️ PVS {mask_pvs_serial(serial)} FLASH MEMORY CRITICAL: {available_mb:.1f}MB remaining (threshold: {threshold_mb:.0f}MB)"
     # This is critical hardware protection - always notify + mobile
     safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True,
                notification_category="flash_memory", cache=cache)
 
 def notify_flash_wear_critical(hass, entry, cache, serial, wear_pct, threshold_pct, remaining_pct):
     """ESSENTIAL: Flash wear critical alert - UI + mobile"""
-    msg = f"⚠️ PVS {serial} FLASH WEAR CRITICAL: {wear_pct}% used / {remaining_pct}% remaining (threshold: {threshold_pct}%)"
+    msg = f"⚠️ PVS {mask_pvs_serial(serial)} FLASH WEAR CRITICAL: {wear_pct}% used / {remaining_pct}% remaining (threshold: {threshold_pct}%)"
     # This is critical hardware protection - always notify + mobile
     safe_notify(hass, msg, "Enhanced SunPower Critical Alert", entry, force_notify=True,
                notification_category="flash_wear", cache=cache)

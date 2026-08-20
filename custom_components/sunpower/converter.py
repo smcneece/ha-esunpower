@@ -24,6 +24,7 @@ from .const import (
     ESS_DEVICE_TYPE,
     TRANSFER_SWITCH_DEVICE_TYPE,
 )
+from .data_processor import mask_pvs_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -297,7 +298,7 @@ async def migrate_sunstrong_entities(hass: HomeAssistant, pvs_serial: str, pvs_m
         return {"migrated": 0, "skipped": 0, "errors": 0}
 
     _LOGGER.info("Found %d orphaned SunStrong entities - starting migration", len(orphaned))
-    _LOGGER.info("PVS Info - Serial: %s, Model: %s", pvs_serial, pvs_model)
+    _LOGGER.info("PVS Info - Serial: %s, Model: %s", mask_pvs_serial(pvs_serial), pvs_model)
 
     entity_reg = er.async_get(hass)
     results = {

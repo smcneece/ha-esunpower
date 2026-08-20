@@ -18,6 +18,7 @@ from .const import (
 )
 from .varserver_client import VarserverClient
 from .notifications import get_mobile_devices, get_email_notification_services
+from .data_processor import mask_pvs_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,8 +115,8 @@ async def get_supervisor_info(host, session):
                             return None, None, None, model, f"Unparseable BUILD format: {build_raw}"
 
                         last5 = (serial[-5:] if len(serial) >= 5 else serial).upper()
-                        _LOGGER.info("supervisor/info: SERIAL=%s, BUILD=%s (raw: %s), MODEL=%s, Last5=%s",
-                                    serial, build, build_raw, model, last5)
+                        _LOGGER.info("supervisor/info: SERIAL=%s, BUILD=%s (raw: %s), MODEL=%s",
+                                    mask_pvs_serial(serial), build, build_raw, model)
                         return serial, build, last5, model, None
                     else:
                         return None, None, None, model, "supervisor/info missing SERIAL or BUILD"
@@ -152,7 +153,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if error or build is None:
             return None, None, None, None, error or "Could not read firmware BUILD from PVS"
 
-        _LOGGER.info("PVS detected: BUILD=%s, Serial=%s, Last5=%s, MODEL=%s", build, serial, last5, model)
+        _LOGGER.info("PVS detected: BUILD=%s, Serial=%s, MODEL=%s", build, mask_pvs_serial(serial), model)
 
         is_pvs5 = model == "PVS5"
         min_build = 5408 if is_pvs5 else 61840
@@ -222,7 +223,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                     await self.async_set_unique_id(serial)
                     self._abort_if_unique_id_configured({})
-                    _LOGGER.info("Setup: Serial=%s, Build=%s, Last5=%s", serial, build, last5)
+                    _LOGGER.info("Setup: Serial=%s, Build=%s", mask_pvs_serial(serial), build)
 
                     return await self.async_step_need_password()
                 else:
@@ -304,12 +305,13 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store uppercase password in basic config
                 self._basic_config["pvs_serial_last5"] = pvs_serial_last5
 
-                _LOGGER.info("Setup: Password=%s", pvs_serial_last5)
                 return await self.async_step_notifications()
 
         # Step 2 schema: Pre-fill password with auto-detected last5
         schema = vol.Schema({
-            vol.Required("pvs_serial_last5", default=auto_detected_last5 or ""): str,
+            vol.Required("pvs_serial_last5", default=auto_detected_last5 or ""): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
         })
 
         return self.async_show_form(
@@ -509,7 +511,9 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Optional("pvs_serial_last5", default=current_pvs_serial): str,
+            vol.Optional("pvs_serial_last5", default=current_pvs_serial): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
         })
 
         return self.async_show_form(

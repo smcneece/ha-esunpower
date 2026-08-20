@@ -47,6 +47,7 @@ from .data_processor import (
     convert_sunpower_data,
     validate_converted_data,
     get_device_summary,
+    mask_pvs_serial,
 )
 
 # Import health check functions
@@ -634,16 +635,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     pvs_serial_last5 = pvs_serial_last5.strip() if pvs_serial_last5 else ""
     if not pvs_serial_last5 and entry.unique_id and len(entry.unique_id) >= 5:
         pvs_serial_last5 = entry.unique_id[-5:].upper()
-        _LOGGER.warning("pvs_serial_last5 missing from config entry, derived from serial: %s", pvs_serial_last5)
+        _LOGGER.warning("pvs_serial_last5 missing from config entry, derived from serial")
     auth_password = pvs_serial_last5 if pvs_serial_last5 else None
 
     _LOGGER.info("Using varserver client (BUILD %s) with authentication", firmware_build)
-    _LOGGER.info("Auth details: host=%s, user=ssm_owner, password=%s*** (length=%d)",
-                 entry.data['host'], auth_password[:2] if auth_password else "NONE",
-                 len(auth_password) if auth_password else 0)
 
     pvs_serial = entry.unique_id
-    _LOGGER.info("Using PVS serial from config: %s", pvs_serial)
+    _LOGGER.info("Using PVS serial from config: %s", mask_pvs_serial(pvs_serial))
     try:
         varserver_client = VarserverClient(
             session=async_get_clientsession(hass, False),
@@ -653,7 +651,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if not await varserver_client.authenticate():
             _LOGGER.warning("Initial varserver authentication failed (PVS may be offline) - coordinator will retry")
         else:
-            _LOGGER.info("Varserver client initialized and authenticated (serial: %s)", pvs_serial)
+            _LOGGER.info("Varserver client initialized and authenticated (serial: %s)", mask_pvs_serial(pvs_serial))
     except Exception as e:
         _LOGGER.warning("Failed to initialize varserver client during setup: %s", e)
         _LOGGER.info("Integration will continue setup - coordinator will retry authentication during first poll")

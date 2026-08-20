@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -12,6 +13,14 @@ from .const import (
     SUNPOWER_COORDINATOR,
     SUNPOWER_HOST,
 )
+
+# SERIAL/serials: the PVS serial's last 5 characters are the varserver auth
+# password, so no device serial (PVS or inverter) may appear unredacted.
+# DESCR: raw PVS device records embed the same serial again as free text
+# (e.g. "Inverter E00122143004565"), a separate leak path SERIAL redaction
+# alone doesn't catch since it matches by key name, not by value content.
+# host/gateway_ip: local network addresses, not needed for troubleshooting.
+TO_REDACT = {"SERIAL", "serials", "DESCR", "host", "gateway_ip"}
 
 
 async def async_get_config_entry_diagnostics(
@@ -32,8 +41,8 @@ async def async_get_config_entry_diagnostics(
             "title": entry.title,
             "host": entry.data.get("host", entry.options.get("host", "unknown")),
             "polling_interval": entry.options.get("polling_interval", entry.data.get("polling_interval", "unknown")),
-            "password_configured": bool(entry.data.get("password", "")),
-            "mobile_device": entry.options.get("mobile_device", entry.data.get("mobile_device", "not configured")),
+            "password_configured": bool(entry.options.get("pvs_serial_last5", entry.data.get("pvs_serial_last5", ""))),
+            "mobile_device_configured": entry.options.get("mobile_device", entry.data.get("mobile_device")) not in (None, "none"),
             "flash_threshold_mb": entry.options.get("flash_threshold_mb", entry.data.get("flash_threshold_mb", "not configured")),
             "enable_debug_notifications": entry.options.get("enable_debug_notifications", entry.data.get("enable_debug_notifications", False)),
             "enable_route_checking": entry.options.get("enable_route_checking", entry.data.get("enable_route_checking", False)),
@@ -111,4 +120,4 @@ async def async_get_config_entry_diagnostics(
         except Exception as e:
             diagnostics["cache_error"] = f"Could not access cache data: {str(e)}"
 
-    return diagnostics
+    return async_redact_data(diagnostics, TO_REDACT)

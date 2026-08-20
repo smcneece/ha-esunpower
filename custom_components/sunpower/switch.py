@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .data_processor import mask_pvs_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def async_setup_entry(
 
     async_add_entities([polling_switch])
 
-    _LOGGER.info("Created polling control switch for PVS %s", pvs_serial)
+    _LOGGER.info("Created polling control switch for PVS %s", mask_pvs_serial(pvs_serial))
 
 
 class SunPowerPollingSwitch(CoordinatorEntity, SwitchEntity):
@@ -55,7 +56,7 @@ class SunPowerPollingSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable PVS polling."""
-        _LOGGER.info("Enabling PVS polling for %s", self._pvs_serial)
+        _LOGGER.info("Enabling PVS polling for %s", mask_pvs_serial(self._pvs_serial))
 
         # Update config entry options
         new_options = {**self.config_entry.options, "polling_enabled": True}
@@ -76,7 +77,7 @@ class SunPowerPollingSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable PVS polling."""
-        _LOGGER.info("Disabling PVS polling for %s", self._pvs_serial)
+        _LOGGER.info("Disabling PVS polling for %s", mask_pvs_serial(self._pvs_serial))
 
         # Update config entry options
         new_options = {**self.config_entry.options, "polling_enabled": False}

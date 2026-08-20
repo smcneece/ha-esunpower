@@ -361,8 +361,11 @@ class VarserverClient:
         devices = []
         for data in inverters_raw:
             try:
-                sn = data.get("sn", "")
-                if not sn:
+                sn = data.get("sn", "").strip()
+                if not sn or sn.lower() == "n/a":
+                    _LOGGER.warning(
+                        "Skipping inverter with invalid serial %r - PVS returned malformed data", sn
+                    )
                     continue
 
                 model = data.get("prodMdlNm", "AC_Module_Type_E")
@@ -415,8 +418,11 @@ class VarserverClient:
         devices = []
         for data in meters_raw:
             try:
-                sn = data.get("sn", "")
-                if not sn:
+                sn = data.get("sn", "").strip()
+                if not sn or sn.lower() == "n/a":
+                    _LOGGER.warning(
+                        "Skipping power meter with invalid serial %r - PVS returned malformed data", sn
+                    )
                     continue
 
                 model = data.get("prodMdlNm", "PVS6M0400p")
@@ -490,8 +496,11 @@ class VarserverClient:
         devices = []
         for data in ess_raw:
             try:
-                sn = data.get("sn", "")
-                if not sn:
+                sn = data.get("sn", "").strip()
+                if not sn or sn.lower() == "n/a":
+                    _LOGGER.warning(
+                        "Skipping ESS device with invalid serial %r - PVS returned malformed data", sn
+                    )
                     continue
 
                 model = data.get("prodMdlNm", "")
@@ -558,8 +567,11 @@ class VarserverClient:
         devices = []
         for data in ts_raw:
             try:
-                sn = data.get("sn", "")
-                if not sn:
+                sn = data.get("sn", "").strip()
+                if not sn or sn.lower() == "n/a":
+                    _LOGGER.warning(
+                        "Skipping transfer switch with invalid serial %r - PVS returned malformed data", sn
+                    )
                     continue
 
                 model = data.get("prodMdlNm", "")

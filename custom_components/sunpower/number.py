@@ -18,6 +18,7 @@ from .const import (
     DOMAIN,
     MIN_SUNPOWER_UPDATE_INTERVAL,
 )
+from .data_processor import mask_pvs_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class SunPowerPollingIntervalNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         new_interval = max(MIN_SUNPOWER_UPDATE_INTERVAL, min(MAX_POLLING_INTERVAL, int(value)))
-        _LOGGER.info("Polling interval changed to %d seconds for PVS %s", new_interval, self._pvs_serial)
+        _LOGGER.info("Polling interval changed to %d seconds for PVS %s", new_interval, mask_pvs_serial(self._pvs_serial))
 
         new_options = {**self.config_entry.options, "polling_interval": new_interval}
         self.hass.config_entries.async_update_entry(self.config_entry, options=new_options)
@@ -116,7 +117,7 @@ class SunPowerLiveWriteIntervalNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         new_interval = max(1, min(60, int(value)))
-        _LOGGER.info("Live data write interval changed to %ds for PVS %s", new_interval, self._pvs_serial)
+        _LOGGER.info("Live data write interval changed to %ds for PVS %s", new_interval, mask_pvs_serial(self._pvs_serial))
 
         new_options = {**self.config_entry.options, CONF_LIVE_DATA_WRITE_INTERVAL: new_interval}
         self.hass.config_entries.async_update_entry(self.config_entry, options=new_options)

@@ -55,6 +55,18 @@ def generate_safe_virtual_serial(base_name, device_type):
     return safe_serial
 
 
+def mask_pvs_serial(serial):
+    """Mask the last 5 characters of a PVS serial for safe logging/display.
+
+    The last 5 characters of the PVS serial are also the varserver auth
+    password, so the full serial must never appear in logs, notifications,
+    or diagnostics.
+    """
+    if not serial or len(serial) <= 5:
+        return "*****"
+    return f"{serial[:-5]}*****"
+
+
 def create_vmeter(data):
     """Create a virtual 'METER' that uses the sum of inverters - IP-SAFE VERSION"""
     kwh = 0.0

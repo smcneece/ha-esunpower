@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .data_processor import mask_pvs_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ async def async_setup_entry(
     entities.append(reserve_percentage_select)
 
     async_add_entities(entities)
-    _LOGGER.info("Created %d battery control select(s) for PVS %s", len(entities), pvs_serial)
+    _LOGGER.info("Created %d battery control select(s) for PVS %s", len(entities), mask_pvs_serial(pvs_serial))
 
 
 class SunPowerBatteryModeSelect(CoordinatorEntity, SelectEntity):
