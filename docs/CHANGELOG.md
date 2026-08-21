@@ -3,6 +3,21 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.08.3
+
+### Security Hardening: Remaining PVS Serial Exposure Closed
+
+A follow-up review found the PVS serial still reaching the log, and in one case a permanent device identifier, in a few places the earlier pass missed:
+
+- The virtual production meter's serial (built from the full PVS serial) was logged at INFO on every single poll cycle. Now masked.
+- The flash memory and flash wear WARNING log lines still logged the raw serial, even though the paired mobile notification text right next to them was already masked. Now masked.
+- The polling enabled/disabled notification (shown when toggling the `switch.polling_enabled` entity) still showed the full serial in its message text and used it in the notification's internal ID. The message is now masked, and the ID no longer uses the serial at all.
+- A multi-PVS-only code path used the raw password itself (not just the derived serial) to build an identifier for the second PVS's diagnostics device, so the password became a permanent part of that device's entity IDs, not just a log line. It now uses Home Assistant's own internal entry ID instead, which is not derived from anything sensitive.
+
+**Note for multi-PVS households only** (running more than one separate PVS gateway under one Home Assistant instance): the second-and-later PVS's "Enhanced SunPower Diagnostics" device (poll success rate, response time, etc.) will appear as a new device after this update, since its identifier changed. The old one will stop updating. Try deleting it via the three-dot menu on the device card; if Home Assistant does not allow it while the integration is active, remove and re-add the integration and it will clear along with it. This does not affect the actual PVS, inverter, or power meter entities, and does not affect single-PVS installs at all.
+
+---
+
 ## [Unreleased] - v2026.08.2
 
 ### Security Hardening: PVS Serial Number No Longer Logged or Included Unredacted

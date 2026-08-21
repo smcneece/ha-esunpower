@@ -534,7 +534,7 @@ def notify_battery_system_issue(hass, entry, cache, consecutive_failures):
 async def notify_polling_disabled(hass, entry, serial):
     """INFO: Polling disabled notification"""
     msg = (f"⏸️ PVS Polling Disabled\n\n"
-           f"PVS {serial} will not be polled until polling is re-enabled.\n\n"
+           f"PVS {mask_pvs_serial(serial)} will not be polled until polling is re-enabled.\n\n"
            f"Entities will retain last known values. "
            f"Use this to reduce PVS disk I/O during nighttime hours.")
 
@@ -544,7 +544,7 @@ async def notify_polling_disabled(hass, entry, serial):
         {
             "message": msg,
             "title": "Enhanced SunPower Polling Status",
-            "notification_id": f"sunpower_polling_disabled_{serial}"
+            "notification_id": f"sunpower_polling_disabled_{entry.entry_id}"
         },
         blocking=False
     )
@@ -552,7 +552,7 @@ async def notify_polling_disabled(hass, entry, serial):
 async def notify_polling_enabled(hass, entry, serial):
     """INFO: Polling enabled notification"""
     msg = (f"▶️ PVS Polling Enabled\n\n"
-           f"PVS {serial} polling has been resumed.\n\n"
+           f"PVS {mask_pvs_serial(serial)} polling has been resumed.\n\n"
            f"Normal data collection will continue.")
 
     await hass.services.async_call(
@@ -561,7 +561,7 @@ async def notify_polling_enabled(hass, entry, serial):
         {
             "message": msg,
             "title": "Enhanced SunPower Polling Status",
-            "notification_id": f"sunpower_polling_enabled_{serial}"
+            "notification_id": f"sunpower_polling_enabled_{entry.entry_id}"
         },
         blocking=False
     )

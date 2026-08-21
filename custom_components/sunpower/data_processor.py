@@ -106,23 +106,25 @@ def create_vmeter(data):
         return data
 
     pvs_serial = next(iter(pvs_devices))
-    
+    derived_from_real_serial = False
+
     # BULLETPROOF IP DETECTION: Check all IP address ranges
     if is_ip_address(pvs_serial):
         # PVS has IP address as serial - use completely safe alternative naming
         vmeter_serial = generate_safe_virtual_serial("virtual_production_meter", "meter")
-        _LOGGER.warning("PVS has IP-based serial (%s), using safe virtual meter name: %s", 
+        _LOGGER.warning("PVS has IP-based serial (%s), using safe virtual meter name: %s",
                        pvs_serial, vmeter_serial)
     else:
         # Real PVS serial - safe to create virtual meter with "pv" suffix
         vmeter_serial = f"{pvs_serial}pv"
-        
+
         # Double-check the result isn't accidentally an IP
         if is_ip_address(vmeter_serial):
             vmeter_serial = generate_safe_virtual_serial("virtual_production_meter", "meter")
             _LOGGER.warning("Virtual meter serial became IP-like, using safe alternative: %s", vmeter_serial)
         else:
-            _LOGGER.debug("Creating virtual meter with real PVS serial: %s", vmeter_serial)
+            derived_from_real_serial = True
+            _LOGGER.debug("Creating virtual meter with real PVS serial: %s", f"{mask_pvs_serial(pvs_serial)}pv")
     
     # Create the virtual meter device
     try:
@@ -150,8 +152,9 @@ def create_vmeter(data):
             "tot_pf_rto": 1.0,  # Power Factor (assume perfect for solar production)
         }
         
-        _LOGGER.info("Created virtual meter: %s (aggregated from %d inverters)", 
-                    vmeter_serial, len(inverters))
+        log_serial = f"{mask_pvs_serial(pvs_serial)}pv" if derived_from_real_serial else vmeter_serial
+        _LOGGER.info("Created virtual meter: %s (aggregated from %d inverters)",
+                    log_serial, len(inverters))
     except Exception as e:
         _LOGGER.error("Failed to create virtual meter: %s", e)
     
@@ -227,8 +230,9 @@ def convert_sunpower_data(sunpower_data):
             # Validate device serial is reasonable (not obviously corrupted)
             # Note: Battery system serials can be 70+ chars for multi-module systems
             if len(str(device_serial)) > 150:
+                logged_serial = mask_pvs_serial(str(device_serial)) if device_type == PVS_DEVICE_TYPE else str(device_serial)[:100]
                 _LOGGER.warning("convert_sunpower_data: Device %d has suspiciously long serial (>150 chars): %s",
-                               i, str(device_serial)[:100])
+                               i, logged_serial)
                 continue
             
             # Add device to data structure

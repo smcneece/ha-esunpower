@@ -3,6 +3,8 @@
 import logging
 import time
 
+from .data_processor import mask_pvs_serial
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -292,7 +294,7 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
                         alert_info['last_alert_time'] = current_time
                         alert_info['alert_count'] += 1
                         _LOGGER.warning("PVS %s flash memory critical: %d%% available (threshold: %d%%)",
-                                      serial, 100 - flash_pct, 100 - flash_threshold)
+                                      mask_pvs_serial(serial), 100 - flash_pct, 100 - flash_threshold)
                 else:
                     alert_info['last_alert_time'] = 0
 
@@ -402,7 +404,7 @@ def check_flash_wear_level(hass, entry, cache, pvs_data):
                         alert_info['alert_count'] += 1
                         
                         _LOGGER.warning("PVS %s flash wear critical: %d%% used / %d%% remaining (threshold: %d%%)",
-                                      serial, wear_pct, remaining_pct, flash_wear_threshold)
+                                      mask_pvs_serial(serial), wear_pct, remaining_pct, flash_wear_threshold)
                 else:
                     # Reset alert tracking when below threshold
                     alert_info['last_alert_time'] = 0

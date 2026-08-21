@@ -172,7 +172,7 @@ def _determine_diagnostic_serial(hass, entry):
     """Determine diagnostic device serial based on PVS creation order.
 
     First PVS: 'sunpower_diagnostics' (preserves existing single-PVS users)
-    Additional PVS: 'sunpower_diagnostics_{last5}' (multi-PVS support)
+    Additional PVS: 'sunpower_diagnostics_{entry_id[:8]}' (multi-PVS support)
 
     If anything fails, defaults to 'sunpower_diagnostics' (safe fallback)
     """
@@ -203,14 +203,11 @@ def _determine_diagnostic_serial(hass, entry):
             _LOGGER.info("Multi-PVS: This is the first PVS integration - using standard diagnostic serial")
             return "sunpower_diagnostics"
 
-        # Additional PVS gets unique serial
-        pvs_serial_last5 = entry.options.get("pvs_serial_last5") or entry.data.get("pvs_serial_last5")
-
-        if not pvs_serial_last5:
-            _LOGGER.error("Multi-PVS: pvs_serial_last5 missing from config for PVS #%d! Using entry_id fallback.", our_index + 1)
-            pvs_serial_last5 = entry.entry_id[:8]
-
-        unique_serial = f"sunpower_diagnostics_{pvs_serial_last5}"
+        # Additional PVS gets a unique serial based on the config entry ID.
+        # Must not be derived from pvs_serial_last5 (the auth password) since
+        # this value becomes a permanent device/entity identifier, not just a
+        # log line - entry_id is stable, unique, and not sensitive.
+        unique_serial = f"sunpower_diagnostics_{entry.entry_id[:8]}"
         _LOGGER.info("Multi-PVS: This is PVS #%d - using unique diagnostic serial: %s", our_index + 1, unique_serial)
         return unique_serial
 
