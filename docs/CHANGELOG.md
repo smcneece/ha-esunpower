@@ -3,6 +3,22 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [Unreleased] - v2026.08.4
+
+### Security Hardening: Two Remaining Debug Log Lines Closed
+
+The last two DEBUG-level log lines still carrying the unmasked PVS serial are now fixed, in the exception-handling branches of the same flash memory and flash wear checks fixed in v2026.08.3. They only fire when the PVS reports a value that fails to parse as a number, an edge case, but the fix is the same one-line masking applied everywhere else.
+
+### Bug Fix: Options Dialog Could Crash on Older Home Assistant Versions
+
+`hacs.json` declared support back to Home Assistant 2024.6.0, but the integration options dialog relies on `self.config_entry` being automatically available, which Home Assistant only started doing in 2024.11. Opening integration options on a 2024.6 through 2024.10 install would have raised an error. The minimum supported Home Assistant version is now correctly set to 2024.11.0.
+
+### Cleanup: Removed Unreachable SunStrong Migration Code
+
+`converter.py`, a file for migrating entities away from a separate competing integration, was never actually called from anywhere in the codebase. While auditing it we found it had the same unmasked PVS serial logging as everything else fixed this week, in three places, but since the code path was completely unreachable it could never have actually run. Removed entirely rather than patched, since it served no active purpose.
+
+---
+
 ## [Unreleased] - v2026.08.3
 
 ### Security Hardening: Remaining PVS Serial Exposure Closed

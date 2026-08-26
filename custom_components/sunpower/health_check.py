@@ -299,7 +299,7 @@ def check_flash_memory_level(hass, entry, cache, pvs_data):
                     alert_info['last_alert_time'] = 0
 
             except (ValueError, TypeError):
-                _LOGGER.debug("Invalid flash usage value for PVS %s: %s", serial, flash_usage_pct)
+                _LOGGER.debug("Invalid flash usage value for PVS %s: %s", mask_pvs_serial(serial), flash_usage_pct)
 
 
 def update_diagnostic_stats(cache, success, response_time=None):
@@ -410,4 +410,4 @@ def check_flash_wear_level(hass, entry, cache, pvs_data):
                     alert_info['last_alert_time'] = 0
             
             except (ValueError, TypeError):
-                _LOGGER.debug("Invalid flash wear value for PVS %s: %s", serial, flashwear_pct)
+                _LOGGER.debug("Invalid flash wear value for PVS %s: %s", mask_pvs_serial(serial), flashwear_pct)
