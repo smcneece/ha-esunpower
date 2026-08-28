@@ -15,6 +15,7 @@ from .const import (
 )
 # UPDATED: Import battery constants from battery_handler.py
 from .battery_handler import SUNVAULT_BINARY_SENSORS
+from .data_processor import mask_pvs_serial
 from .entity import SunPowerEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,7 +109,10 @@ async def _create_binary_entities(hass, config_entry, async_add_entities, coordi
         
         for index, sensor_data in enumerate(sunpower_data[device_type].values()):
             device_serial = sensor_data.get('SERIAL', 'Unknown')
-            
+            # PVS's own serial's last 5 chars are the auth password; inverter/meter/ESS
+            # serials are a different, non-sensitive value and are logged as-is.
+            log_serial = mask_pvs_serial(device_serial) if device_type == PVS_DEVICE_TYPE else device_serial
+
             for sensor_name in sensors:
                 sensor = sensors[sensor_name]
                 
@@ -143,7 +147,7 @@ async def _create_binary_entities(hass, config_entry, async_add_entities, coordi
                         SUN_POWER=text_sunpower,
                         SUN_VAULT=text_sunvault,
                         PVS=text_pvs,
-                        SERIAL=device_serial,
+                        SERIAL=log_serial,
                         MODEL=sensor_data.get("MODEL", "Unknown"),
                     ),
                     device_class=sensor["device"],
@@ -151,7 +155,7 @@ async def _create_binary_entities(hass, config_entry, async_add_entities, coordi
                     entity_category=sensor.get("entity_category", None),
                 )
                 
-                _LOGGER.debug("Creating binary sensor %s for %s", sensor_name, device_serial)
+                _LOGGER.debug("Creating binary sensor %s for %s", sensor_name, log_serial)
                 entities.append(sunpower_sensor)
                 created_entities.add(entity_unique_id)
 

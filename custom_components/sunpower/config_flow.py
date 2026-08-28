@@ -286,7 +286,7 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         auto_detected_last5 = self._basic_config.get("auto_detected_last5", "")
         firmware_build = self._basic_config.get("firmware_build")
 
-        description_placeholders["serial_number"] = self.unique_id or "Unknown"
+        description_placeholders["serial_number"] = mask_pvs_serial(self.unique_id) if self.unique_id else "Unknown"
         description_placeholders["firmware_build"] = str(firmware_build) if firmware_build else "Unknown"
         description_placeholders["auth_required"] = "Yes"
 
@@ -608,57 +608,61 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                 # Force descriptive names to True (better for energy dashboard)
                 complete_config["use_descriptive_names"] = True
                 complete_config["use_product_names"] = False
-            
-            # Update data if basic settings changed
-            data_updates = {}
-            if complete_config["host"] != self.config_entry.data.get("host"):
-                data_updates["host"] = complete_config["host"]
-            if complete_config["polling_interval"] != self.config_entry.data.get("polling_interval"):
-                data_updates["polling_interval"] = complete_config["polling_interval"]
-            if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):
-                data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
-            if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):
-                data_updates["use_product_names"] = complete_config["use_product_names"]
-            if complete_config.get("pvs_serial_last5", "") != self.config_entry.data.get("pvs_serial_last5", ""):
-                data_updates["pvs_serial_last5"] = complete_config.get("pvs_serial_last5", "")
-            # Always update firmware info if detected (critical for existing integrations)
-            if "firmware_build" in complete_config:
-                data_updates["firmware_build"] = complete_config["firmware_build"]
-            if "uses_pypvs" in complete_config:
-                data_updates["uses_pypvs"] = complete_config["uses_pypvs"]
 
-            # Apply data updates if needed
-            if data_updates:
-                new_data = dict(self.config_entry.data)
-                new_data.update(data_updates)
-                
-                title = f"Enhanced SunPower PVS {new_data['host']}" if "host" in data_updates else None
-                
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, 
-                    data=new_data,
-                    title=title
-                )
-            
-            # Create options
-            options = {
-                "general_notifications": complete_config["general_notifications"],
-                "deep_debug_notifications": complete_config["deep_debug_notifications"],
-                "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
-                "mobile_device": complete_config.get("mobile_device"),
-                "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
-                "flash_wear_threshold": complete_config.get("flash_wear_threshold", 90),
-                "email_notification_service": complete_config.get("email_notification_service"),
-                "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
-                "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
-            }
+                # Update data if basic settings changed
+                data_updates = {}
+                if complete_config["host"] != self.config_entry.data.get("host"):
+                    data_updates["host"] = complete_config["host"]
+                if complete_config["polling_interval"] != self.config_entry.data.get("polling_interval"):
+                    data_updates["polling_interval"] = complete_config["polling_interval"]
+                if complete_config["use_descriptive_names"] != self.config_entry.data.get("use_descriptive_names"):
+                    data_updates["use_descriptive_names"] = complete_config["use_descriptive_names"]
+                if complete_config["use_product_names"] != self.config_entry.data.get("use_product_names"):
+                    data_updates["use_product_names"] = complete_config["use_product_names"]
+                if complete_config.get("pvs_serial_last5", "") != self.config_entry.data.get("pvs_serial_last5", ""):
+                    data_updates["pvs_serial_last5"] = complete_config.get("pvs_serial_last5", "")
+                # Always update firmware info if detected (critical for existing integrations)
+                if "firmware_build" in complete_config:
+                    data_updates["firmware_build"] = complete_config["firmware_build"]
+                if "uses_pypvs" in complete_config:
+                    data_updates["uses_pypvs"] = complete_config["uses_pypvs"]
 
-            # Persist live data options (new firmware only; safe to include for old firmware too)
-            options[CONF_ENABLE_LIVE_DATA] = complete_config.get(CONF_ENABLE_LIVE_DATA, False)
-            options[CONF_LIVE_DATA_THRESHOLD] = complete_config.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
-            options[CONF_LIVE_DATA_WRITE_INTERVAL] = int(complete_config.get(CONF_LIVE_DATA_WRITE_INTERVAL, DEFAULT_LIVE_DATA_WRITE_INTERVAL))
+                # Apply data updates if needed
+                if data_updates:
+                    new_data = dict(self.config_entry.data)
+                    new_data.update(data_updates)
 
-            return self.async_create_entry(title="", data=options)
+                    title = f"Enhanced SunPower PVS {new_data['host']}" if "host" in data_updates else None
+
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data=new_data,
+                        title=title
+                    )
+
+                # Create options. Start from the existing options so keys this
+                # form doesn't manage (e.g. polling_enabled, set by the Polling
+                # Enabled switch) survive a Submit instead of being wiped back
+                # to their default.
+                options = {
+                    **self.config_entry.options,
+                    "general_notifications": complete_config["general_notifications"],
+                    "deep_debug_notifications": complete_config["deep_debug_notifications"],
+                    "overwrite_general_notifications": complete_config["overwrite_general_notifications"],
+                    "mobile_device": complete_config.get("mobile_device"),
+                    "flash_memory_threshold_mb": complete_config["flash_memory_threshold_mb"],
+                    "flash_wear_threshold": complete_config.get("flash_wear_threshold", 90),
+                    "email_notification_service": complete_config.get("email_notification_service"),
+                    "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
+                    "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
+                }
+
+                # Persist live data options (new firmware only; safe to include for old firmware too)
+                options[CONF_ENABLE_LIVE_DATA] = complete_config.get(CONF_ENABLE_LIVE_DATA, False)
+                options[CONF_LIVE_DATA_THRESHOLD] = complete_config.get(CONF_LIVE_DATA_THRESHOLD, DEFAULT_LIVE_DATA_THRESHOLD)
+                options[CONF_LIVE_DATA_WRITE_INTERVAL] = int(complete_config.get(CONF_LIVE_DATA_WRITE_INTERVAL, DEFAULT_LIVE_DATA_WRITE_INTERVAL))
+
+                return self.async_create_entry(title="", data=options)
 
         # Get available mobile devices
         mobile_devices = await get_mobile_devices(self.hass)

@@ -30,6 +30,7 @@ from .const import (
 )
 # UPDATED: Import battery constants from battery_handler.py
 from .battery_handler import SUNVAULT_SENSORS
+from .data_processor import mask_pvs_serial
 from .entity import SunPowerEntity
 from .notifications import notify_inverters_discovered
 
@@ -71,6 +72,25 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     else:
         _LOGGER.debug("Found No ESS Data")
 
+    def _maybe_setup_live_data(coordinator_data):
+        """Create WebSocket live data sensors once data is available (created once).
+
+        Called from both the happy path (data already available at setup) and
+        the recovery listener below (data arrives later - e.g. the PVS was
+        offline at HA startup). Without this, a PVS that's unreachable during
+        initial platform setup would never get its live data sensors created
+        even after it comes back online, since the recovery listener only used
+        to call _create_entities.
+        """
+        if (config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
+                and hasattr(coordinator, "async_add_live_data_listener")
+                and not sunpower_state.get("_live_data_sensors_created")):
+            live_sensors = _setup_live_data_sensors(
+                hass, config_entry, async_add_entities, coordinator, coordinator_data
+            )
+            sunpower_state["_live_data_sensors_created"] = True
+            sunpower_state["_live_data_sensors"] = live_sensors
+
     # Set up coordinator listener to create entities when new devices appear
     # This handles both initial setup (no data yet) and ongoing discovery (new inverters added)
     def _add_entities_when_ready():
@@ -81,6 +101,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 _create_entities(hass, config_entry, async_add_entities, coordinator,
                                 do_descriptive_names, do_product_names, created_entities)
             )
+            _maybe_setup_live_data(coordinator.data)
 
     # Listen for coordinator updates (for ongoing device discovery)
     config_entry.async_on_unload(
@@ -97,15 +118,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     await _create_entities(hass, config_entry, async_add_entities, coordinator,
                           do_descriptive_names, do_product_names, created_entities)
 
-    # Create WebSocket live data sensors (new firmware + enable_live_data only, created once)
-    if (config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
-            and hasattr(coordinator, "async_add_live_data_listener")
-            and not sunpower_state.get("_live_data_sensors_created")):
-        live_sensors = _setup_live_data_sensors(
-            hass, config_entry, async_add_entities, coordinator, sunpower_data
-        )
-        sunpower_state["_live_data_sensors_created"] = True
-        sunpower_state["_live_data_sensors"] = live_sensors
+    _maybe_setup_live_data(sunpower_data)
 
 
 async def _create_entities(hass, config_entry, async_add_entities, coordinator,
@@ -139,7 +152,10 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
         
         for index, sensor_data in enumerate(sunpower_data[device_type].values()):
             device_serial = sensor_data.get('SERIAL', 'Unknown')
-            
+            # PVS's own serial's last 5 chars are the auth password; inverter/meter/ESS
+            # serials are a different, non-sensitive value and are logged as-is.
+            log_serial = mask_pvs_serial(device_serial) if device_type == PVS_DEVICE_TYPE else device_serial
+
             for sensor_name in sensors:
                 sensor = sensors[sensor_name]
                 
@@ -169,8 +185,8 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
                 # NEW: Hybrid approach - field exists AND has value (upgrade compatible + clean interface)
                 field_name = sensor["field"]
                 if field_name not in sensor_data:
-                    _LOGGER.debug("Skipping sensor %s for %s - field '%s' not in device data", 
-                                sensor_name, device_serial, field_name)
+                    _LOGGER.debug("Skipping sensor %s for %s - field '%s' not in device data",
+                                sensor_name, log_serial, field_name)
                     continue
                 
                 # Create the sensor object to check its value
@@ -198,7 +214,7 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
                         SUN_POWER=text_sunpower,
                         SUN_VAULT=text_sunvault,
                         PVS=text_pvs,
-                        SERIAL=device_serial,
+                        SERIAL=log_serial,
                         MODEL=sensor_data.get("MODEL", "Unknown"),
                     ),
                     unit=sensor["unit"],
@@ -214,17 +230,17 @@ async def _create_entities(hass, config_entry, async_add_entities, coordinator,
                     # Skip KB-based memory/flash sensors if value is "0" (new firmware - data unavailable)
                     if sensor_name in ["PVS_MEMORY_USED", "PVS_FLASH_AVAILABLE"] and sunpower_sensor.native_value == "0":
                         _LOGGER.debug("Skipping sensor %s for %s - new firmware uses percentage sensors instead",
-                                    sensor_name, device_serial)
+                                    sensor_name, log_serial)
                         continue
 
                     _LOGGER.debug("Creating sensor %s for %s - field '%s' has value: %s",
-                                sensor_name, device_serial, field_name,
+                                sensor_name, log_serial, field_name,
                                 sunpower_sensor.native_value)
                     entities.append(sunpower_sensor)
                     created_entities.add(entity_unique_id)
                 else:
                     _LOGGER.debug("Skipping sensor %s for %s - field '%s' has no value",
-                                sensor_name, device_serial, field_name)
+                                sensor_name, log_serial, field_name)
 
     # Add new entities if any were created
     if entities:
@@ -542,10 +558,14 @@ class SunPowerLiveDataSensor(SensorEntity):
 
     @property
     def device_info(self):
-        serial_suffix = self._pvs_serial[-5:] if self._pvs_serial and len(self._pvs_serial) >= 5 else self._pvs_serial
+        # Fixed display name: the serial's last 5 characters are the auth
+        # password, so nothing serial-derived may appear in a permanently
+        # visible device name. In multi-PVS households this device's name is
+        # not unique, but its identifiers (and via_device link to the actual
+        # PVS device, which does have a distinguishing name) are.
         return {
             "identifiers": {(DOMAIN, f"{self._pvs_serial}_livedata")},
-            "name": f"PVS Live Data {serial_suffix}",
+            "name": "PVS Live Data",
             "manufacturer": "SunPower",
             "model": "PVS Live Data",
             "via_device": (DOMAIN, self._pvs_serial),
@@ -566,13 +586,19 @@ class SunPowerLiveDataSensor(SensorEntity):
             return self._hold_value
         raw = live_data.get(self._var_name)
         if raw is None:
-            return None
+            # On reconnect, the websocket client seeds a fresh, momentarily
+            # empty PVSLiveData object before the real values arrive (either
+            # from the seed task or the next broadcast). live_data being
+            # non-None but not yet populated for this var is the same "don't
+            # have a value right now" case as live_data being None outright -
+            # fall back the same way instead of flashing to Unknown.
+            return self._hold_value
         # SOC arrives as 0.0-1.0 from WebSocket; convert to percentage
         if self._var_name == "/sys/livedata/soc":
             try:
                 return round(float(raw) * 100, 2)
             except (TypeError, ValueError):
-                return None
+                return self._hold_value
         return raw
 
     async def async_added_to_hass(self) -> None:

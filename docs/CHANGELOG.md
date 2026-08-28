@@ -3,6 +3,39 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.08.5] - 2026-08-27
+
+### Security Hardening: PVS Serial Removed from Sensor Names, Device Names, and Setup Dialog
+
+A follow-up review found the PVS serial appearing in several user-visible places, not just logs. Since its last 5 characters are the varserver authentication password, none of these were safe to leave as-is:
+
+- All 14 PVS diagnostic sensors and the PVS binary sensor include the PVS serial in their entity name when descriptive names are enabled. This affects every install, not just multi-PVS households. The serial is now masked in these names (for example `PV Supervisor PVS6 ZT222885000549*****`).
+- The PVS device card itself (Settings, Devices & Services, Enhanced SunPower, the PVS device) falls back to showing `{model} {serial}` as its name whenever the PVS's raw data doesn't include a description field, which is always, for every install. This is now masked the same way.
+- The "PVS Live Data" virtual device (created when WebSocket live data is enabled) used the bare last 5 characters of the serial, the password itself, as its device name suffix. That suffix is now gone entirely; the device is just named "PVS Live Data". In a multi-PVS household this name is no longer unique per PVS, but the device still links to the correct physical PVS (which does have a distinguishing name), so nothing is actually ambiguous.
+- The password setup screen (step 2 of initial setup) displayed the full serial number directly above the password entry field, as reference text. Setup screens are exactly what people screenshot into support requests. It's now masked there too.
+- Two data-validation error paths that could include the PVS serial in an error message (visible in logs and in a "data conversion failed" error) are now masked, and a separate malformed-data warning that could dump a raw device record no longer prints record contents at all, only field names.
+
+**What changes for you:** if you use descriptive names, your 14 PVS diagnostic sensor names and the PVS device card name will show a masked serial after this update. This is a display-only change, no entities are renamed or lose history, since only the human-readable name changed, not any entity ID. If you have live data enabled, the "PVS Live Data" device no longer has a name suffix at all, same reasoning, no entities affected.
+
+### Improvement: Integration Icon Now Also Ships In-Tree
+
+Home Assistant 2026.3 added support for integrations shipping their own icon/logo directly in a `brand/` folder, which takes priority over the community brands repository when present. This integration's icon was already working via the brands repository (`sunpower` has been an official Home Assistant brand since before SunPower's bankruptcy), so this isn't fixing broken icons, it's just adding the newer, more resilient option alongside the existing one. Added `custom_components/sunpower/brand/` with the same icon and logo images already published for this domain.
+
+### Bug Fixes: Options Dialog Crash, Options Not Applying, Polling Switch Reset, and More
+
+An independent code review of the full codebase (unrelated to the HACS security review above) turned up several functional bugs:
+
+- **Options dialog could crash on Submit.** If you selected an email notification service but left the recipient blank, submitting the options form raised an error instead of showing the validation message, due to a misplaced indentation level in the code. Fixed.
+- **Submitting the options dialog silently re-enabled polling if it had been turned off.** The Polling Enabled switch's state lives in the same storage the options dialog rewrites, and the options dialog wasn't preserving it, so visiting Configure after turning polling off would turn it back on with no indication anything changed. Fixed.
+- **Live data sensors could be permanently skipped if the PVS was offline at Home Assistant startup.** If the PVS wasn't reachable when Home Assistant started, WebSocket live data sensors were never created, even after the PVS came back online, until another full restart. They're now created via the same recovery path regular sensors already use.
+- **Flash memory critical alert never actually fired.** The alert crashed internally due to a formatting mismatch (passing an already-formatted percentage string through a numeric format specifier), silently swallowed as a harmless-looking debug log line. The alert now sends correctly.
+- **Diagnostics download reported some settings incorrectly.** The diagnostics export used the wrong internal names for the flash memory threshold and debug notifications settings, so it always showed them as unconfigured regardless of your actual settings, and included two settings left over from a removed feature. Fixed and cleaned up.
+- **WebSocket reconnects could briefly blank live data sensors.** A brief gap between a WebSocket reconnect and the next real data arriving could show live data sensors as "Unknown" instead of holding their last known value, which was the intended behavior through outages. Fixed.
+- **Virtual production meter's frequency and voltage sensors could show implausible readings during sunrise/sunset.** These are averaged across all inverters; inverters that are cached because they're temporarily offline contribute a placeholder zero for these two fields, which was pulling the average toward zero while some panels were still waking up. They're now excluded from the average (their power/energy contribution, which is summed rather than averaged, was never affected).
+- **A partial poll during sunrise/sunset could transiently understate the virtual production meter's Lifetime Power.** The disk cache's inverter-preservation logic only kicked in when a poll returned zero inverters, not when it returned some but not all of them, which is the more common case during sunrise/sunset. It now preserves any inverters missing from a given poll individually, matching the equivalent logic already used elsewhere.
+
+---
+
 ## [Unreleased] - v2026.08.4
 
 ### Security Hardening: Two Remaining Debug Log Lines Closed

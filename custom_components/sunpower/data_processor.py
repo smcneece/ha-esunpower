@@ -89,10 +89,20 @@ def create_vmeter(data):
             kwh += float(inverter.get("ltea_3phsum_kwh", "0"))
             kw += float(inverter.get("p_mppt1_kw", "0"))
             amps += float(inverter.get("i_3phsum_a", "0"))
+            # Skip zero readings: cached/offline inverters are sanitized to
+            # '0.0' for freq/voltage (see _sanitize_cached_inverter in
+            # __init__.py), which would otherwise drag the average toward
+            # zero during sunrise/sunset when some inverters are still
+            # asleep. Zero kWh/kW/amps are correctly neutral for a sum, but
+            # zero is not a neutral frequency or voltage for an average.
             if "freq_hz" in inverter:
-                freq.append(float(inverter["freq_hz"]))
+                freq_val = float(inverter["freq_hz"])
+                if freq_val > 0:
+                    freq.append(freq_val)
             if "vln_3phavg_v" in inverter:
-                volts.append(float(inverter["vln_3phavg_v"]))
+                volts_val = float(inverter["vln_3phavg_v"])
+                if volts_val > 0:
+                    volts.append(volts_val)
         except (ValueError, TypeError) as e:
             _LOGGER.warning("Error processing inverter %s data: %s", _serial, e)
             continue
@@ -218,13 +228,17 @@ def convert_sunpower_data(sunpower_data):
             device_serial = device.get("SERIAL")
             
             if not device_type:
-                _LOGGER.warning("convert_sunpower_data: Device %d missing DEVICE_TYPE: %s", i, 
-                               str(device)[:100] if device else "None")
+                # Log field names only, never stringify the record: DEVICE_TYPE is
+                # what's missing here, so we can't check it to know whether this
+                # record's SERIAL (if present) is the PVS's own, and a raw dict
+                # dump could include it either way.
+                _LOGGER.warning("convert_sunpower_data: Device %d missing DEVICE_TYPE, fields present: %s", i,
+                               list(device.keys()) if device else "None")
                 continue
-            
+
             if not device_serial:
-                _LOGGER.warning("convert_sunpower_data: Device %d missing SERIAL: %s", i, 
-                               str(device)[:100] if device else "None")
+                _LOGGER.warning("convert_sunpower_data: Device %d missing SERIAL, fields present: %s", i,
+                               list(device.keys()) if device else "None")
                 continue
             
             # Validate device serial is reasonable (not obviously corrupted)
@@ -306,14 +320,17 @@ def validate_converted_data(data):
                 
                 # Validate each device has minimum required fields
                 for serial, device_data in devices.items():
+                    # PVS's own serial's last 5 chars are the auth password; other
+                    # device types' serials are a different, non-sensitive value.
+                    log_serial = mask_pvs_serial(serial) if device_type == PVS_DEVICE_TYPE else serial
                     if not isinstance(device_data, dict):
-                        return False, 0, f"Device '{serial}' data is not a dict: {type(device_data)}"
-                    
+                        return False, 0, f"Device '{log_serial}' data is not a dict: {type(device_data)}"
+
                     if "DEVICE_TYPE" not in device_data:
-                        return False, 0, f"Device '{serial}' missing DEVICE_TYPE"
-                    
+                        return False, 0, f"Device '{log_serial}' missing DEVICE_TYPE"
+
                     if "SERIAL" not in device_data:
-                        return False, 0, f"Device '{serial}' missing SERIAL field"
+                        return False, 0, f"Device '{log_serial}' missing SERIAL field"
                 
                 device_count += len(devices)
                 

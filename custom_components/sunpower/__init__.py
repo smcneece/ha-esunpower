@@ -821,17 +821,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 # Merge cached inverters/meters before saving to preserve night-time data
                 data_to_save = dict(fresh_data)  # Copy fresh data
                 if cached_data:
-                    fresh_device_types = {dev.get('DEVICE_TYPE') for dev in fresh_data.get('devices', [])}
                     fresh_serials = {dev.get('SERIAL') for dev in fresh_data.get('devices', [])}
                     cached_devices = cached_data.get('devices', [])
-                    
-                    # Preserve inverters if missing (night-time)
-                    if 'Inverter' not in fresh_device_types:
-                        cached_inverters = [dev for dev in cached_devices 
-                                           if dev.get('DEVICE_TYPE') == 'Inverter']
-                        if cached_inverters:
-                            data_to_save['devices'] = fresh_data['devices'] + cached_inverters
-                            _LOGGER.debug("Preserving %d inverters in cache (offline)", len(cached_inverters))
+
+                    # Preserve any cached inverters missing from this poll, per-serial
+                    # rather than all-or-nothing. A partial poll during sunrise/sunset
+                    # has SOME fresh inverters and is missing others, not zero of them,
+                    # so checking "'Inverter' not in fresh_device_types" would skip this
+                    # entirely and let the disk cache lose the still-offline ones.
+                    cached_inverters = [dev for dev in cached_devices
+                                       if dev.get('DEVICE_TYPE') == 'Inverter'
+                                       and dev.get('SERIAL') not in fresh_serials]
+                    if cached_inverters:
+                        sanitized_inverters = [_sanitize_cached_inverter(inv) for inv in cached_inverters]
+                        data_to_save['devices'] = fresh_data['devices'] + sanitized_inverters
+                        _LOGGER.debug("Preserving %d inverters in cache (offline/partial poll)", len(cached_inverters))
                 
                 cache_success = await save_cache_file(hass, host_ip, data_to_save)
                 if cache_success:
@@ -1047,6 +1051,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "varserver_client": varserver_client,
         "_cache": cache,
     }
+
+    # NOTE: deliberately NOT registering add_update_listener(async_reload_entry)
+    # here. This integration already calls hass.config_entries.async_update_entry()
+    # on entry.data during normal setup (sensor.py's known_inverter_serials/
+    # inverters_discovered_notified bookkeeping, synchronously while platforms
+    # are still being forwarded below). A reload-on-update-entry listener fires
+    # on that write too, mid-setup, causing a second overlapping async_setup_entry
+    # call and "already been setup" errors on every platform. Confirmed live on
+    # 2026-08-27. Fixing this properly means moving that bookkeeping out of
+    # entry.data into separate storage first; until then, Configure changes
+    # still require a manual restart or reload, same as before this release.
 
     # Initial setup - COORDINATOR FIRST, THEN PLATFORMS
     try:

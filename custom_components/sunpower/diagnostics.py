@@ -43,10 +43,8 @@ async def async_get_config_entry_diagnostics(
             "polling_interval": entry.options.get("polling_interval", entry.data.get("polling_interval", "unknown")),
             "password_configured": bool(entry.options.get("pvs_serial_last5", entry.data.get("pvs_serial_last5", ""))),
             "mobile_device_configured": entry.options.get("mobile_device", entry.data.get("mobile_device")) not in (None, "none"),
-            "flash_threshold_mb": entry.options.get("flash_threshold_mb", entry.data.get("flash_threshold_mb", "not configured")),
-            "enable_debug_notifications": entry.options.get("enable_debug_notifications", entry.data.get("enable_debug_notifications", False)),
-            "enable_route_checking": entry.options.get("enable_route_checking", entry.data.get("enable_route_checking", False)),
-            "gateway_ip": entry.options.get("gateway_ip", entry.data.get("gateway_ip", "not configured")),
+            "flash_memory_threshold_mb": entry.options.get("flash_memory_threshold_mb", entry.data.get("flash_memory_threshold_mb", "not configured")),
+            "deep_debug_notifications": entry.options.get("deep_debug_notifications", entry.data.get("deep_debug_notifications", False)),
         },
         "coordinator_state": {
             "last_update_success": coordinator.last_update_success,

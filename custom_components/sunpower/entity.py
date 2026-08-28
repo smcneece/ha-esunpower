@@ -2,7 +2,8 @@
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, PVS_DEVICE_TYPE
+from .data_processor import mask_pvs_serial
 
 
 class SunPowerEntity(CoordinatorEntity):
@@ -29,7 +30,14 @@ class SunPowerEntity(CoordinatorEntity):
     def device_info(self):
         serial = self._my_info.get("SERIAL", "UnknownSerial")
         model = self._my_info.get("MODEL", "UnknownModel")
-        name = self._my_info.get("DESCR", f"{model} {serial}")
+        # The PVS's own device record has no DESCR field, so it falls through to
+        # this f"{model} {serial}" default. Its serial's last 5 characters are the
+        # auth password, and this "name" is the device card title shown in
+        # Settings > Devices & Services, so it must never show the raw serial.
+        # Other device types (inverter, meter, ESS) always provide DESCR and never
+        # reach this fallback with a sensitive value.
+        display_serial = mask_pvs_serial(serial) if self._my_info.get("DEVICE_TYPE") == PVS_DEVICE_TYPE else serial
+        name = self._my_info.get("DESCR", f"{model} {display_serial}")
         hw_version = self._my_info.get("HWVER", self._my_info.get("hw_version")) or None
         sw_version = self._my_info.get("SWVER") or None
         device_info = {
