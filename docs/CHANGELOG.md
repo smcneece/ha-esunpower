@@ -3,6 +3,18 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.8.7] - 2026-08-29
+
+### Bug Fix: Battery Control Mode and Reserve Percentage Showing "Unknown"
+
+Reported in [issue #90](https://github.com/smcneece/ha-esunpower/issues/90). The Battery Control Mode and Battery Reserve Percentage select entities would briefly show "Unknown" after changing either one, whether from Home Assistant or the SunStrong app, for up to one full polling interval.
+
+The cause: battery control mode and reserve percentage are only fetched from the PVS during an actual poll. The integration checks the cache's timestamp before polling and reuses it instead of polling again if a real poll already happened recently enough, a protection originally added to stop rapid Home Assistant restarts during development from hammering the PVS with a fresh poll every time. Normal scheduled polling always does a real poll regardless of interval length, since by the time the next scheduled tick arrives the cache is already about as old as the interval itself; this protection instead kicks in for refreshes that land sooner than that, which is exactly what happens right after changing either select entity, since they explicitly ask for an immediate refresh, moments after a real poll most likely just ran. That reused-cache path never carried battery configuration forward at all, so it vanished entirely instead of continuing to show the pre-change value, reappearing only once the next real scheduled poll landed. The same gap could also make the ESS Configured Mode sensor go blank, and a separate, related gap could do the same on an ordinary poll if the battery-config portion of that poll failed to reach the PVS while the rest of the poll succeeded. All three now hold their last known value instead of disappearing.
+
+**What changes for you:** Battery Control Mode, Battery Reserve Percentage, and ESS Configured Mode should no longer flash "Unknown" between changes.
+
+---
+
 ## [v2026.8.6] - 2026-08-29
 
 ### Security Hardening: Virtual Production Meter's Device and Entity Names

@@ -144,6 +144,14 @@ class SunPowerDataCache:
 
         # Battery detection (persistent once detected)
         self.battery_detected_once = False
+
+        # Last known battery control_mode/min_customer_soc. Only refreshed on
+        # a real varserver poll (see Step 4 of async_update_data), so it must
+        # be carried forward into every other return path (cache-shortcut,
+        # cache-fallback) or the battery select entities briefly show
+        # "Unknown" every time a cycle doesn't do a fresh poll - see GitHub
+        # issue #90.
+        self.battery_config = None
         
         # Firmware tracking
         self.last_known_firmware = None
@@ -409,6 +417,31 @@ async def migrate_from_krbaker_if_needed(hass: HomeAssistant, entry: ConfigEntry
     hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
     _LOGGER.info("✅ krbaker migration completed successfully")
 
+
+
+def _restore_battery_config_if_missing(data: dict, cache) -> None:
+    """Carry forward the last known battery control_mode/min_customer_soc.
+
+    battery_config is only ever (re)fetched during a live varserver poll
+    (Step 4 of async_update_data). Every other return path - the
+    cache-shortcut, the cache-fallback, and the polling-disabled path -
+    rebuilds `data` from cached raw JSON, which never contains it, and even
+    the live-poll path can miss it on a transient per-cycle fetch failure.
+    Without this, the battery select entities and the ESS Configured Mode
+    sensor briefly show "Unknown" any time a cycle doesn't do a fresh
+    battery-config fetch, which is most cycles for most users. See issue #90.
+
+    Never overwrites a value already set this cycle.
+    """
+    if "battery_config" not in data and cache.battery_config:
+        data["battery_config"] = cache.battery_config
+
+    control_mode = cache.battery_config.get("control_mode") if cache.battery_config else None
+    if control_mode:
+        for ess_type in ("Energy Storage System", "ESS", "SunVault"):
+            for device in data.get(ess_type, {}).values():
+                if "configured_mode" not in device:
+                    device["configured_mode"] = control_mode
 
 
 def _sanitize_cached_inverter(inverter_data: dict) -> dict:
@@ -694,6 +727,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
 
+                # Polling is off, so battery_config is never fetched here -
+                # restore the last known value (see issue #90).
+                _restore_battery_config_if_missing(data, cache)
+
                 # No notification here - switch already notified when toggled off
                 return data
             else:
@@ -753,6 +790,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 meter_data = data.get('Power Meter', {})
                 diag_serial, diag_device = create_diagnostic_device_data(hass, entry, cache, inverter_data, meter_data, current_polling_interval, polling_enabled)
                 data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
+
+                # This path never polls battery_config fresh - restore the last
+                # known value so the battery select entities don't go "Unknown"
+                # just because this cycle used cached data (see issue #90).
+                _restore_battery_config_if_missing(data, cache)
 
                 notify_using_cached_data(hass, entry, cache, "polling_interval_not_elapsed", cache_age, current_polling_interval)
                 return data
@@ -944,6 +986,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
                         if battery_config:
                             data["battery_config"] = battery_config
+                            cache.battery_config = battery_config
                             _LOGGER.debug("Battery config: control_mode=%s, min_customer_soc=%s",
                                         battery_config.get("control_mode"),
                                         battery_config.get("min_customer_soc"))
@@ -990,6 +1033,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 _LOGGER.warning("Diagnostic device creation failed: %s", e)
                 # Continue - diagnostic failure shouldn't stop data processing
 
+            # Safety net: battery_config is missing here if has_battery is
+            # False (no battery select entities exist anyway) or if the
+            # varserver fetch above failed transiently this one cycle - fall
+            # back to the last known value instead of leaving it missing
+            # (see issue #90). Never overwrites a value fetched this cycle.
+            _restore_battery_config_if_missing(data, cache)
+
             # Success notification
             notify_data_update_success(hass, entry, cache, time.time())
             return data
@@ -1016,6 +1066,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                         data[DIAGNOSTIC_DEVICE_TYPE] = {diag_serial: diag_device}
                     except Exception as e:
                         _LOGGER.warning("Diagnostic device creation failed for cached data: %s", e)
+
+                    # Same restoration as the cache-shortcut path above - this
+                    # is a fallback after a failed fresh poll, so battery_config
+                    # was never (re)fetched this cycle either (see issue #90).
+                    _restore_battery_config_if_missing(data, cache)
 
                     notify_using_cached_data(hass, entry, cache, "polling_error", cache_age)
                     return data
