@@ -122,6 +122,7 @@ def create_vmeter(data):
     if is_ip_address(pvs_serial):
         # PVS has IP address as serial - use completely safe alternative naming
         vmeter_serial = generate_safe_virtual_serial("virtual_production_meter", "meter")
+        display_serial = vmeter_serial
         _LOGGER.warning("PVS has IP-based serial (%s), using safe virtual meter name: %s",
                        pvs_serial, vmeter_serial)
     else:
@@ -131,11 +132,13 @@ def create_vmeter(data):
         # Double-check the result isn't accidentally an IP
         if is_ip_address(vmeter_serial):
             vmeter_serial = generate_safe_virtual_serial("virtual_production_meter", "meter")
+            display_serial = vmeter_serial
             _LOGGER.warning("Virtual meter serial became IP-like, using safe alternative: %s", vmeter_serial)
         else:
             derived_from_real_serial = True
-            _LOGGER.debug("Creating virtual meter with real PVS serial: %s", f"{mask_pvs_serial(pvs_serial)}pv")
-    
+            display_serial = f"{mask_pvs_serial(pvs_serial)}pv"
+            _LOGGER.debug("Creating virtual meter with real PVS serial: %s", display_serial)
+
     # Create the virtual meter device
     try:
         data.setdefault(METER_DEVICE_TYPE, {})[vmeter_serial] = {
@@ -143,7 +146,14 @@ def create_vmeter(data):
             "TYPE": "PVS-METER-P",
             "STATE": state,
             "MODEL": "Virtual Production Meter",
-            "DESCR": f"Virtual Production Meter {vmeter_serial}",
+            # DESCR is user-visible text, not an internal identifier: it's read
+            # as the device name fallback (entity.py) and substituted into
+            # every meter entity title via {DESCR} (sensor.py/const.py). Must
+            # use display_serial (masked) here, never vmeter_serial itself -
+            # vmeter_serial embeds the full, unmasked PVS serial and is only
+            # safe to use as the dict key / SERIAL field (an internal
+            # identifier, never rendered as text).
+            "DESCR": f"Virtual Production Meter {display_serial}",
             "DEVICE_TYPE": "Power Meter",
             "interface": "virtual",
             "SWVER": "1.0",
@@ -161,10 +171,9 @@ def create_vmeter(data):
             "s_3phsum_kva": kw,  # Apparent Power (simplified as kW for virtual meter)
             "tot_pf_rto": 1.0,  # Power Factor (assume perfect for solar production)
         }
-        
-        log_serial = f"{mask_pvs_serial(pvs_serial)}pv" if derived_from_real_serial else vmeter_serial
+
         _LOGGER.info("Created virtual meter: %s (aggregated from %d inverters)",
-                    log_serial, len(inverters))
+                    display_serial, len(inverters))
     except Exception as e:
         _LOGGER.error("Failed to create virtual meter: %s", e)
     
@@ -383,6 +392,7 @@ def get_device_summary(data):
 # EXPORT ALL REQUIRED FUNCTIONS for other modules
 __all__ = [
     'convert_sunpower_data',
+    'mask_pvs_serial',
     'validate_converted_data', 
     'get_device_summary',
     'create_vmeter',

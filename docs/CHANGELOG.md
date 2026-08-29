@@ -3,6 +3,32 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.8.6] - 2026-08-29
+
+### Security Hardening: Virtual Production Meter's Device and Entity Names
+
+A follow-up review found the PVS serial still appearing unmasked, this time on the virtual production meter (the aggregated meter created from your inverters when you don't have a physical power meter). Its `DESCR` field, used as both the device card name and substituted into every one of its entity titles, was built directly from the meter's internal identifier, which embeds the full PVS serial. Since descriptive names are on by default, this was live for every install with inverters and no physical meter: the device card and entities read things like "Virtual Production Meter ZT222885000549*****pv" with the password portion unmasked. Now masked at the source, same as everywhere else.
+
+**What changes for you:** if you have a virtual production meter, its device name and entity names will show a masked serial after this update. Display-only change, no entities renamed or lose history.
+
+### Bug Fix: Options Dialog Would Crash on Home Assistant 2024.11
+
+`SunPowerOptionsFlowHandler` relies on Home Assistant auto-populating `self.config_entry`, which only started in Home Assistant 2024.12, one release later than `hacs.json` previously declared. On 2024.11.x the integration would install and poll normally, but opening Configure would raise an error before the dialog rendered. Minimum supported Home Assistant version is now correctly 2024.12.0.
+
+### Cleanup: Removed Unused simplejson Dependency
+
+A startup diagnostic log line imported `simplejson` solely to print its version number; nothing in the integration actually uses it for JSON handling (that's all done with the standard library). Removed the dependency and the diagnostic line, so installing this integration no longer pulls in a package it never used.
+
+### Internal: Added a Regression Test for This Class of Bug
+
+Added an automated test (`tests/test_data_processor.py`) that walks every device record `convert_sunpower_data()` produces and fails if the PVS's password (the serial's last 5 characters) appears anywhere except the internal `SERIAL` identifier field. This exact class of bug has now shipped twice; this makes it fail a test run instead of depending on manual review catching it a third time.
+
+### Cleanup: Invalid hacs.json Country Field
+
+`hacs.json` declared `"country": ["ALL"]`, which isn't a real value in HACS's schema, only actual ISO 3166-1 country codes are valid there, and the field should simply be omitted entirely for a worldwide integration. Removed.
+
+---
+
 ## [v2026.08.5] - 2026-08-27
 
 ### Security Hardening: PVS Serial Removed from Sensor Names, Device Names, and Setup Dialog

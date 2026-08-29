@@ -86,13 +86,10 @@ from .livedata import PVSLiveData
 
 _LOGGER = logging.getLogger(__name__)
 
-# Dependency diagnostic logging - check installations (one-time on load)
+# Dependency diagnostic logging - check installation (one-time on load)
 try:
     import aiohttp
-    import simplejson
-    _LOGGER.info("Dependencies loaded: aiohttp=%s, simplejson=%s",
-                 aiohttp.__version__,
-                 simplejson.__version__)
+    _LOGGER.info("Dependencies loaded: aiohttp=%s", aiohttp.__version__)
 except ImportError as e:
     _LOGGER.error("Dependency import failed: %s", e)
 except Exception as e:
