@@ -15,7 +15,7 @@
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Connection Setup",
-                "description": "Step 1: Enter your PVS IP address.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.",
+                "description": "Step 1: Enter your PVS IP address.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\n{error_details}\n{help_text}",
                 "data": {
                     "host": "PVS IP Address",
                     "polling_interval": "Polling Interval (seconds)"
@@ -27,7 +27,7 @@
             },
             "need_password": {
                 "title": "Enhanced SunPower - Authentication",
-                "description": "Step 2: Enter password for PVS authentication.\n\n\ud83d\udd10 Password is the last 5 characters of your PVS serial number.\n\n\ud83d\udccd Find serial number:\n\u2022 Physical device: Remove PVS cover - serial on device label\n\u2022 SunPower/SunStrong App: Profile \u2192 System Info \u2192 Serial Number\n\n{serial_number}",
+                "description": "Step 2: Enter password for PVS authentication.\n\n\ud83d\udd10 Password is the last 5 characters of your PVS serial number.\n\n\ud83d\udccd Find serial number:\n\u2022 Physical device: Remove PVS cover - serial on device label\n\u2022 SunPower/SunStrong App: Profile \u2192 System Info \u2192 Serial Number\n\n\ud83d\udce1 Detected PVS: {serial_number} (firmware build {firmware_build})",
                 "data": {
                     "pvs_serial_last5": "PVS Password (last 5 chars of serial)"
                 },
@@ -158,7 +158,8 @@
             "invalid_ip": "Invalid IP address format. Please enter a valid IPv4 address.",
             "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
-            "email_recipient_required": "Email recipient is required when email service is selected"
+            "email_recipient_required": "Email recipient is required when email service is selected",
+            "old_firmware": "Old firmware detected on that PVS. This version of Enhanced SunPower requires new firmware (BUILD 61840+ on PVS6, BUILD 5408+ on PVS5). v2026.05.1 is the last version supporting old firmware, see the Old Firmware Install Guide in the docs for pinning instructions."
         }
     },
     "title": "Enhanced SunPower"

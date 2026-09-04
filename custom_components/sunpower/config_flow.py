@@ -186,7 +186,12 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Password collected in step 2 (async_step_need_password).
         """
         errors = {}
-        description_placeholders = {}
+        # Both keys must always be present: the "user" step's description
+        # template references {error_details}/{help_text} unconditionally, and
+        # HA renders a missing placeholder as the literal "{name}" text rather
+        # than blank. Empty strings here just render as harmless blank lines
+        # when there's nothing to show yet.
+        description_placeholders = {"error_details": "", "help_text": ""}
 
         if user_input is not None:
             # Validate IP address format
@@ -475,7 +480,21 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     user_input["firmware_build"] = build
                     _LOGGER.info("Options: Auto-detected firmware BUILD %s, MODEL=%s", build, model)
 
-                    if not pvs_serial_last5:
+                    # Reject old firmware the same way the initial setup flow does
+                    # (_validate_pvs). Without this, reconfiguring onto an
+                    # old-firmware host silently saves it, then only fails later
+                    # with a generic "connection failed" during polling instead
+                    # of a clear, actionable message here.
+                    is_pvs5 = model == "PVS5"
+                    min_build = 5408 if is_pvs5 else 61840
+                    if build < min_build:
+                        errors["host"] = "old_firmware"
+                        _LOGGER.warning(
+                            "Options: Old firmware detected (BUILD %s, model %s) - rejecting reconfigure",
+                            build, model,
+                        )
+
+                    if not errors and not pvs_serial_last5:
                         errors["pvs_serial_last5"] = "Password required (last 5 chars of serial)"
 
             if not errors:

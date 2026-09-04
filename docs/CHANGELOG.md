@@ -3,6 +3,24 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.9.1] - 2026-09-03
+
+### Enhanced SunPower Is Now an Official HACS Default Integration
+
+This integration is now part of the official HACS default store. No more adding it as a custom repository, it's directly searchable and installable in HACS like any other listed integration. README installation instructions updated accordingly.
+
+### Bug Fix: Reconfiguring Onto Old Firmware Silently Succeeded, Then Failed Later
+
+Reconfiguring the integration to a new host IP (Settings, Devices & Services, Enhanced SunPower, Configure) never checked the detected firmware build against the minimum this integration supports, unlike the initial setup flow, which does. Pointing the integration at a PVS running old firmware would save without any warning, then only fail later with a generic "connection failed" notification during polling instead of a clear explanation. It now rejects old firmware at reconfigure time with the same message the initial setup flow already shows.
+
+### Bug Fix: Setup Screen Never Actually Showed Its Own Error Details
+
+Found while fixing the above: the initial setup screen's specific, already-written guidance for different failure types (old firmware, timeout, wrong IP, auth failure) was computed correctly every time, then silently discarded, because the screen's description text never actually referenced the placeholders holding that text. Every failure, regardless of cause, showed only a single generic "Failed to connect to PVS" message. The setup screen and the password step (which had the same issue with the detected firmware build) now show what was already being computed.
+
+**What changes for you:** if a PVS connection fails during setup or reconfigure, you'll now see the specific reason and troubleshooting guidance instead of a generic message. No functional change if setup already succeeds for you.
+
+---
+
 ## [v2026.8.7] - 2026-08-29
 
 ### Bug Fix: Battery Control Mode and Reserve Percentage Showing "Unknown"

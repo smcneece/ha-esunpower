@@ -4,7 +4,7 @@ Monitor your SunPower solar system locally from Home Assistant with no cloud dep
 
 > **New to Home Assistant?** See the [Getting Started Guide](docs/HA_SetupDoc.md) for help choosing hardware, installing Home Assistant, setting up HACS, and getting your PVS on WiFi before coming back here.
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/smcneece/ha-esunpower)](https://github.com/smcneece/ha-esunpower/releases)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/smcneece/ha-esunpower.svg)](https://github.com/smcneece/ha-esunpower/commits/main)
 [![GitHub](https://img.shields.io/github/license/smcneece/ha-esunpower)](LICENSE)
@@ -43,12 +43,14 @@ Check your firmware: Settings, Devices and Services, Enhanced SunPower, open the
 
 **Can install any time of day** - dynamic entity discovery works even at night when inverters are offline.
 
+Enhanced SunPower is in the official HACS default store, no custom repository needed.
+
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=smcneece&repository=ha-esunpower&category=integration)
 
-1. Click the button above, then **Open Link** in the browser prompt, then **Add** in the HACS window
-2. Click **Download** (bottom right), then **Download** again on the version prompt
-3. Restart Home Assistant (Settings shows a "Restart Required" repair at the top)
-4. Add the integration:
+1. Click the button above, then **Download** (bottom right), then **Download** again on the version prompt
+   - Or in HACS, search for "Enhanced SunPower" and download it from there
+2. Restart Home Assistant (Settings shows a "Restart Required" repair at the top)
+3. Add the integration:
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
