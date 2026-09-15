@@ -502,6 +502,7 @@ class SunPowerCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             logger,
+            config_entry=entry,
             name=name,
             update_method=update_method,
             update_interval=update_interval,

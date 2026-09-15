@@ -1,9 +1,14 @@
 """The Enhanced SunPower integration base entity."""
 
+import logging
+
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, PVS_DEVICE_TYPE
 from .data_processor import mask_pvs_serial
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SunPowerEntity(CoordinatorEntity):
@@ -49,8 +54,20 @@ class SunPowerEntity(CoordinatorEntity):
             "hw_version": hw_version,
         }
         if self._parent_info is not None:
-            device_info["via_device"] = (
-                DOMAIN,
-                f"{self._parent_info.get('SERIAL', 'UnknownParent')}",
-            )
+            parent_serial = self._parent_info.get("SERIAL", "UnknownParent")
+            try:
+                device_info["via_device_id"] = dr.async_get_device_id_by_identifier(
+                    self.coordinator.hass,
+                    (DOMAIN, parent_serial),
+                    config_entry_id=self.coordinator.config_entry.entry_id,
+                )
+            except ValueError:
+                # Parent (PVS) device isn't registered yet. Shouldn't normally
+                # happen since PVS entities are always processed first (PVS_DEVICE_TYPE
+                # is the first key in SUNPOWER_SENSORS/SUNPOWER_BINARY_SENSORS), but
+                # fall back to no via-device link rather than crashing entity setup.
+                _LOGGER.debug(
+                    "Could not link device to parent PVS %s (not yet registered)",
+                    mask_pvs_serial(parent_serial),
+                )
         return device_info

@@ -9,6 +9,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import EntityCategory
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
     BATTERY_DEVICE_TYPE,
@@ -561,15 +562,30 @@ class SunPowerLiveDataSensor(SensorEntity):
         # Fixed display name: the serial's last 5 characters are the auth
         # password, so nothing serial-derived may appear in a permanently
         # visible device name. In multi-PVS households this device's name is
-        # not unique, but its identifiers (and via_device link to the actual
+        # not unique, but its identifiers (and via_device_id link to the actual
         # PVS device, which does have a distinguishing name) are.
-        return {
+        device_info = {
             "identifiers": {(DOMAIN, f"{self._pvs_serial}_livedata")},
             "name": "PVS Live Data",
             "manufacturer": "SunPower",
             "model": "PVS Live Data",
-            "via_device": (DOMAIN, self._pvs_serial),
         }
+        try:
+            device_info["via_device_id"] = dr.async_get_device_id_by_identifier(
+                self._coordinator.hass,
+                (DOMAIN, self._pvs_serial),
+                config_entry_id=self._coordinator.config_entry.entry_id,
+            )
+        except ValueError:
+            # PVS device isn't registered yet. Can happen if the PVS was offline
+            # at HA startup and live data sensors are created via the recovery
+            # listener before the main entity-creation task finishes. Fall back
+            # to no via-device link rather than crashing entity setup.
+            _LOGGER.debug(
+                "Could not link PVS Live Data to parent PVS %s (not yet registered)",
+                mask_pvs_serial(self._pvs_serial),
+            )
+        return device_info
 
     @property
     def available(self) -> bool:

@@ -3,6 +3,18 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.9.2] - 2026-09-15
+
+### Bug Fix: Deprecated Device Registry Parameter (via_device)
+
+Home Assistant 2026.9 started logging a deprecation warning for every inverter, meter, ESS, and PVS Live Data entity: "calls device_registry.async_get_or_create with a deprecated via_device parameter." This is how child devices (inverters, meters, batteries) link back to the parent PVS device in the device list. Home Assistant is replacing that mechanism with via_device_id ahead of removing via_device entirely in 2027.8. Updated all device linking to use the new parameter, no functional or visible change, this only affects internal device registry linkage.
+
+**Minimum Home Assistant version raised to 2026.8.0.** The replacement API (via_device_id, async_get_device_id_by_identifier) didn't exist in Home Assistant before 2026.8.0. Without this floor, anyone on an older Home Assistant core would pass HACS's version check, update, and then crash on setup. Raised hacs.json accordingly, thanks to a sharp catch from a user in the community discussions.
+
+### Bug Fix: Battery State of Health Showing 0% Instead of Unavailable
+
+Some ESS/battery models don't report a State of Health value from the PVS at all. The integration defaulted a missing reading to 0, identical to a real 0% reading, so affected users saw a permanent, misleading "0% battery health" instead of the sensor correctly showing as unavailable. State of Charge and Customer State of Charge aren't affected, this was specific to State of Health. A missing reading now shows as unavailable instead of a fake 0%.
+
 ## [v2026.9.1] - 2026-09-03
 
 ### Enhanced SunPower Is Now an Official HACS Default Integration

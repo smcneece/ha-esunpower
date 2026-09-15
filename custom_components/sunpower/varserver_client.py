@@ -511,7 +511,17 @@ class VarserverClient:
                 # varserver returns SOC/SOH as 0-1 decimals; convert to 0-100
                 soc_val = float(data.get("socVal", 0)) * 100.0
                 customer_soc_val = float(data.get("customerSocVal", 0)) * 100.0
-                soh_val = float(data.get("sohVal", 0)) * 100.0
+                # Unlike SOC, some ESS models/firmware don't report sohVal at all.
+                # Defaulting to 0 would show a misleading "0% battery health"
+                # indistinguishable from a real 0. Leave it unset (None) instead,
+                # same handling as flashwear_percent, so the sensor shows
+                # unavailable rather than a fake reading. See GitHub issue #95.
+                soh_raw = data.get("sohVal")
+                soh_val = float(soh_raw) * 100.0 if soh_raw is not None else None
+                if soh_val is None:
+                    _LOGGER.debug(
+                        "ESS device %s: sohVal not present in varserver response", sn
+                    )
 
                 devices.append({
                     "DEVICE_TYPE": "Energy Storage System",
@@ -525,7 +535,7 @@ class VarserverClient:
                     "DATATIME": datatime,
                     "soc_val": str(soc_val),
                     "customer_soc_val": str(customer_soc_val),
-                    "soh_val": str(soh_val),
+                    "soh_val": str(soh_val) if soh_val is not None else None,
                     "op_mode": str(data.get("opMode", "")),
                     "power_3ph_kw": str(float(data.get("p3phsumKw", 0))),
                     "neg_lte_kwh": str(float(data.get("negLtea3phsumKwh", 0))),
