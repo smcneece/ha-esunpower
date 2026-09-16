@@ -179,7 +179,6 @@ class SunPowerReservePercentageSelect(CoordinatorEntity, SelectEntity):
         self._attr_name = "Battery Reserve Percentage"
         self._attr_unique_id = f"{pvs_serial}_battery_reserve_percentage"
         self._attr_icon = "mdi:battery-lock"
-        self._attr_options = RESERVE_PERCENTAGE_OPTIONS
 
     @property
     def current_option(self) -> str | None:
@@ -193,13 +192,33 @@ class SunPowerReservePercentageSelect(CoordinatorEntity, SelectEntity):
         if min_soc is None:
             return None
 
-        # Convert 0.20 to "20%"
-        percentage = int(float(min_soc) * 100)
+        # Convert 0.20 to "20%". round() rather than int(): float multiplication
+        # gives 0.29 * 100 == 28.999999999999996, which int() truncates to "28%".
+        percentage = round(float(min_soc) * 100)
         return f"{percentage}%"
+
+    @property
+    def options(self) -> list[str]:
+        """Return the selectable reserve percentages.
+
+        The PVS accepts any percentage, and the SunStrong app sets it with a
+        continuous slider, so min_customer_soc is easily left on a value that
+        is not one of our 5% steps (39% seen in the field, aiming for 40%).
+        Home Assistant renders a select as unknown when current_option is
+        absent from options, so fold the value the device actually reports
+        into the list when it falls off the grid.
+        """
+        current = self.current_option
+        if current is None or current in RESERVE_PERCENTAGE_OPTIONS:
+            return RESERVE_PERCENTAGE_OPTIONS
+        return sorted(
+            [*RESERVE_PERCENTAGE_OPTIONS, current],
+            key=lambda option: int(option.rstrip("%")),
+        )
 
     async def async_select_option(self, option: str) -> None:
         """Change the minimum reserve percentage."""
-        if option not in RESERVE_PERCENTAGE_OPTIONS:
+        if option not in self.options:
             _LOGGER.error("Invalid reserve percentage option: %s", option)
             return
 

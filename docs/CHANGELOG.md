@@ -3,6 +3,16 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.9.3] - 2026-09-16
+
+### Bug Fix: Battery Reserve Percentage Shows Unknown When Not a 5% Step
+
+**Contributor:** Special thanks to [@ratm](https://github.com/ratm) for the diagnosis, fix, and test coverage (PR #97)
+
+The Battery Reserve Percentage select would show as unknown whenever the PVS reported a reserve that wasn't one of the fixed 5% steps (5%, 10%, 15%, and so on). The SunStrong app sets this with a continuous slider, so it's easy to land off that grid without meaning to, for example aiming for 40% and landing on 39%. Home Assistant blanks a select entity whenever its current value isn't in its declared list of options, so a perfectly real reading looked like no reading at all. A related rounding bug (int() truncating instead of rounding when converting the stored decimal to a percentage) could also shift a handful of specific values down by one percent, invisible on its own since none of the affected values landed on the 5% grid either.
+
+The reserve percentage select now folds the device's actual value into its option list when it falls off the 5% grid, so it displays correctly and stays selectable, and uses proper rounding for the percentage conversion. On-grid reserves (the common case) see no change at all.
+
 ## [v2026.9.2] - 2026-09-15
 
 ### Bug Fix: Deprecated Device Registry Parameter (via_device)
