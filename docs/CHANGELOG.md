@@ -3,6 +3,14 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.9.4] - 2026-09-27
+
+### Bug Fix: WebSocket Live Data Power/Energy Sensors Missing state_class
+
+Reported in [issue #98](https://github.com/smcneece/ha-esunpower/issues/98) by @mvcl. WebSocket Live Data's power and energy sensors (Production, Net, Site Load, and Battery) had no `state_class` set, which meant Home Assistant's Energy Dashboard couldn't offer them as a grid/solar/battery power source (that picker only lists `measurement`-class sensors), and Home Assistant recorded no long-term statistics for any of them. Net Power and Site Load Power have no other Energy Dashboard-eligible equivalent in this integration, so this was a real gap, not just a redundant option.
+
+All four `*_power` sensors are now `measurement`. Production Energy and Site Load Energy, which only ever accumulate, are now `total_increasing`. Net Energy and Battery Energy, which can move in either direction (net export/import, charge/discharge), are now `total` instead. Battery State of Charge is also now `measurement`, the same gap existed there but wasn't part of the original report. Since none of these ever had a `state_class` before, there's no existing statistics history to disrupt.
+
 ## [v2026.9.3] - 2026-09-16
 
 ### Bug Fix: Battery Reserve Percentage Shows Unknown When Not a 5% Step

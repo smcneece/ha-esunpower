@@ -269,6 +269,10 @@ If you have enabled the Data Timestamp sensor (disabled by default), also add:
       - sensor.pvs_live_data_xxxxx_data_timestamp
 ```
 
+This exclusion recipe still works exactly as described above regardless of any other changes to these sensors. A recorder-excluded entity never reaches Home Assistant's database at all, so it gets no history and no long-term statistics either, the sensor still updates live on your dashboards, it just isn't stored anywhere.
+
+**Some Live Data sensors duplicate a regular polled sensor.** Production Power and Battery Power mirror the values already available from the production meter's and battery's own regular Power sensors, just updated every second instead of on the normal poll schedule. Net Power and Site Load Power have no such equivalent, they're only available through Live Data. If you're picking a source for the Energy Dashboard, prefer the regular polled sensor over the Live Data version wherever a duplicate exists: the polled sensor keeps recording as long as normal polling works, while the Live Data version stops updating if you disable Live Data or the WebSocket connection drops, which could leave gaps in your permanent energy statistics.
+
 ---
 
 ## Debug Information
