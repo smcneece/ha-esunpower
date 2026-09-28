@@ -271,7 +271,22 @@ If you have enabled the Data Timestamp sensor (disabled by default), also add:
 
 This exclusion recipe still works exactly as described above regardless of any other changes to these sensors. A recorder-excluded entity never reaches Home Assistant's database at all, so it gets no history and no long-term statistics either, the sensor still updates live on your dashboards, it just isn't stored anywhere.
 
-**Some Live Data sensors duplicate a regular polled sensor.** Production Power and Battery Power mirror the values already available from the production meter's and battery's own regular Power sensors, just updated every second instead of on the normal poll schedule. Net Power and Site Load Power have no such equivalent, they're only available through Live Data. If you're picking a source for the Energy Dashboard, prefer the regular polled sensor over the Live Data version wherever a duplicate exists: the polled sensor keeps recording as long as normal polling works, while the Live Data version stops updating if you disable Live Data or the WebSocket connection drops, which could leave gaps in your permanent energy statistics.
+**Live Data's Power sensors (Production, Net, Site Load, Battery Power, and Battery State of Charge) can be used as Energy Dashboard Power sources**, the ones feeding the "Now" card and the power Sankey diagram. These are not new measurements, they're the same readings you already get from the regular polled sensors. The only difference is how often they update: Live Data about every second, while the regular sensors only change as often as the PVS itself refreshes those values, which is about every 5 minutes for most of them no matter what polling interval you set (polling faster doesn't get you fresher data):
+
+| Live Data sensor | Same reading as (polled) |
+|---|---|
+| Production Power / Production Energy | Power Meter `...p` Power / Lifetime Power |
+| Net Power / Net Energy | Power Meter `...c` Power / Lifetime Power |
+| Site Load Power / Site Load Energy | Production plus Net (the `...p` and `...c` meters added together), no single polled sensor |
+| Battery Power | Likely the ESS Power sensor (not verified, no battery system on the test setup) |
+
+Compared on a real system, Live Data Net Power tracked the `...c` meter's Power sensor within a few percent (they're sampled at different moments), Production Energy matched the `...p` meter's Lifetime Power exactly, and Site Load Energy equalled Production Energy plus Net Energy exactly.
+
+Each Live Data Power sensor decides on its own when to update, based on a minimum change threshold and a minimum time between writes (both adjustable in the integration options, they exist to limit database writes). Because of that, two sensors that should agree, such as Net Power and Site Load Power when Production is near zero, can briefly differ by a few tenths of a kW and then match again a moment later. That's a display timing effect, not a data problem.
+
+The Energy Dashboard calculates consumption as solar plus grid plus battery rather than measuring it directly, so in principle, mixing a source that updates every few seconds with one that only updates every few minutes for that same calculation could combine readings from different moments and produce an inaccurate consumption figure. One user reported exactly this and found that using Live Data for all three Power sources rather than mixing polled and Live Data resolved it for them. This hasn't been independently verified by us or confirmed by other users yet, treat it as a report worth trying rather than settled guidance. If you're not using the Power-sources feature at all, this doesn't affect you.
+
+**Live Data's Energy sensors (Production, Net, Site Load, and Battery Energy) are not usable as Energy Dashboard sources**, and don't have a `state_class` set for that reason. This feature's original design treats them as session/running totals from the PVS rather than lifetime counters, and says they aren't suitable for the Energy Dashboard, so using one as a permanent kWh statistics source may give unreliable long-term statistics. For the Energy Dashboard's daily/monthly kWh totals and long-term statistics, use the regular polled lifetime kWh sensors this project has always recommended, see the Energy Dashboard Setup section in [README.md](../README.md).
 
 ---
 

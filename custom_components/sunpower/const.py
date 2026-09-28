@@ -644,7 +644,18 @@ LIVEDATA_SENSORS = [
         "unit": UnitOfEnergy.KILO_WATT_HOUR,
         "icon": "mdi:solar-power",
         "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        # Deliberately None, not a fixable gap. The original Live Data design
+        # (Summaries/livedata-plan.md) treats the *_en fields as session/running
+        # totals rather than lifetime counters and says explicitly they are not
+        # suitable for the Energy Dashboard. (That "session totals" description
+        # is inherited from that design, it has not been independently
+        # observed, e.g. across a WebSocket reconnect.) Giving them a
+        # state_class would make them selectable as an Energy Dashboard kWh
+        # source, so leave them unclassed and use the regular polled lifetime
+        # kWh sensors (from varserver) for the Energy Dashboard instead,
+        # matching README.md's documented setup. See issue #98 for the
+        # incident that temporarily added TOTAL/TOTAL_INCREASING here in error.
+        "state_class": None,
         "suggested_display_precision": 3,
         "battery_only": False,
         "enabled_default": True,
@@ -668,9 +679,8 @@ LIVEDATA_SENSORS = [
         "unit": UnitOfEnergy.KILO_WATT_HOUR,
         "icon": "mdi:transmission-tower",
         "device_class": SensorDeviceClass.ENERGY,
-        # TOTAL, not TOTAL_INCREASING: this is net import/export, which can
-        # move in either direction, unlike a monotonic lifetime counter.
-        "state_class": SensorStateClass.TOTAL,
+        # Deliberately None. See the identical comment on production_energy above.
+        "state_class": None,
         "suggested_display_precision": 3,
         "battery_only": False,
         "enabled_default": True,
@@ -694,7 +704,8 @@ LIVEDATA_SENSORS = [
         "unit": UnitOfEnergy.KILO_WATT_HOUR,
         "icon": "mdi:home-lightning-bolt",
         "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        # Deliberately None. See the identical comment on production_energy above.
+        "state_class": None,
         "suggested_display_precision": 3,
         "battery_only": False,
         "enabled_default": True,
@@ -718,9 +729,8 @@ LIVEDATA_SENSORS = [
         "unit": UnitOfEnergy.KILO_WATT_HOUR,
         "icon": "mdi:battery-charging",
         "device_class": SensorDeviceClass.ENERGY,
-        # TOTAL, not TOTAL_INCREASING: net charge/discharge energy, which can
-        # move in either direction rather than only accumulate.
-        "state_class": SensorStateClass.TOTAL,
+        # Deliberately None. See the identical comment on production_energy above.
+        "state_class": None,
         "suggested_display_precision": 3,
         "battery_only": True,
         "enabled_default": True,

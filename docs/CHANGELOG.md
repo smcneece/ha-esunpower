@@ -3,6 +3,14 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.9.5] - 2026-09-28
+
+### Correction: v2026.9.4 Over-Applied the state_class Fix to Live Data Energy Sensors
+
+v2026.9.4 added `state_class` to both the power and energy Live Data sensors. The power sensors (Production, Net, Site Load, Battery Power, plus Battery State of Charge) were correct and stay `measurement`. The four energy sensors (Production, Net, Site Load, and Battery Energy) should not have been changed: this feature's original design notes treat them as session/running totals rather than lifetime counters and say explicitly not to use them for the Energy Dashboard, and that was never meant to change. Giving them a `state_class` made them selectable as an Energy Dashboard kWh source, which risks unreliable long-term statistics. Reverted to `state_class: None` for all four. Use the existing polled lifetime kWh sensors for Energy Dashboard energy sources, as this project's README has always recommended, this correction does not change that guidance.
+
+The v2026.9.4 entry below also said Net Power and Site Load Power had no equivalent elsewhere in this integration. That was wrong. Comparing recorded values, Live Data Net Power is the same reading as the `...c` meter's Power sensor, Production Power/Energy match the `...p` meter's Power/Lifetime Power, and Site Load is Production plus Net. Live Data doesn't add new measurements, it just updates about every second, while the regular sensors only change as often as the PVS refreshes those values (about every 5 minutes for most, regardless of polling interval). TROUBLESHOOTING.md now has a table of which Live Data sensor matches which polled sensor.
+
 ## [v2026.9.4] - 2026-09-27
 
 ### Bug Fix: WebSocket Live Data Power/Energy Sensors Missing state_class
