@@ -67,6 +67,7 @@ class PVSWebSocket:
         self._live_data: PVSLiveData | None = None
         self._timestamp_format: str | None = None
         self._stopping = False
+        self._warned_stale = False
         self._state = ConnectionState.DISCONNECTED
 
     @property
@@ -155,6 +156,32 @@ class PVSWebSocket:
         self._live_data = None
         self._set_state(ConnectionState.DISCONNECTED)
 
+    async def _ensure_telemetry_enabled(self) -> bool:
+        """Ask the PVS to broadcast telemetry, and say so loudly if it won't.
+
+        The callback returns False when the PVS rejects the set without
+        raising. Previously the return value was discarded, so a refusal was
+        indistinguishable from success: the socket still connects (the PVS
+        accepts the handshake on port 9002 regardless), it just never sends a
+        frame. The result was permanently unavailable sensors and an empty log.
+        """
+        if self._enable_callback is None:
+            return True
+        try:
+            result = await self._enable_callback()
+        except Exception as e:
+            _LOGGER.warning("Failed to enable telemetry websocket: %s", e)
+            return False
+        if result is False:
+            _LOGGER.warning(
+                "PVS refused to enable telemetry (/sys/telemetryws/enable). "
+                "The WebSocket will connect but receive no data, and live data "
+                "sensors will stay unavailable. A Home Assistant restart is "
+                "usually needed after enabling live data in Configure."
+            )
+            return False
+        return True
+
     async def _run_websocket(self) -> None:
         """Run WebSocket connection loop with auto-reconnect."""
         # Strip port suffix from host if present (host should be bare IP/hostname)
@@ -194,13 +221,7 @@ class PVSWebSocket:
                     self._set_state(ConnectionState.CONNECTING)
 
                     # Ensure telemetry websocket is enabled on the PVS
-                    if self._enable_callback is not None:
-                        try:
-                            await self._enable_callback()
-                        except Exception as e:
-                            _LOGGER.warning(
-                                "Failed to enable telemetry websocket: %s", e
-                            )
+                    await self._ensure_telemetry_enabled()
 
                     _LOGGER.debug(
                         "Attempting WebSocket connection to %s (attempt %d)",
@@ -230,10 +251,24 @@ class PVSWebSocket:
                                 await asyncio.sleep(30)
                                 elapsed = time.monotonic() - last_message_time
                                 if elapsed > stale_timeout:
-                                    _LOGGER.debug(
-                                        "WebSocket stale (no messages for %.0fs), reconnecting",
-                                        elapsed,
-                                    )
+                                    # Connecting but never receiving means the PVS
+                                    # isn't broadcasting. Say it once, then keep
+                                    # quiet so a flaky link can't spam the log.
+                                    if self._warned_stale:
+                                        _LOGGER.debug(
+                                            "WebSocket stale (no messages for %.0fs), reconnecting",
+                                            elapsed,
+                                        )
+                                    else:
+                                        self._warned_stale = True
+                                        _LOGGER.warning(
+                                            "WebSocket connected to %s but received no data for "
+                                            "%.0fs. The PVS is not broadcasting telemetry; check "
+                                            "/sys/telemetryws/enable. Live data sensors will stay "
+                                            "unavailable until it is set.",
+                                            websocket_url,
+                                            elapsed,
+                                        )
                                     await ws.close()
                                     break
 
@@ -241,6 +276,7 @@ class PVSWebSocket:
 
                         async for msg in ws:
                             last_message_time = time.monotonic()
+                            self._warned_stale = False
 
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 try:
