@@ -70,11 +70,56 @@ async def test_only_false_counts_as_refusal(result, caplog):
     assert caplog.text == ""
 
 
-def test_stale_warning_latch_starts_clear():
-    """The stale warning fires once per silent stretch, not every 30s.
+def test_stale_after_receiving_frames_does_not_warn(caplog):
+    """A socket that goes quiet after delivering data is ordinary, not broken.
 
-    The heartbeat monitor re-checks every 30 seconds and reconnects on a stale
-    socket, so warning each time would flood the log for anyone on a flaky
-    link. The latch clears as soon as a message arrives.
+    The PVS has stretches with nothing to say, and its auth session ages out,
+    so healthy systems see stale reconnects routinely. Warning on those would
+    tell those users the PVS isn't broadcasting telemetry, which is false for
+    them, and would train everyone to ignore the message that matters.
     """
-    assert make_ws()._warned_stale is False
+    ws = make_ws()
+
+    with caplog.at_level(logging.WARNING):
+        assert ws._note_stale(120.0, received_any=True, url="ws://pvs:9002") is False
+
+    assert caplog.text == ""
+    assert ws._warned_never_received is False, (
+        "a healthy stale reconnect must not consume the warning latch"
+    )
+
+
+def test_stale_without_any_frame_warns_once(caplog):
+    """Connected but never received is the broken case, and it warns once.
+
+    This is the #99 scenario: telemetry off, the PVS accepts the handshake and
+    sends nothing, and the client reconnects every 90s forever. The heartbeat
+    re-checks on every cycle, so warning each time would flood the log.
+    """
+    ws = make_ws()
+
+    with caplog.at_level(logging.WARNING):
+        assert ws._note_stale(95.0, received_any=False, url="ws://pvs:9002") is True
+    assert "/sys/telemetryws/enable" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        assert ws._note_stale(95.0, received_any=False, url="ws://pvs:9002") is False
+    assert caplog.text == ""
+
+
+def test_latch_clears_once_data_arrives(caplog):
+    """After a silent run recovers, a later silent run must warn again."""
+    ws = make_ws()
+    ws._note_stale(95.0, received_any=False, url="ws://pvs:9002")
+
+    ws._warned_never_received = False   # what the message loop does on a frame
+
+    with caplog.at_level(logging.WARNING):
+        assert ws._note_stale(95.0, received_any=False, url="ws://pvs:9002") is True
+    assert "/sys/telemetryws/enable" in caplog.text
+
+
+def test_stale_warning_latch_starts_clear():
+    """Nothing has been warned about on a fresh client."""
+    assert make_ws()._warned_never_received is False
