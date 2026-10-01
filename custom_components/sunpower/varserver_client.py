@@ -124,7 +124,7 @@ class VarserverClient:
                 if response.status == 400:
                     # Varserver returns 400 when no devices exist for the
                     # queried path (e.g., no physical meters, no ESS).
-                    # Not an auth error — proactive re-auth every 600s
+                    # Not an auth error, proactive re-auth every 600s
                     # keeps the session fresh.
                     _LOGGER.debug(
                         "Varserver returned 400 (no devices for this path)"

@@ -86,6 +86,17 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         if (config_entry.options.get(CONF_ENABLE_LIVE_DATA, False)
                 and hasattr(coordinator, "async_add_live_data_listener")
                 and not sunpower_state.get("_live_data_sensors_created")):
+            if not getattr(coordinator, "live_data_tracker_active", False):
+                # Live data was turned on in Configure after setup. The WebSocket
+                # tracker only starts during setup, so creating the sensors now
+                # would leave them unavailable with nothing in the log.
+                if not sunpower_state.get("_live_data_reload_hint_logged"):
+                    sunpower_state["_live_data_reload_hint_logged"] = True
+                    _LOGGER.warning(
+                        "Live data is enabled but the WebSocket tracker is not "
+                        "running. Reload the integration to start live data."
+                    )
+                return
             live_sensors = _setup_live_data_sensors(
                 hass, config_entry, async_add_entities, coordinator, coordinator_data
             )

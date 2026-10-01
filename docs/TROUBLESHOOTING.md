@@ -96,7 +96,7 @@ The PVS6 uses soldered NAND flash (eMMC) for storage. Early firmware versions wr
 **Thresholds:**
 - Below 50%: Normal, no action needed
 - 50-79%: Monitor regularly
-- 80%+: Critical -- SunPower blocks firmware updates at this level. Consider the USB boot workaround (see community resources) to extend device life
+- 80%+: Critical. SunPower blocks firmware updates at this level. Consider the USB boot workaround (see community resources) to extend device life
 
 **Symptoms of severe flash exhaustion:**
 - PVS shows a rotating rainbow LED pattern (cycling yellow/green/red at multi-second intervals)
@@ -217,6 +217,14 @@ This resolves the issue for the majority of affected users.
 
 ---
 
+## WebSocket Live Data - Sensors Missing or Unavailable After Turning It On
+
+Turning WebSocket Live Data on (or off) in Configure does not take effect until the integration is reloaded. The live data connection is only started when the integration loads. Go to Settings, Devices & Services, open the three-dot menu on the integration, and choose Reload. A full Home Assistant restart is not needed.
+
+If you see a "Live data is enabled but the WebSocket tracker is not running" warning in the log, this is why. If the sensors exist but stay Unavailable after a reload, look for a warning about `/sys/telemetryws/enable` or "has never received data" in the log, which means the PVS accepted the connection but is not broadcasting.
+
+---
+
 ## WebSocket Live Data - Backup Time Remaining and MID State Showing Unknown
 
 Battery users may see the "Backup Time Remaining" and "MID State" live data sensors show as Unknown even when the WebSocket is connected and other sensors are updating normally. This has been observed in beta testing (April 2026) and appears to be related to whether the PVS actually broadcasts those fields in the live data stream.
@@ -280,13 +288,13 @@ This exclusion recipe still works exactly as described above regardless of any o
 | Site Load Power / Site Load Energy | Production plus Net (the `...p` and `...c` meters added together), no single polled sensor |
 | Battery Power | Likely the ESS Power sensor (not verified, no battery system on the test setup) |
 
-Compared on a real system, Live Data Net Power tracked the `...c` meter's Power sensor within a few percent (they're sampled at different moments), Production Energy matched the `...p` meter's Lifetime Power exactly, and Site Load Energy equalled Production Energy plus Net Energy exactly.
+Compared on a real system, Live Data Net Power tracked the `...c` meter's Power sensor closely while the load was steady, and differed by a few tenths of a kW while production was changing, because the polled value can be minutes old. Production Energy matched the `...p` meter's Lifetime Power exactly, Site Load Energy equalled Production Energy plus Net Energy exactly, and Site Load Power equalled Net Power plus Production Power.
 
 Each Live Data Power sensor decides on its own when to update, based on a minimum change threshold and a minimum time between writes (both adjustable in the integration options, they exist to limit database writes). Because of that, two sensors that should agree, such as Net Power and Site Load Power when Production is near zero, can briefly differ by a few tenths of a kW and then match again a moment later. That's a display timing effect, not a data problem.
 
 The Energy Dashboard calculates consumption as solar plus grid plus battery rather than measuring it directly, so in principle, mixing a source that updates every few seconds with one that only updates every few minutes for that same calculation could combine readings from different moments and produce an inaccurate consumption figure. One user reported exactly this and found that using Live Data for all three Power sources rather than mixing polled and Live Data resolved it for them. This hasn't been independently verified by us or confirmed by other users yet, treat it as a report worth trying rather than settled guidance. If you're not using the Power-sources feature at all, this doesn't affect you.
 
-**Live Data's Energy sensors (Production, Net, Site Load, and Battery Energy) are not usable as Energy Dashboard sources**, and don't have a `state_class` set for that reason. This feature's original design treats them as session/running totals from the PVS rather than lifetime counters, and says they aren't suitable for the Energy Dashboard, so using one as a permanent kWh statistics source may give unreliable long-term statistics. For the Energy Dashboard's daily/monthly kWh totals and long-term statistics, use the regular polled lifetime kWh sensors this project has always recommended, see the Energy Dashboard Setup section in [README.md](../README.md).
+**Live Data's Energy sensors (Production, Net, Site Load, and Battery Energy) are not usable as Energy Dashboard sources**, and don't have a `state_class` set. They duplicate values the regular polled sensors already provide (Production Energy matches the `...p` meter's Lifetime Power, and Net Energy tracks the `...c` meter's), so there's nothing to gain by using them there. This feature's original design also describes them as session/running totals and says they aren't suitable for the Energy Dashboard. In testing they held their values across several WebSocket reconnects over about 10 hours and looked like lifetime counters, though a PVS reboot wasn't tested, so stick with the regular polled sensors for permanent statistics. For the Energy Dashboard's daily/monthly kWh totals and long-term statistics, use the regular polled lifetime kWh sensors this project has always recommended, see the Energy Dashboard Setup section in [README.md](../README.md).
 
 ---
 

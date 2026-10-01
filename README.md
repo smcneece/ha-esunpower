@@ -164,6 +164,7 @@ Live data sensors (production power, site load, net power, battery power, SOC, b
 | Email Notification | Disabled | Select HA email service for critical alerts |
 | Enable WebSocket Live Data | Off | PVS6 only; requires SSD storage |
 | Power Change Threshold | 0.05 kW | Min change to trigger live data state write |
+| Write Interval | 1s | 1-60s; how often live data power sensors write to HA. Also adjustable live via the Live Data Write Interval number entity, no reconfigure needed |
 
 ---
 

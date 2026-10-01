@@ -3,6 +3,28 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.10.1] - 2026-10-01
+
+### Bug Fix: WebSocket Live Data Sensors Stay Unavailable After Turning It On Until a Reload
+
+**Contributor:** Special thanks to [@ratm](https://github.com/ratm) for the report, diagnosis, and the logging fix with test coverage (issue #99, PR #100)
+
+Turning WebSocket Live Data on in Configure created the Live Data sensors on the next poll, but the live connection to the PVS is only started when the integration loads. With no connection and nothing telling the PVS to broadcast, the sensors sat Unavailable and nothing was written to the log. Reloading the integration fixed it.
+
+The Live Data sensors are no longer created until the live connection exists. If Live Data is on but the connection isn't running, a single warning now appears in the log asking you to reload the integration. The Live Data options text and TROUBLESHOOTING.md now say to reload the integration after turning Live Data on or off (Settings, Devices & Services, the three-dot menu on the integration, Reload). A full Home Assistant restart is not needed. Nothing changes if Live Data is off, or if it was already on when the integration loaded.
+
+### Improvement: Live Data Now Logs When the PVS Isn't Broadcasting
+
+Three silent failures now log a warning:
+- The request to turn on the PVS telemetry broadcast could not be confirmed (the log names `/sys/telemetryws/enable` and suggests a reload).
+- A connection to the PVS was made but it never sent any data. This is warned once per silent stretch, and only when a connection has never received a frame, so the ordinary quiet periods and session reconnects on a healthy system stay out of the log.
+- Live Data is enabled but there is no PVS client to run it.
+
+### Documentation
+
+- README: added the Live Data Write Interval setting to the configuration options table.
+- TROUBLESHOOTING.md: new section for Live Data sensors that are missing or unavailable after turning it on. Clarified how Live Data Net Power relates to the polled `...c` meter, and added the reconnect evidence to the Live Data Energy sensors paragraph.
+
 ## [v2026.9.5] - 2026-09-28
 
 ### Correction: v2026.9.4 Over-Applied the state_class Fix to Live Data Energy Sensors
@@ -518,7 +540,7 @@ These errors are expected and self-recovering during a PVS reboot. They will now
 ### Bug Fix: Virtual Production Meter Sunrise Spike
 
 **Fixed: Virtual production meter reporting incorrect lifetime value at sunrise**
-- **Problem**: At sunrise, PVS inverters do not all come online simultaneously -- they report in to the PVS one by one over several poll cycles. The virtual production meter aggregates lifetime kWh from all inverters, so early morning polls produced a partial sum much lower than the actual lifetime total. When the last inverters came online, the meter appeared to jump by tens of thousands of kWh
+- **Problem**: At sunrise, PVS inverters do not all come online simultaneously; they report in to the PVS one by one over several poll cycles. The virtual production meter aggregates lifetime kWh from all inverters, so early morning polls produced a partial sum much lower than the actual lifetime total. When the last inverters came online, the meter appeared to jump by tens of thousands of kWh
 - **Impact**: Any utility meter helper using the virtual production meter as its source would record this jump as a massive daily production spike, corrupting daily statistics and requiring manual SQLite cleanup to fix
 - **Fix**: The integration now fills in any missing inverters from cache on every poll (not just when all inverters are absent). Missing inverters contribute their last known lifetime kWh while their real-time power values are zeroed. As each inverter comes online, its fresh data replaces the cached value. The virtual meter sum remains stable through the entire sunrise startup sequence
 

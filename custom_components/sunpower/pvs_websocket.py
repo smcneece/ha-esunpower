@@ -67,6 +67,7 @@ class PVSWebSocket:
         self._live_data: PVSLiveData | None = None
         self._timestamp_format: str | None = None
         self._stopping = False
+        self._warned_never_received = False
         self._state = ConnectionState.DISCONNECTED
 
     @property
@@ -155,6 +156,62 @@ class PVSWebSocket:
         self._live_data = None
         self._set_state(ConnectionState.DISCONNECTED)
 
+    async def _ensure_telemetry_enabled(self) -> bool:
+        """Ask the PVS to broadcast telemetry, and say so if we can't confirm it.
+
+        The callback returns False when the set wasn't confirmed: a rejection,
+        a timeout and an empty response all look the same from here.
+        Previously the return value was discarded, so that was
+        indistinguishable from success, because the socket still connects (the
+        PVS accepts the handshake on port 9002 regardless) and simply never
+        sends a frame. The result was permanently unavailable sensors and an
+        empty log.
+        """
+        if self._enable_callback is None:
+            return True
+        try:
+            result = await self._enable_callback()
+        except Exception as e:
+            _LOGGER.warning("Failed to enable telemetry websocket: %s", e)
+            return False
+        if result is False:
+            _LOGGER.warning(
+                "Could not enable telemetry (/sys/telemetryws/enable). The "
+                "WebSocket will connect but receive no data until it is set. "
+                "Try reloading the integration."
+            )
+            return False
+        return True
+
+    def _note_stale(self, elapsed: float, received_any: bool, url: str) -> bool:
+        """Handle a stale connection. Returns True if a warning was emitted.
+
+        A socket that goes quiet after delivering frames is ordinary: the PVS
+        has stretches with nothing to say, and its auth session ages out. Those
+        reconnects stay at debug. A socket that connects and never receives a
+        single frame is the broken case, and only that one warns, once per
+        silent run.
+        """
+        if received_any:
+            _LOGGER.debug(
+                "WebSocket stale (no messages for %.0fs), reconnecting", elapsed
+            )
+            return False
+        if self._warned_never_received:
+            _LOGGER.debug(
+                "WebSocket still receiving nothing after %.0fs, reconnecting", elapsed
+            )
+            return False
+        self._warned_never_received = True
+        _LOGGER.warning(
+            "WebSocket connected to %s but has never received data (%.0fs). The "
+            "PVS is not broadcasting telemetry; check /sys/telemetryws/enable. "
+            "Live data sensors will stay unavailable until it is set.",
+            url,
+            elapsed,
+        )
+        return True
+
     async def _run_websocket(self) -> None:
         """Run WebSocket connection loop with auto-reconnect."""
         # Strip port suffix from host if present (host should be bare IP/hostname)
@@ -194,13 +251,7 @@ class PVSWebSocket:
                     self._set_state(ConnectionState.CONNECTING)
 
                     # Ensure telemetry websocket is enabled on the PVS
-                    if self._enable_callback is not None:
-                        try:
-                            await self._enable_callback()
-                        except Exception as e:
-                            _LOGGER.warning(
-                                "Failed to enable telemetry websocket: %s", e
-                            )
+                    await self._ensure_telemetry_enabled()
 
                     _LOGGER.debug(
                         "Attempting WebSocket connection to %s (attempt %d)",
@@ -218,6 +269,7 @@ class PVSWebSocket:
                         _LOGGER.info("WebSocket connected to %s", websocket_url)
 
                         # Initialize live data
+                        received_any = False
                         self._live_data = PVSLiveData()
                         self._timestamp_format = None
                         last_message_time = time.monotonic()
@@ -225,14 +277,13 @@ class PVSWebSocket:
 
                         # Start heartbeat monitor
                         async def monitor_heartbeat() -> None:
-                            nonlocal last_message_time
+                            nonlocal last_message_time, received_any
                             while True:
                                 await asyncio.sleep(30)
                                 elapsed = time.monotonic() - last_message_time
                                 if elapsed > stale_timeout:
-                                    _LOGGER.debug(
-                                        "WebSocket stale (no messages for %.0fs), reconnecting",
-                                        elapsed,
+                                    self._note_stale(
+                                        elapsed, received_any, websocket_url
                                     )
                                     await ws.close()
                                     break
@@ -241,6 +292,8 @@ class PVSWebSocket:
 
                         async for msg in ws:
                             last_message_time = time.monotonic()
+                            received_any = True
+                            self._warned_never_received = False
 
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 try:

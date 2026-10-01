@@ -529,9 +529,26 @@ class SunPowerCoordinator(DataUpdateCoordinator):
             return False
         return self._websocket.is_connected
 
+    @property
+    def live_data_tracker_active(self) -> bool:
+        """Return True if the live data WebSocket tracker was set up.
+
+        The tracker is only created during integration setup, so enabling live
+        data in Configure afterwards does not start it until a reload.
+        """
+        return self._websocket is not None
+
     def _async_setup_live_data_tracker(self) -> None:
         """Set up WebSocket live data if enabled in options (new firmware only)."""
         if self._varserver_client is None:
+            if self._entry is not None and self._entry.options.get(
+                CONF_ENABLE_LIVE_DATA, False
+            ):
+                _LOGGER.warning(
+                    "Live data is enabled in options but this PVS has no varserver "
+                    "client (old firmware, or setup ran before one was available). "
+                    "Live data sensors will stay unavailable."
+                )
             return
 
         if not self._entry.options.get(CONF_ENABLE_LIVE_DATA, False):

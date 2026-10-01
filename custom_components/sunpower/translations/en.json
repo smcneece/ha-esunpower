@@ -98,7 +98,7 @@
             },
             "live_data": {
                 "title": "Enhanced SunPower - Live Data",
-                "description": "Configure WebSocket live data (new firmware only).\n\nThe PVS broadcasts real-time data on port 9002 every second. When enabled, sensors update as values change rather than waiting for the next poll.\n\n\u26a0\ufe0f SD Card Warning: 1-second sensor updates generate heavy database writes. Use SSD storage, not SD card.",
+                "description": "Configure WebSocket live data (new firmware only).\n\nThe PVS broadcasts real-time data on port 9002 every second. When enabled, sensors update as values change rather than waiting for the next poll.\n\nAfter turning live data on or off, reload the integration (Settings, Devices & Services, the three-dot menu, Reload) for the change to take effect.\n\n\u26a0\ufe0f SD Card Warning: 1-second sensor updates generate heavy database writes. Use SSD storage, not SD card.",
                 "data": {
                     "enable_live_data": "Enable WebSocket live data",
                     "live_data_threshold": "Power change threshold",

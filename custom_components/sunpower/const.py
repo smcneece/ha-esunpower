@@ -647,14 +647,16 @@ LIVEDATA_SENSORS = [
         # Deliberately None, not a fixable gap. The original Live Data design
         # (Summaries/livedata-plan.md) treats the *_en fields as session/running
         # totals rather than lifetime counters and says explicitly they are not
-        # suitable for the Energy Dashboard. (That "session totals" description
-        # is inherited from that design, it has not been independently
-        # observed, e.g. across a WebSocket reconnect.) Giving them a
-        # state_class would make them selectable as an Energy Dashboard kWh
-        # source, so leave them unclassed and use the regular polled lifetime
-        # kWh sensors (from varserver) for the Energy Dashboard instead,
-        # matching README.md's documented setup. See issue #98 for the
-        # incident that temporarily added TOTAL/TOTAL_INCREASING here in error.
+        # suitable for the Energy Dashboard. (Observed 2026-09-28 over about 10
+        # hours: they did not reset across four WebSocket connects, one of them
+        # an HA restart, and their values are lifetime scale, Production Energy
+        # matches the ...p meter's lifetime kWh exactly, so they are likely
+        # lifetime counters. A PVS reboot was not tested.) They stay unclassed because the
+        # regular polled lifetime kWh sensors (from varserver) already provide
+        # the same values, so classing these adds nothing except a second way
+        # to pick the Energy Dashboard kWh source, matching README.md's
+        # documented setup. See issue #98 for the incident that temporarily
+        # added TOTAL/TOTAL_INCREASING here in error.
         "state_class": None,
         "suggested_display_precision": 3,
         "battery_only": False,
