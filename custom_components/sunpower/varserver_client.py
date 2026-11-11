@@ -92,6 +92,17 @@ class VarserverClient:
             _LOGGER.warning("Varserver auth request failed: %s", e)
             return False
 
+    async def verify_login(self) -> bool:
+        """Check the password by logging in and reading an authenticated var.
+
+        Used by the config and options flows before a password is saved.
+        A successful /auth response alone is not treated as proof, the
+        session must also be able to read /sys/info/ from /vars.
+        """
+        if not await self.authenticate():
+            return False
+        return bool(await self._request_vars("/sys/info/"))
+
     def _parse_response(self, data: dict) -> dict:
         """Convert varserver array-format response to {path: value} dict."""
         if not data or "values" not in data:

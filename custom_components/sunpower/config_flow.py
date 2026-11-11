@@ -128,6 +128,24 @@ async def get_supervisor_info(host, session):
         return None, None, None, "", str(e)
 
 
+async def check_pvs_password(hass, host, password):
+    """Return True if the PVS at host accepts this password.
+
+    Called right after supervisor/info has answered from the same host, so a
+    False here almost always means a wrong password rather than a dead PVS.
+    """
+    client = VarserverClient(
+        session=async_get_clientsession(hass, False),
+        host=host,
+        password=password,
+    )
+    try:
+        return await client.verify_login()
+    except Exception as e:
+        _LOGGER.warning("PVS password check failed: %s", e)
+        return False
+
+
 class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Enhanced SunPower integration.
 
@@ -305,6 +323,12 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["pvs_serial_last5"] = "Must be exactly 5 characters"
             elif not pvs_serial_last5.isalnum():
                 errors["pvs_serial_last5"] = "Must contain only letters and numbers"
+
+            if not errors and not await check_pvs_password(
+                self.hass, self._basic_config["host"], pvs_serial_last5
+            ):
+                errors["pvs_serial_last5"] = "invalid_auth"
+                _LOGGER.warning("Setup: PVS rejected the entered password")
 
             if not errors:
                 # Store uppercase password in basic config
@@ -494,8 +518,30 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                             build, model,
                         )
 
+                    # Refuse to point this entry at a different PVS. Its
+                    # devices would otherwise be merged into this entry's
+                    # devices and history.
+                    entry_serial = self.config_entry.unique_id
+                    if (
+                        not errors
+                        and serial
+                        and entry_serial
+                        and serial.upper() != entry_serial.upper()
+                    ):
+                        errors["host"] = "different_pvs"
+                        _LOGGER.warning(
+                            "Options: PVS at %s is %s, this entry belongs to %s, rejecting",
+                            host, mask_pvs_serial(serial), mask_pvs_serial(entry_serial),
+                        )
+
                     if not errors and not pvs_serial_last5:
                         errors["pvs_serial_last5"] = "Password required (last 5 chars of serial)"
+
+                    if not errors and not await check_pvs_password(
+                        self.hass, host, pvs_serial_last5
+                    ):
+                        errors["pvs_serial_last5"] = "invalid_auth"
+                        _LOGGER.warning("Options: PVS rejected the entered password")
 
             if not errors:
                 self._basic_config = user_input.copy()

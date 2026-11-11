@@ -10,7 +10,8 @@
             "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "unknown": "Unknown Error",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
-            "email_recipient_required": "Email recipient is required when email service is selected"
+            "email_recipient_required": "Email recipient is required when email service is selected",
+            "invalid_auth": "The PVS rejected this password. It is the last 5 characters of the PVS serial number, in uppercase."
         },
         "step": {
             "user": {
@@ -159,7 +160,9 @@
             "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
             "email_recipient_required": "Email recipient is required when email service is selected",
-            "old_firmware": "Old firmware detected on that PVS. This version of Enhanced SunPower requires new firmware (BUILD 61840+ on PVS6, BUILD 5408+ on PVS5). v2026.05.1 is the last version supporting old firmware, see the Old Firmware Install Guide in the docs for pinning instructions."
+            "old_firmware": "Old firmware detected on that PVS. This version of Enhanced SunPower requires new firmware (BUILD 61840+ on PVS6, BUILD 5408+ on PVS5). v2026.05.1 is the last version supporting old firmware, see the Old Firmware Install Guide in the docs for pinning instructions.",
+            "different_pvs": "The PVS at this address has a different serial number than the one this integration entry was set up with. To monitor another PVS, add it as a separate integration entry instead.",
+            "invalid_auth": "The PVS rejected this password. It is the last 5 characters of the PVS serial number, in uppercase."
         }
     },
     "title": "Enhanced SunPower"

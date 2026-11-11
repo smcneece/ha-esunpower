@@ -3,6 +3,21 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.11.1] - 2026-11-11
+
+### Improvement: PVS Password Is Checked Before It Is Saved
+
+The setup flow and Configure used to save any 5 character password without trying it. A wrong one only showed up later as repeated poll failures. Both now log in to the PVS with the entered password and read a value from it before saving. If the PVS rejects it, the form shows "The PVS rejected this password" and nothing is changed. If the PVS can't be reached at all while you're in Configure, the check is skipped and your changes save as before.
+
+### Improvement: Configure Won't Point an Entry at a Different PVS
+
+Changing the PVS address in Configure now checks the serial number of the PVS at the new address. If it doesn't match the PVS this entry was set up with, the form shows an error instead of saving. Without this, a typo or a reassigned IP address could merge another PVS's devices into this entry's devices and history. To monitor a second PVS, add it as a separate integration entry.
+
+### Documentation
+
+- New [MIGRATION_FROM_SUNSTRONG.md](MIGRATION_FROM_SUNSTRONG.md): how to move from SunStrong's PVS integration and keep sensor history and the Energy Dashboard, with a full sensor mapping table. Linked from the README Installation section.
+- TROUBLESHOOTING.md: the Live Data Energy sensors paragraph now notes the values also held across two PVS reboots in testing, still on one system, so the polled lifetime sensors remain the recommendation.
+
 ## [v2026.10.1] - 2026-10-01
 
 ### Bug Fix: WebSocket Live Data Sensors Stay Unavailable After Turning It On Until a Reload
@@ -23,7 +38,7 @@ Three silent failures now log a warning:
 ### Documentation
 
 - README: added the Live Data Write Interval setting to the configuration options table.
-- TROUBLESHOOTING.md: new section for Live Data sensors that are missing or unavailable after turning it on. Clarified how Live Data Net Power relates to the polled `...c` meter, and added the reconnect evidence to the Live Data Energy sensors paragraph.
+- TROUBLESHOOTING.md: new section for Live Data sensors that are missing or unavailable after turning it on. Clarified how Live Data Net Power relates to the polled `...c` meter, and added the reconnect and PVS reboot test results to the Live Data Energy sensors paragraph.
 
 ## [v2026.9.5] - 2026-09-28
 

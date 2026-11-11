@@ -54,6 +54,8 @@ Enhanced SunPower is in the official HACS default store, no custom repository ne
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sunpower)
 
+**Switching from another integration?** See [Migrating from krbaker's SunPower](docs/MIGRATION.md) or [Migrating from SunStrong's PVS integration](docs/MIGRATION_FROM_SUNSTRONG.md). Both keep your history and Energy Dashboard.
+
 **During setup:** Enter your PVS IP address. Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default and recommended polling is 300 seconds. 
 
 ---
