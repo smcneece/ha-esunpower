@@ -36,6 +36,7 @@ Check your firmware: Settings, Devices and Services, Enhanced SunPower, open the
 - **WiFi WAN (Recommended):** Connect PVS to your home WiFi, find the IP in your router's DHCP leases, reserve it
 - **LAN port (Alternative):** Fixed IP `172.27.153.1`, requires VLAN isolation (LAN port runs its own DHCP server)
 - **Ethernet WAN:** Not recommended - known intermittent reliability issues on PVS6
+- **Hostname instead of IP (optional):** If you run local DNS, you can enter a hostname such as `sunpower-pvs.home.arpa` instead of an IP, so a changed PVS address only needs a DNS update. An IP with a DHCP reservation is still the simplest and most reliable setup, since a hostname adds your DNS server as one more thing that has to be up. Prefer a regular local DNS name over a `.local` (mDNS) name, which may not resolve for WebSocket Live Data.
 
 ---
 
@@ -56,7 +57,7 @@ Enhanced SunPower is in the official HACS default store, no custom repository ne
 
 **Switching from another integration?** See [Migrating from krbaker's SunPower](docs/MIGRATION.md) or [Migrating from SunStrong's PVS integration](docs/MIGRATION_FROM_SUNSTRONG.md). Both keep your history and Energy Dashboard.
 
-**During setup:** Enter your PVS IP address. Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default and recommended polling is 300 seconds. 
+**During setup:** Enter your PVS IP address (or a hostname, see Network above). Firmware version, serial number, and password are auto-detected. The 3-step wizard takes about 2 minutes. Default and recommended polling is 300 seconds. 
 
 ---
 

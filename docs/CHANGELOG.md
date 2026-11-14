@@ -3,6 +3,33 @@
 All notable changes to the Enhanced SunPower Home Assistant Integration will be documented in this file.
 
 
+## [v2026.11.2] - 2026-11-14
+
+### Improvement: PVS Host Can Be a Hostname
+
+Requested in [issue #102](https://github.com/smcneece/ha-esunpower/issues/102) by @topshelf510. Setup and Configure now accept a hostname such as `sunpower-pvs.home.arpa` for the PVS host, not only an IP address. With local DNS, a changed PVS address then only needs a DNS update instead of a Configure change. Hostnames are checked strictly (letters, digits, and hyphens, with an optional `:port`), and stored in lowercase. An IP with a DHCP reservation is still the simplest and most reliable setup. If you switch an existing install from an IP to a hostname, the first poll starts with an empty local cache, which refills on the next successful poll.
+
+### Improvement: Configure Changes Apply Without a Manual Reload
+
+Finishing Configure now reloads the integration automatically, using Home Assistant's own reload for options dialogs (`OptionsFlowWithReload`). Turning WebSocket Live Data on or off, changing the PVS address, password, polling interval, or notification settings all take effect right away, with no manual reload or restart. Finishing Configure without changing anything does not reload. The Polling Interval and Polling Enabled controls on the device page still apply live without a reload. The first time you save Configure after updating, it reloads once even if nothing changed, because the PVS address and polling interval are now also stored with the other options.
+
+### Bug Fix: Polling Interval Changed in Configure Could Be Ignored
+
+Configure saved the polling interval in one place, but the integration reads it from another first, which is where the Polling Interval control on the device page saves it. If you had ever used that control, later interval changes made in Configure were silently ignored. Both now save to the same place.
+
+### Bug Fix: Diagnostics File Included the PVS IP Address
+
+The PVS address was already redacted from the diagnostics download, but the integration entry's title ("Enhanced SunPower PVS" followed by the IP address) was not. The title is now redacted too.
+
+### Internal
+
+- The varserver client now separates request parameters with `&`. Every request today sends a single parameter, so nothing changes on the wire, but a future request with two parameters would otherwise have been sent malformed.
+- Removed the unused `async_reload_entry` function.
+
+### Documentation
+
+- TROUBLESHOOTING.md: the Live Data section now says Configure reloads the integration automatically, with a manual reload as the fallback.
+
 ## [v2026.11.1] - 2026-11-11
 
 ### Improvement: PVS Password Is Checked Before It Is Saved

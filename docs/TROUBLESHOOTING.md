@@ -219,9 +219,9 @@ This resolves the issue for the majority of affected users.
 
 ## WebSocket Live Data - Sensors Missing or Unavailable After Turning It On
 
-Turning WebSocket Live Data on (or off) in Configure does not take effect until the integration is reloaded. The live data connection is only started when the integration loads. Go to Settings, Devices & Services, open the three-dot menu on the integration, and choose Reload. A full Home Assistant restart is not needed.
+The live data connection is only started when the integration loads. Finishing Configure reloads the integration automatically, so turning Live Data on or off takes effect right away. If the sensors still don't appear, reload it by hand: Settings, Devices & Services, the three-dot menu on the integration, Reload. A full Home Assistant restart is not needed.
 
-If you see a "Live data is enabled but the WebSocket tracker is not running" warning in the log, this is why. If the sensors exist but stay Unavailable after a reload, look for a warning about `/sys/telemetryws/enable` or "has never received data" in the log, which means the PVS accepted the connection but is not broadcasting.
+If you see a "Live data is enabled but the WebSocket tracker is not running" warning in the log, a reload will fix it. If the sensors exist but stay Unavailable after a reload, look for a warning about `/sys/telemetryws/enable` or "has never received data" in the log, which means the PVS accepted the connection but is not broadcasting.
 
 ---
 

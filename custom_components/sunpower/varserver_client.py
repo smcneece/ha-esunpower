@@ -124,8 +124,10 @@ class VarserverClient:
                 return {}
 
         url = f"https://{self._host}/vars"
-        # Match pypvs payload format exactly (no & separator; always single param)
-        payload_str = "".join(f"{k}={v}" for k, v in params.items())
+        # Standard form encoding. Every call sends a single param today, which
+        # produces the same body with or without the separator, but joining
+        # with "" would silently corrupt a multi-param request (pypvs #54).
+        payload_str = "&".join(f"{k}={v}" for k, v in params.items())
 
         try:
             async with self._session.post(

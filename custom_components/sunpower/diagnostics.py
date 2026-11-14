@@ -20,7 +20,9 @@ from .const import (
 # (e.g. "Inverter E00122143004565"), a separate leak path SERIAL redaction
 # alone doesn't catch since it matches by key name, not by value content.
 # host/gateway_ip: local network addresses, not needed for troubleshooting.
-TO_REDACT = {"SERIAL", "serials", "DESCR", "host", "gateway_ip"}
+# title: the entry title is "Enhanced SunPower PVS <host>", so it carries the
+# same IP address as host.
+TO_REDACT = {"SERIAL", "serials", "DESCR", "host", "gateway_ip", "title"}
 
 
 async def async_get_config_entry_diagnostics(

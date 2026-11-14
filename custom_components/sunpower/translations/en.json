@@ -5,8 +5,8 @@
         },
         "error": {
             "cannot_connect": "Cannot Connect",
-            "connection_failed": "Failed to connect to PVS. Check IP address and network connection.",
-            "invalid_ip": "Invalid IP address format. Please enter a valid IPv4 address.",
+            "connection_failed": "Failed to connect to PVS. Check the IP address or hostname and the network connection.",
+            "invalid_host": "Not a valid IP address or hostname. Enter an IPv4 address (e.g. 192.168.1.73) or a hostname (e.g. sunpower-pvs.home.arpa), optionally followed by :port.",
             "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "unknown": "Unknown Error",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
@@ -16,13 +16,13 @@
         "step": {
             "user": {
                 "title": "Enhanced SunPower - Connection Setup",
-                "description": "Step 1: Enter your PVS IP address.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\n{error_details}\n{help_text}",
+                "description": "Step 1: Enter your PVS IP address or hostname.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\n{error_details}\n{help_text}",
                 "data": {
-                    "host": "PVS IP Address",
+                    "host": "PVS IP Address or Hostname",
                     "polling_interval": "Polling Interval (seconds)"
                 },
                 "data_description": {
-                    "host": "PVS IP address",
+                    "host": "PVS IP address, or a hostname from your local DNS",
                     "polling_interval": "How often to poll PVS (10-3600 seconds, 20s minimum for battery). Note: PVS updates gateway sensors every poll, but meter/inverter data updates every ~5min regardless."
                 }
             },
@@ -85,21 +85,21 @@
         "step": {
             "init": {
                 "title": "Enhanced SunPower - Basic Settings",
-                "description": "\u26a0\ufe0f Host IP changes take effect immediately. Other changes require restarting Home Assistant or reloading the integration.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\nSubmit to continue to Notification & Advanced settings on the next page.",
+                "description": "When you finish Configure, the integration reloads itself so your changes take effect. No restart or manual reload is needed.\n\n\u26a0\ufe0f PVS Protection: 10-second minimum polling interval (20s for battery systems). More aggressive polling = higher CPU usage & larger databases.\n\nSubmit to continue to Notification & Advanced settings on the next page.",
                 "data": {
-                    "host": "PVS IP Address",
+                    "host": "PVS IP Address or Hostname",
                     "polling_interval": "Polling Interval (seconds)",
                     "pvs_serial_last5": "PVS Serial (last 5 characters)"
                 },
                 "data_description": {
-                    "host": "PVS IP address",
+                    "host": "PVS IP address, or a hostname from your local DNS",
                     "polling_interval": "How often to poll PVS (10-3600 seconds). Note: PVS updates gateway sensors every poll, but meter/inverter data updates every ~5min regardless.",
                     "pvs_serial_last5": "Last 5 characters of PVS serial number (found on device label)"
                 }
             },
             "live_data": {
                 "title": "Enhanced SunPower - Live Data",
-                "description": "Configure WebSocket live data (new firmware only).\n\nThe PVS broadcasts real-time data on port 9002 every second. When enabled, sensors update as values change rather than waiting for the next poll.\n\nAfter turning live data on or off, reload the integration (Settings, Devices & Services, the three-dot menu, Reload) for the change to take effect.\n\n\u26a0\ufe0f SD Card Warning: 1-second sensor updates generate heavy database writes. Use SSD storage, not SD card.",
+                "description": "Configure WebSocket live data (new firmware only).\n\nThe PVS broadcasts real-time data on port 9002 every second. When enabled, sensors update as values change rather than waiting for the next poll.\n\nTurning live data on or off takes effect when you finish Configure, the integration reloads itself.\n\n\u26a0\ufe0f SD Card Warning: 1-second sensor updates generate heavy database writes. Use SSD storage, not SD card.",
                 "data": {
                     "enable_live_data": "Enable WebSocket live data",
                     "live_data_threshold": "Power change threshold",
@@ -156,7 +156,7 @@
             }
         },
         "error": {
-            "invalid_ip": "Invalid IP address format. Please enter a valid IPv4 address.",
+            "invalid_host": "Not a valid IP address or hostname. Enter an IPv4 address (e.g. 192.168.1.73) or a hostname (e.g. sunpower-pvs.home.arpa), optionally followed by :port.",
             "MAX_INTERVAL": "Polling interval cannot exceed 3600 seconds (1 hour).",
             "MIN_INTERVAL": "Polling interval must be at least 10 seconds (20 seconds for battery systems)",
             "email_recipient_required": "Email recipient is required when email service is selected",

@@ -1122,16 +1122,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "_cache": cache,
     }
 
-    # NOTE: deliberately NOT registering add_update_listener(async_reload_entry)
-    # here. This integration already calls hass.config_entries.async_update_entry()
-    # on entry.data during normal setup (sensor.py's known_inverter_serials/
-    # inverters_discovered_notified bookkeeping, synchronously while platforms
-    # are still being forwarded below). A reload-on-update-entry listener fires
-    # on that write too, mid-setup, causing a second overlapping async_setup_entry
-    # call and "already been setup" errors on every platform. Confirmed live on
-    # 2026-08-27. Fixing this properly means moving that bookkeeping out of
-    # entry.data into separate storage first; until then, Configure changes
-    # still require a manual restart or reload, same as before this release.
+    # NOTE: never register add_update_listener here. This integration calls
+    # hass.config_entries.async_update_entry() on entry.data during normal setup
+    # (sensor.py's known_inverter_serials/inverters_discovered_notified
+    # bookkeeping, while platforms are still being forwarded below). An update
+    # listener fires on that write too, mid-setup, causing a second overlapping
+    # setup and "already been setup" errors on every platform (confirmed live
+    # 2026-08-27). Home Assistant also refuses update listeners alongside
+    # OptionsFlowWithReload. Reloading after Configure is handled by
+    # SunPowerOptionsFlowHandler being an OptionsFlowWithReload instead.
 
     # Initial setup - COORDINATOR FIRST, THEN PLATFORMS
     try:
@@ -1168,9 +1167,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
-
-
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry."""
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)

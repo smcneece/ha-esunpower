@@ -1,4 +1,7 @@
+import ipaddress
 import logging
+import re
+
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -128,6 +131,43 @@ async def get_supervisor_info(host, session):
         return None, None, None, "", str(e)
 
 
+_HOSTNAME_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
+
+
+def validate_host(host_input):
+    """Return the cleaned PVS host, or None if it isn't valid.
+
+    Accepts an IPv4 address or a DNS hostname, each with an optional :port.
+    Hostnames are checked strictly (RFC 1123 labels) rather than just
+    "resolves or not", because the host also becomes part of the cache file
+    name in .storage, so characters like "/" must never get through.
+    Hostnames are lowercased so one PVS always maps to one cache file.
+    """
+    host = (host_input or "").strip()
+    if not host:
+        return None
+
+    name, sep, port = host.partition(":")
+    if sep and (not port.isdigit() or not 1 <= int(port) <= 65535):
+        return None
+    suffix = f":{port}" if sep else ""
+
+    try:
+        ipaddress.ip_address(name)
+        return name + suffix
+    except ValueError:
+        pass
+
+    name = name.lower().rstrip(".")
+    labels = name.split(".")
+    if len(name) > 253 or not all(_HOSTNAME_LABEL.match(label) for label in labels):
+        return None
+    # All-numeric names are mistyped IPs (e.g. 192.168.1.300), not hostnames.
+    if all(label.isdigit() for label in labels):
+        return None
+    return name + suffix
+
+
 async def check_pvs_password(hass, host, password):
     """Return True if the PVS at host accepts this password.
 
@@ -212,17 +252,12 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         description_placeholders = {"error_details": "", "help_text": ""}
 
         if user_input is not None:
-            # Validate IP address format
-            import ipaddress
-            host_input = user_input["host"].strip()
-            try:
-                # Handle host:port format
-                host_part = host_input.split(':')[0]
-                ipaddress.ip_address(host_part)
-            except ValueError:
-                errors["host"] = "invalid_ip"
-                description_placeholders["error_details"] = f"Invalid IP address format: {host_input}"
-                description_placeholders["help_text"] = "Enter a valid IP address (e.g., 172.27.153.1 or 192.168.1.73)"
+            host_input = validate_host(user_input["host"])
+            if host_input is None:
+                host_input = user_input["host"].strip()
+                errors["host"] = "invalid_host"
+                description_placeholders["error_details"] = f"Not a valid IP address or hostname: {host_input}"
+                description_placeholders["help_text"] = "Enter an IP address (e.g., 192.168.1.73) or a hostname (e.g., sunpower-pvs.home.arpa)"
 
             # Validate polling interval
             polling_interval = user_input["polling_interval"]
@@ -458,7 +493,17 @@ class SunPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return SunPowerOptionsFlowHandler(config_entry)
 
 
-class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
+class SunPowerOptionsFlowHandler(config_entries.OptionsFlowWithReload):
+    """Configure dialog.
+
+    OptionsFlowWithReload makes Home Assistant reload the entry itself, using
+    its own locked reload, when this flow finishes with changed options. It
+    does not fire on the entry.data writes sensor.py makes during setup, or on
+    the Polling Interval number and Polling Enabled switch, which apply live.
+    host and polling_interval are mirrored into options below so that changing
+    only those still counts as an options change and triggers the reload.
+    """
+
     def __init__(self, config_entry):
         """Initialize options flow."""
         self._basic_config = {}
@@ -468,16 +513,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
 
         if user_input is not None:
-            # Validate IP address format
-            import ipaddress
-            host_input = user_input["host"].strip()
-            try:
-                # Handle host:port format
-                host_part = host_input.split(':')[0]
-                ipaddress.ip_address(host_part)
+            host_input = validate_host(user_input["host"])
+            if host_input is None:
+                errors["host"] = "invalid_host"
+            else:
                 user_input["host"] = host_input  # Use cleaned host
-            except ValueError:
-                errors["host"] = "invalid_ip"
 
             polling_interval = user_input["polling_interval"]
 
@@ -720,6 +760,11 @@ class SunPowerOptionsFlowHandler(config_entries.OptionsFlow):
                     "email_notification_service": complete_config.get("email_notification_service"),
                     "email_notification_recipient": complete_config.get("email_notification_recipient", ""),
                     "pvs_serial_last5": complete_config.get("pvs_serial_last5", ""),
+                    # Runtime reads options["polling_interval"] before data, and
+                    # the Polling Interval number entity writes it there, so a
+                    # value saved only to data here could be silently ignored.
+                    "polling_interval": int(complete_config["polling_interval"]),
+                    "host": complete_config["host"],
                 }
 
                 # Persist live data options (new firmware only; safe to include for old firmware too)
